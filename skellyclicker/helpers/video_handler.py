@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 import os
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -8,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from skellyclicker.helpers.click_handler import ClickHandler
-from skellyclicker.helpers.data_frame_handler import DataFrameHandler, DataHandlerConfig
+from skellyclicker.helpers.data_handler import DataHandler, DataHandlerConfig
 from skellyclicker.helpers.image_annotator import ImageAnnotator, ImageAnnotatorConfig
 from skellyclicker.helpers.video_models import VideoPlaybackState, GridParameters, VideoMetadata, VideoScalingParameters
 
@@ -20,7 +21,7 @@ class VideoHandler(BaseModel):
     video_folder: str
     videos: list[VideoPlaybackState] = []
     click_handler: ClickHandler
-    data_handler: DataFrameHandler
+    data_handler: DataHandler
     grid_parameters: GridParameters
     image_annotator: ImageAnnotator = ImageAnnotator()
     frame_count: int
@@ -30,7 +31,7 @@ class VideoHandler(BaseModel):
 
         videos, grid_parameters, frame_count = cls._load_videos(video_folder, max_window_size)
 
-        data_handler = DataFrameHandler.from_config(
+        data_handler = DataHandler.from_config(
             DataHandlerConfig.from_config_file(videos=videos, config_path=data_handler_config_path)
         )
 
@@ -243,12 +244,14 @@ class VideoHandler(BaseModel):
 
         while True:
             save_data = input("Save data? (yes/no): ")
-            if save_data == "yes" or save_data == "y":
-                save_path = Path(self.video_folder).parent / "output.csv"
-                self.data_handler.save_csv(output_path=str(save_path))
+            if save_data.lower() == "yes" or save_data.lower() == "y":
+                save_path = Path(self.video_folder).parent / "skellyclicker"
+                save_path.mkdir(exist_ok=True, parents=True)
+                csv_path = save_path / (datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_skellyclicker_output.csv")
+                self.data_handler.save_csv(output_path=str(csv_path))
                 break   
             else:
-                confirmation = input("Confirm your choice: Type 'yes' to prevent data loss (yes/no): ")
+                confirmation = input("Confirm your choice: Type 'yes' to prevent data loss or 'no' to delete this session forever (yes/no): ")
                 if confirmation == "no" or confirmation == "n":
                     logger.info("Data not saved.")
                     break

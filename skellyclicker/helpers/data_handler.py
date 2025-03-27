@@ -1,11 +1,14 @@
 import json
+import logging
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from skellyclicker.helpers.video_models import VideoPlaybackState, ClickData
 
+logger = logging.getLogger(__name__)
 
 class DataHandlerConfig(BaseModel):
     num_frames: int
@@ -13,16 +16,18 @@ class DataHandlerConfig(BaseModel):
     tracked_point_names: list[str]
 
     @classmethod
-    def from_config_file(cls, videos: list[VideoPlaybackState], config_path: str | Path):
+    def from_config_file(cls, videos: list[VideoPlaybackState], config_path: str ):
 
         with open(file=Path(config_path)) as file:
             config = json.load(file)
         tracked_point_names = config["tracked_point_names"]
-        print(f"Found tracked point names in file: {tracked_point_names}")
-        return cls(num_frames=videos[0].metadata.frame_count, video_names=[video.name for video in videos], tracked_point_names=tracked_point_names)
+        logger.debug(f"Found tracked point names in file: {tracked_point_names}")
+        return cls(num_frames=videos[0].metadata.frame_count,
+                   video_names=[video.name for video in videos],
+                   tracked_point_names=tracked_point_names)
 
 
-class DataFrameHandler(BaseModel):
+class DataHandler(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     config: DataHandlerConfig
     dataframe: pd.DataFrame
@@ -54,16 +59,16 @@ class DataFrameHandler(BaseModel):
         if point_name not in self.config.tracked_point_names:
             raise ValueError(f"Point name {point_name} is not in the list of tracked points: {self.config.tracked_point_names}")
         self.active_point = point_name
-        print(f"Active point set to {self.active_point}")
+        logger.debug(f"Active point set to {self.active_point}")
 
     def move_active_point_by_index(self, index_change: int):
         current_position = self.config.tracked_point_names.index(self.active_point)
         new_position = (current_position + index_change) % len(self.config.tracked_point_names)
         self.active_point = self.config.tracked_point_names[new_position]
-        print(f"Active point set to {self.active_point}")
+        logger.debug(f"Active point set to {self.active_point}")
 
     def update_dataframe(self, click_data: ClickData):
-        video_name = self.config.video_names[click_data.video_index]
+        video_name = self.config.video_names[click_data.video_index] # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
         self.dataframe.loc[(video_name, click_data.frame_number), f"{self.active_point}_x"] = click_data.x
         self.dataframe.loc[(video_name, click_data.frame_number), f"{self.active_point}_y"] = click_data.y
 
@@ -71,7 +76,7 @@ class DataFrameHandler(BaseModel):
         for video_name in self.config.video_names:
             self.dataframe.loc[(video_name, frame_number), f"{self.active_point}_x"] = np.nan
             self.dataframe.loc[(video_name, frame_number), f"{self.active_point}_y"] = np.nan
-        print(f"Cleared point {self.active_point} for all videos, frame {frame_number}")
+        logger.debug(f"Cleared point {self.active_point} for all videos, frame {frame_number}")
 
     def get_data_by_video_frame(self, video_index: int, frame_number: int) -> dict[str, ClickData]:
         video_name = self.config.video_names[video_index]
@@ -86,12 +91,12 @@ class DataFrameHandler(BaseModel):
 
     def save_csv(self, output_path: str | Path):
         self.dataframe.to_csv(output_path)
-        print(f"Saved csv data to {output_path}")
+        logger.info(f"Saved csv data to {output_path}")
 
     def save_parquet(self, output_path: str | Path):
         # TODO: Add some useful metadata here?
         self.dataframe.to_parquet(output_path)
-        print(f"Saved parquet data to {output_path}")
+        logger.info(f"Saved parquet data to {output_path}")
 
 
 
@@ -134,14 +139,14 @@ if __name__=="__main__":
             scaling_params=scaling_params
         ))
     handler_config = DataHandlerConfig.from_config_file(videos=videos, config_path=config_file_path)
-    handler = DataFrameHandler.from_config(handler_config)
+    handler = DataHandler.from_config(handler_config)
 
     click_data = ClickData(window_x=100, window_y=100, video_x=120, video_y=100, frame_number=0, video_index=0)
     handler.update_dataframe(click_data)
     handler.set_active_point_by_name("nose")
     click_data = ClickData(window_x=100, window_y=100, video_x=70, video_y=80, frame_number=221, video_index=2)
     handler.update_dataframe(click_data)
-    print(handler.dataframe)
+    logger.debug(handler.dataframe)
     data = handler.get_data_by_video_frame(video_index=0, frame_number=0)
-    print(f"type(data): {type(data)}, data: {data}")
+    logger.debug(f"type(data): {type(data)}, data: {data}")
     handler.dataframe.to_csv("test.csv")

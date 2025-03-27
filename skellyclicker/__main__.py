@@ -10,7 +10,7 @@ from skellyclicker.helpers.video_handler import VideoHandler
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
@@ -22,7 +22,10 @@ ZOOM_MAX = 10.0
 POSITION_EPSILON = 1e-6  # Small threshold for position changes
 
 TRACKED_POINTS_JSON_PATH = Path(__file__).parent.parent / "tracked_points.json"
-
+DEMO_VIDEO_PATH = (
+        Path.home()
+        / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
+)
 if not TRACKED_POINTS_JSON_PATH.exists():
     logger.error(f"Tracked points JSON file not found: {TRACKED_POINTS_JSON_PATH}")
     exit(1)
@@ -121,7 +124,7 @@ class SkellyClicker(BaseModel):
 
         if event == cv2.EVENT_LBUTTONDOWN:
             self.video_handler.handle_clicks(
-                x, y, self.frame_number, auto_next_point=False
+                x, y, self.frame_number, auto_next_point=True
             )
         elif event == cv2.EVENT_MOUSEWHEEL:
             # Only zoom if mouse is within a valid video cell
@@ -213,10 +216,7 @@ class SkellyClicker(BaseModel):
 
 
 if __name__ == "__main__":
-    DEMO_VIDEO_PATH = (
-            Path.home()
-            / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
-    )
+
     if not DEMO_VIDEO_PATH.exists():
         logger.error(f"Demo video path not found: {DEMO_VIDEO_PATH}")
         exit(1)

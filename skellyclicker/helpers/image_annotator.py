@@ -4,14 +4,13 @@ from pydantic import BaseModel
 
 from skellyclicker.helpers.video_models import ClickData
 
-
 class ImageAnnotatorConfig(BaseModel):
     marker_type: int = cv2.MARKER_DIAMOND
-    marker_size: int = 20
-    marker_thickness: int = 2
+    marker_size: int = 10
+    marker_thickness: int = 1
 
     text_color: tuple[int, int, int] = (215, 115, 40)
-    text_size: float = 1.25
+    text_size: float = 1
     text_thickness: int = 2
     text_font: int = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -39,14 +38,14 @@ class ImageAnnotator(BaseModel):
     @property
     def short_help_text(self) -> str:
         return "H for Help, \nEsc to Quit"
-    
+
     @property
     def show_help_text(self) -> str:
         return (
             "Click on the video to add a point.\n"
             "Use 'a' and 'd' to navigate through frames.\n"
             "Use 'w' and 's' to change the active point.\n"
-            "Press 'u' to clear the data for active point\n" 
+            "Press 'u' to clear the data for active point\n"
             "for the current frame.\n"
             "Press 'H' to toggle help text.\n"
             "Press 'Esc' to quit.\n"
@@ -56,21 +55,20 @@ class ImageAnnotator(BaseModel):
     @property
     def colors(self) -> dict[str, tuple[int, int, int]]:
         np.random.seed(42)
-    
+
         hues = np.linspace(0, 1, len(self.config.tracked_points), endpoint=False)
-        
+
         # Convert HSV to RGB
         rgb_values = []
         for hue in hues:
-            # Using saturation=0.7 and value=0.95 for vibrant but not overwhelming colors
-            hsv = np.array([hue, 0.7, 0.95])
+            hsv = np.array([hue, 1, 0.95])
             rgb = self._hsv_to_rgb(hsv)
             rgb_values.append(tuple(map(int, rgb * 255)))
 
         colors = {}
         for tracked_point, color in zip(self.config.tracked_points, rgb_values):
             colors[tracked_point] = color
-        
+
         return colors
 
     def annotate_image(
@@ -92,6 +90,14 @@ class ImageAnnotator(BaseModel):
             cv2.drawMarker(
                 annotated_image,
                 position=(click.x, click.y),
+                color=(1,1,1),
+                markerType=self.config.marker_type,
+                markerSize=self.config.marker_size + 1,
+                thickness=self.config.marker_thickness+1,
+            )
+            cv2.drawMarker(
+                annotated_image,
+                position=(click.x, click.y),
                 color=self.colors[active_point],
                 markerType=self.config.marker_type,
                 markerSize=self.config.marker_size,
@@ -106,7 +112,7 @@ class ImageAnnotator(BaseModel):
                                thickness=self.config.text_thickness)
 
         return annotated_image
-    
+
     def annotate_grid(self, image: np.ndarray, active_point: str) -> np.ndarray:
         if self.config.show_help:
             help_text = self.show_help_text
@@ -117,7 +123,7 @@ class ImageAnnotator(BaseModel):
                                x=10,
                                y=(image.shape[0] // 10) * 1,
                                font_scale=self.config.text_size,
-                               color=self.config.text_color,       
+                               color=self.config.text_color,
                                thickness=self.config.text_thickness)
         self.draw_doubled_text(image=image,
                                text=help_text,
@@ -127,7 +133,7 @@ class ImageAnnotator(BaseModel):
                                color=self.config.text_color,
                                thickness=self.config.text_thickness)
         return image
-    
+
     @staticmethod
     def _hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
         """Convert HSV color to RGB."""
@@ -137,7 +143,7 @@ class ImageAnnotator(BaseModel):
         p = v * (1. - s)
         q = v * (1. - f * s)
         t = v * (1. - (1. - f) * s)
-        
+
         if hi == 0:
             return np.array([v, t, p])
         elif hi == 1:
