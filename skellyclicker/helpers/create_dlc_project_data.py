@@ -89,7 +89,7 @@ def run(path_to_recording: Path,
 if __name__ == '__main__':
 
     path_to_dlc_project_folder = Path(r"D:\deeplabcut-projects\freemocap_test_data-jon-2025-03-27")
-    path_to_image_labels_csv = Path(r"C:\Users\jonma\freemocap_data\recording_sessions\freemocap_test_data\skellyclicker\2025-03-27_10-32-49skellyclicker_output.csv")
+    path_to_image_labels_csv = Path(r"C:\Users\jonma\freemocap_data\recording_sessions\freemocap_test_data\skellyclicker\2025-03-27_14-41-58_skellyclicker_output.csv")
 
     run(path_to_recording=DEMO_VIDEO_PATH.parent,
         path_to_dlc_project_folder=path_to_dlc_project_folder,

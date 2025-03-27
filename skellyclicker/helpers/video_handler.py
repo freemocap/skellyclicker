@@ -245,7 +245,7 @@ class VideoHandler(BaseModel):
         while True:
             save_data = input("Save data? (yes/no): ")
             if save_data.lower() == "yes" or save_data.lower() == "y":
-                save_path = Path(self.video_folder).parent / "skellyclicker"
+                save_path = Path(self.video_folder).parent / "skellyclicker_data"
                 save_path.mkdir(exist_ok=True, parents=True)
                 csv_path = save_path / (datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_skellyclicker_output.csv")
                 self.data_handler.save_csv(output_path=str(csv_path))
