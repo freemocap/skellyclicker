@@ -1,0 +1,12 @@
+[project]
+name = "skellyclicker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.2.4",
+    "opencv-contrib-python>=4.11.0.86",
+    "pandas>=2.2.3",
+    "pydantic>=2.10.6",
+]
