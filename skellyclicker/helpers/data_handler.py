@@ -25,6 +25,18 @@ class DataHandlerConfig(BaseModel):
         return cls(num_frames=videos[0].metadata.frame_count,
                    video_names=[video.name for video in videos],
                    tracked_point_names=tracked_point_names)
+    
+    @classmethod
+    def from_dataframe(cls, dataframe: pd.DataFrame):
+        tracked_point_names = set()
+        for name in dataframe.columns:
+            name = name.strip("_x").strip("_y")
+            tracked_point_names.add(name)
+        tracked_point_names = list(tracked_point_names)
+        logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
+        return cls(num_frames=dataframe.index.get_level_values("frame").max(),
+                   video_names=dataframe.index.get_level_values("video").unique().tolist(),
+                   tracked_point_names=tracked_point_names)
 
 
 class DataHandler(BaseModel):
@@ -36,6 +48,14 @@ class DataHandler(BaseModel):
     @classmethod
     def from_config(cls, config: DataHandlerConfig):
         dataframe = cls._create_dataframe(config)
+        return cls(config=config, dataframe=dataframe, active_point=config.tracked_point_names[0])
+
+    @classmethod    
+    def from_csv(cls, input_path: str | Path):
+        dataframe = pd.read_csv(input_path)
+        dataframe = dataframe.set_index(["video", "frame"])
+
+        config = DataHandlerConfig.from_dataframe(dataframe)
         return cls(config=config, dataframe=dataframe, active_point=config.tracked_point_names[0])
 
     @staticmethod

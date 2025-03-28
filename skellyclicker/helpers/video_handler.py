@@ -27,13 +27,18 @@ class VideoHandler(BaseModel):
     frame_count: int
 
     @classmethod
-    def from_folder(cls, video_folder: str, max_window_size: tuple[int, int], data_handler_config_path: str):
+    def from_folder(cls, video_folder: str, max_window_size: tuple[int, int], data_handler_path: str):
 
         videos, grid_parameters, frame_count = cls._load_videos(video_folder, max_window_size)
 
-        data_handler = DataHandler.from_config(
-            DataHandlerConfig.from_config_file(videos=videos, config_path=data_handler_config_path)
-        )
+        if Path(data_handler_path).suffix == ".json":
+            data_handler = DataHandler.from_config(
+                DataHandlerConfig.from_config_file(videos=videos, config_path=data_handler_path)
+            )
+        elif Path(data_handler_path).suffix == ".csv":
+            data_handler = DataHandler.from_csv(data_handler_path)
+        else:
+            raise ValueError(f"Invalid data handler file: {data_handler_path}")
 
         image_annotator = ImageAnnotator(
             config=ImageAnnotatorConfig(

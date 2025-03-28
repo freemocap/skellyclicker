@@ -43,24 +43,24 @@ class SkellyClicker(BaseModel):
     zoom_center: tuple[int, int] = (0, 0)
     active_cell: tuple[int, int] | None = None  # Track which cell the mouse is in
     last_mouse_position: tuple[int, int] | None = None
+    show_help: bool = False
+
     @classmethod
     def create(
             cls,
             video_folder: str,
             max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
-            data_handler_config_path: str = TRACKED_POINTS_JSON_PATH,
+            data_handler_path: str = TRACKED_POINTS_JSON_PATH,
     ):
         return cls(
             video_handler=VideoHandler.from_folder(
                 video_folder = video_folder,
                 max_window_size = max_window_size,
-                data_handler_config_path = data_handler_config_path,
+                data_handler_path = data_handler_path,
             ),
             video_folder=video_folder,
             max_window_size=max_window_size,
         )
-
-    show_help: bool = False
 
     @property
     def frame_count(self):
@@ -208,20 +208,33 @@ class SkellyClicker(BaseModel):
                 )
                 cv2.imshow(str(self.video_folder), grid_image)
                 if self.is_playing:
-                    self.frame_number = (
-                                                self.frame_number + self.step_size
-                                        ) % self.frame_count
+                    self.frame_number = (self.frame_number + self.step_size) % self.frame_count
         finally:
             self.video_handler.close()
 
 
 if __name__ == "__main__":
+    # if not DEMO_VIDEO_PATH.exists():
+    #     logger.error(f"Demo video path not found: {DEMO_VIDEO_PATH}")
+    #     exit(1)
+    # try:
+    #     viewer = SkellyClicker.create(video_folder=str(DEMO_VIDEO_PATH))
+    #     viewer.run()
+    # except Exception as e:
+    #     logger.error(f"Fatal error: {str(e)}", exc_info=True)
+    
+    video_path = "/Users/philipqueen/test_ferrets"
+    # video_path = DEMO_VIDEO_PATH
 
-    if not DEMO_VIDEO_PATH.exists():
-        logger.error(f"Demo video path not found: {DEMO_VIDEO_PATH}")
+    if not Path(video_path).exists():
+        logger.error(f"Video path not found: {video_path}")
         exit(1)
-    try:
-        viewer = SkellyClicker.create(video_folder=str(DEMO_VIDEO_PATH))
-        viewer.run()
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}", exc_info=True)
+    
+    # To label a new session:
+    # data_path = TRACKED_POINTS_JSON_PATH
+
+    # To continue labeling an existing session:
+    data_path = "/Users/philipqueen/skellyclicker_data/2025-03-27_16-35-43_skellyclicker_output.csv"
+
+    viewer = SkellyClicker.create(video_folder=video_path, data_handler_path=data_path)
+    viewer.run()
