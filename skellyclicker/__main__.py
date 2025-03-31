@@ -103,7 +103,7 @@ class SkellyClicker(BaseModel):
             self._zoom(
                     self.last_mouse_position[0],
                     self.last_mouse_position[1],
-                    flags=1,
+                    flags=flags,
                     cell_x=self.active_cell[0],
                     cell_y=self.active_cell[1],
                 )
@@ -189,8 +189,7 @@ class SkellyClicker(BaseModel):
                 video.zoom_state.scale *= 1.1
             else:  # Scroll down to zoom out
                 video.zoom_state.scale /= 1.1
-
-                # Keep zoom scale within reasonable limits
+            # Keep zoom scale within reasonable limits
             video.zoom_state.scale = np.clip(video.zoom_state.scale, 1.0, 10.0)
 
     def run(self):
