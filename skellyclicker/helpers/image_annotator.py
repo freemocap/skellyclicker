@@ -45,6 +45,8 @@ class ImageAnnotator(BaseModel):
             "Click on the video to add a point.\n"
             "Use 'a' and 'd' to navigate through frames.\n"
             "Use 'w' and 's' to change the active point.\n"
+            "Use 'e' to zoom in and 'q' to zoom out.\n"
+            "Use 'r' to reset the zoom.\n"
             "Press 'u' to clear the data for active point\n"
             "for the current frame.\n"
             "Press 'H' to toggle help text.\n"

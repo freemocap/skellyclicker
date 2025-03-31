@@ -74,13 +74,13 @@ class SkellyClicker(BaseModel):
         elif key == ord("r"):  # reset zoom
             for video in self.video_handler.videos:
                 video.zoom_state.reset()
-        elif key == ord("a"):  # Left arrow
+        elif key == ord("a"):
             self._jump_n_frames(-1)
-        elif key == ord("d"):  # Right arrow
+        elif key == ord("d"):
             self._jump_n_frames(1)
-        elif key == ord("w"):  # Up arrow
+        elif key == ord("w"):
             self.video_handler.move_active_point_by_index(index_change=-1)
-        elif key == ord("s"):  # Down arrow
+        elif key == ord("s"):
             self.video_handler.move_active_point_by_index(index_change=1)
         elif key == ord("q"):
             if self.active_cell is not None and self.last_mouse_position is not None:
@@ -104,7 +104,9 @@ class SkellyClicker(BaseModel):
             self.show_help = not self.show_help
             self.video_handler.image_annotator.config.show_help = self.show_help
         elif key == ord("u"):
-            self.video_handler.data_handler.clear_current_point(self.frame_number)
+            if self.active_cell is not None:
+                video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
+            self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
         return True
 
     def _jump_n_frames(self, num_frames: int = 1):
