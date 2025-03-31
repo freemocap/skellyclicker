@@ -63,7 +63,11 @@ class VideoHandler(BaseModel):
     def _load_videos(cls, video_folder: str, max_window_size: tuple[int, int]) -> tuple[
         list[VideoPlaybackState], GridParameters, int]:
         """Load all videos from the folder and calculate their scaling parameters."""
-        video_files = [f for f in os.listdir(video_folder) if mimetypes.guess_type(f)[0].startswith('video')]
+        video_files = []
+        for file in os.listdir(video_folder):
+            mime_type = mimetypes.guess_type(file)[0]
+            if mime_type and mime_type.startswith('video'):
+                video_files.append(file)
         video_paths = [str(Path(video_folder) / filename) for filename in video_files]
 
         grid_parameters = GridParameters.calculate(video_count=len(video_paths),
