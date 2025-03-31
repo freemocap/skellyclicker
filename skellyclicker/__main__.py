@@ -216,6 +216,8 @@ class SkellyClicker(BaseModel):
                 if self.is_playing:
                     self.frame_number = (self.frame_number + self.step_size) % self.frame_count
         finally:
+            cv2.destroyAllWindows()
+            cv2.waitKey(1)
             self.video_handler.close()
 
 
