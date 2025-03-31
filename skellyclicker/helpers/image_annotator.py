@@ -49,6 +49,7 @@ class ImageAnnotator(BaseModel):
             "Use 'r' to reset the zoom.\n"
             "Press 'u' to clear the data for active point\n"
             "for the current frame.\n"
+            "Press 'c' to toggle auto next point.\n"
             "Press 'H' to toggle help text.\n"
             "Press 'Esc' to quit.\n"
             "You will be prompted to save the data in the terminal."

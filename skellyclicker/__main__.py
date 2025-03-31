@@ -44,6 +44,8 @@ class SkellyClicker(BaseModel):
     active_cell: tuple[int, int] | None = None  # Track which cell the mouse is in
     last_mouse_position: tuple[int, int] | None = None
     show_help: bool = False
+    auto_next_point: bool = True
+
 
     @classmethod
     def create(
@@ -83,31 +85,33 @@ class SkellyClicker(BaseModel):
         elif key == ord("s"):
             self.video_handler.move_active_point_by_index(index_change=1)
         elif key == ord("q"):
-            if self.active_cell is not None and self.last_mouse_position is not None:
-                self._zoom(
-                    self.last_mouse_position[0],
-                    self.last_mouse_position[1],
-                    flags=-1,
-                    cell_x=self.active_cell[0],
-                    cell_y=self.active_cell[1],
-                )
+            self.keyboard_zoom(zoom_in=False) # Zoom out
         elif key == ord("e"):
-            if self.active_cell is not None and self.last_mouse_position is not None:
-                self._zoom(
+            self.keyboard_zoom(zoom_in=True)
+        elif key == ord("h"):
+            self.show_help = not self.show_help
+            self.video_handler.image_annotator.config.show_help = self.show_help
+        elif key == ord("u"):
+            self.clear_current_point()
+        elif key == ord("c"):
+            self.auto_next_point = not self.auto_next_point
+        return True
+
+    def keyboard_zoom(self, zoom_in: bool = True):
+        flags = 1 if zoom_in else -1
+        if self.active_cell is not None and self.last_mouse_position is not None:
+            self._zoom(
                     self.last_mouse_position[0],
                     self.last_mouse_position[1],
                     flags=1,
                     cell_x=self.active_cell[0],
                     cell_y=self.active_cell[1],
                 )
-        elif key == ord("h"):
-            self.show_help = not self.show_help
-            self.video_handler.image_annotator.config.show_help = self.show_help
-        elif key == ord("u"):
-            if self.active_cell is not None:
-                video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
-            self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
-        return True
+
+    def clear_current_point(self):
+        if self.active_cell is not None:
+            video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
+        self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
 
     def _jump_n_frames(self, num_frames: int = 1):
         self.is_playing = False
@@ -126,7 +130,7 @@ class SkellyClicker(BaseModel):
 
         if event == cv2.EVENT_LBUTTONDOWN:
             self.video_handler.handle_clicks(
-                x, y, self.frame_number, auto_next_point=True
+                x, y, self.frame_number, auto_next_point=self.auto_next_point
             )
         elif event == cv2.EVENT_MOUSEWHEEL:
             # Only zoom if mouse is within a valid video cell
