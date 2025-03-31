@@ -70,20 +70,17 @@ class VideoHandler(BaseModel):
                 video_files.append(file)
         video_paths = [str(Path(video_folder) / filename) for filename in video_files]
 
-        grid_parameters = GridParameters.calculate(video_count=len(video_paths),
-                                                   max_window_size=max_window_size
-                                                   )
         if not video_files:
             raise ValueError(f"No videos found in {video_folder}")
 
-        videos = []
+        videos: list[VideoPlaybackState] = []
         image_counts = set()
 
         for video_name, video_path in zip(video_files, video_paths):
             cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
                 raise ValueError(f"Could not open video: {video_path}")
-
+            
             metadata = VideoMetadata(
                 path=video_path,
                 name=video_name,
@@ -94,17 +91,24 @@ class VideoHandler(BaseModel):
 
             image_counts.add(metadata.frame_count)
 
-            scaling_params = cls._calculate_scaling_parameters(
-                metadata.width,
-                metadata.height,
-                grid_parameters.cell_size
-            )
-
             videos.append(VideoPlaybackState(
                 metadata=metadata,
                 cap=cap,
-                scaling_params=scaling_params
+                scaling_params=None
             ))
+
+        grid_parameters = GridParameters.calculate(videos=videos,
+                                            max_window_size=max_window_size
+                                            )
+
+        for video in videos:
+            scaling_params = cls._calculate_scaling_parameters(
+                video.metadata.width,
+                video.metadata.height,
+                grid_parameters.cell_size
+            )
+
+            video.scaling_params = scaling_params
 
         if len(image_counts) > 1:
             raise ValueError("All videos must have the same number of images")

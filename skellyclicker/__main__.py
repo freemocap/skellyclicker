@@ -52,7 +52,7 @@ class SkellyClicker(BaseModel):
             cls,
             video_folder: str,
             max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
-            data_handler_path: str = TRACKED_POINTS_JSON_PATH,
+            data_handler_path: str = str(TRACKED_POINTS_JSON_PATH),
     ):
         return cls(
             video_handler=VideoHandler.from_folder(

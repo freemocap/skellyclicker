@@ -1,28 +1,34 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 import cv2
+import math
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 
 class VideoScalingParameters(BaseModel):
     """Parameters for scaling and positioning video frames in the grid."""
+
     scale: float
     x_offset: int
     y_offset: int
     scaled_width: int
     scaled_height: int
 
+
 class VideoMetadata(BaseModel):
     """Metadata about a video file."""
+
     path: str
     name: str
     width: int
     height: int
     frame_count: int
 
+
 class ZoomState(BaseModel):
     """State of the zoom for a video."""
+
     scale: float = 1.0
     center_x: int = 0
     center_y: int = 0
@@ -32,23 +38,29 @@ class ZoomState(BaseModel):
         self.center_x = 0
         self.center_y = 0
 
+
 class VideoPlaybackState(BaseModel):
     """Current state of video playback."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     metadata: VideoMetadata
     cap: cv2.VideoCapture
-    current_frame: np.ndarray|None = None
-    processed_frame: np.ndarray|None = None
-    scaling_params: VideoScalingParameters|None = None # rescale info to put it within the grid
-    zoom_state: ZoomState = ZoomState() # how much the user has zoomed in on the video
+    current_frame: np.ndarray | None = None
+    processed_frame: np.ndarray | None = None
+    scaling_params: VideoScalingParameters | None = (
+        None  # rescale info to put it within the grid
+    )
+    zoom_state: ZoomState = ZoomState()  # how much the user has zoomed in on the video
 
     @property
     def name(self) -> str:
         return self.metadata.name
 
+
 class ClickData(BaseModel):
     """Data associated with a mouse click."""
+
     window_x: int
     window_y: int
     video_x: int
@@ -64,8 +76,10 @@ class ClickData(BaseModel):
     def y(self) -> int:
         return int(self.video_y)
 
+
 class GridParameters(BaseModel):
     """Parameters defining the video grid layout."""
+
     rows: int
     columns: int
     cell_width: int
@@ -81,24 +95,56 @@ class GridParameters(BaseModel):
     def grid_size(self) -> Tuple[int, int]:
         return self.rows, self.columns
 
+
     @classmethod
-    def calculate(cls, video_count: int, max_window_size: Tuple[int, int]) -> "GridParameters":
-        """Calculate grid parameters based on video count and window constraints."""
-        # TODO: have this use the video size to fit the videos tighter
+    def calculate(
+        cls, videos: list[VideoPlaybackState], max_window_size: Tuple[int, int]
+    ) -> "GridParameters":
+        """Calculate grid parameters based on video sizes and window constraints."""
         max_width, max_height = max_window_size
+        
+        avg_width = sum(video.metadata.width for video in videos) / len(videos)
+        avg_height = sum(video.metadata.height for video in videos) / len(videos)
 
-        # Calculate grid dimensions
-        grid_size = int(np.ceil(np.sqrt(video_count)))
-
+        avg_aspect_ratio = avg_width / avg_height
+        
+        # make initial estimate
+        num_rows = round(math.sqrt(len(videos) * avg_aspect_ratio))
+        num_columns = math.ceil(len(videos) / num_rows)
+ 
+        # make sure all videos fit
+        while num_rows * num_columns < len(videos):
+            if avg_aspect_ratio > 1:
+                num_rows += 1
+            else:
+                num_colums += 1
+                
+        # remove empty space where possible
+        while num_rows * num_columns > len(videos):
+            if avg_aspect_ratio < 1: # remove rows first for vertical videos
+                if (num_rows - 1) * num_columns >= len(videos):
+                    num_rows -= 1
+                elif num_rows * (num_columns - 1) >= len(videos):
+                    num_columns -= 1
+                else:
+                    break
+            else: # remove columns first for horizontal videos
+                if num_rows * (num_columns - 1) >= len(videos):
+                    num_columns -= 1
+                elif (num_rows - 1) * num_columns >= len(videos):
+                    num_rows -= 1
+                else:
+                    break
+    
         # Calculate cell size
-        cell_width = max_width // grid_size
-        cell_height = max_height // grid_size
+        cell_width = max_width // num_columns
+        cell_height = max_height // num_rows
 
         return cls(
-            rows=grid_size,
-            columns=grid_size,
+            rows=num_rows,
+            columns=num_columns,
             cell_width=cell_width,
             cell_height=cell_height,
-            total_width=cell_width * grid_size,
-            total_height=cell_height * grid_size
+            total_width=cell_width * num_columns,
+            total_height=cell_height * num_rows,
         )
