@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from skellyclicker.helpers.video_models import ClickData
 
+
 class ImageAnnotatorConfig(BaseModel):
     marker_type: int = cv2.MARKER_DIAMOND
     marker_size: int = 10
@@ -15,7 +16,9 @@ class ImageAnnotatorConfig(BaseModel):
     text_font: int = cv2.FONT_HERSHEY_SIMPLEX
 
     show_help: bool = False
+    show_names: bool = True
     tracked_points: list[str] = []
+
 
 class ImageAnnotator(BaseModel):
     config: ImageAnnotatorConfig = ImageAnnotatorConfig()
@@ -50,6 +53,7 @@ class ImageAnnotator(BaseModel):
             "for the current frame.\n"
             "Press 'c' to toggle auto next point.\n"
             "Press 'm' to toggle machine labels.\n"
+            "Press 'n' to toggle point name visibility.\n"
             "Press 'H' to toggle help text.\n"
             "Press 'Esc' to quit.\n"
             "You will be prompted to save the data in the terminal."
@@ -93,10 +97,10 @@ class ImageAnnotator(BaseModel):
             cv2.drawMarker(
                 annotated_image,
                 position=(click.x, click.y),
-                color=(1,1,1),
+                color=(1, 1, 1),
                 markerType=self.config.marker_type,
                 markerSize=self.config.marker_size + 1,
-                thickness=self.config.marker_thickness+1,
+                thickness=self.config.marker_thickness + 1,
             )
             cv2.drawMarker(
                 annotated_image,
@@ -106,6 +110,16 @@ class ImageAnnotator(BaseModel):
                 markerSize=self.config.marker_size,
                 thickness=self.config.marker_thickness,
             )
+            if self.config.show_names:
+                self.draw_doubled_text(image=annotated_image,
+                                       text=active_point,
+                                       x=click.x + 5,
+                                       y=click.y - 5,
+                                       font_scale=self.config.text_size * .5,
+                                       color=self.colors[active_point],
+                                       thickness=1,
+                                       )
+
         self.draw_doubled_text(image=annotated_image,
                                text=f"Frame Number: {frame_number}, \nClick Count: {len(click_data)}",
                                x=text_offset,

@@ -45,6 +45,7 @@ class SkellyClicker(BaseModel):
     last_mouse_position: tuple[int, int] | None = None
     show_help: bool = False
     auto_next_point: bool = True
+    show_names: bool = True
 
 
     @classmethod
@@ -99,6 +100,8 @@ class SkellyClicker(BaseModel):
             self.auto_next_point = not self.auto_next_point
         elif key == ord("m"):
             self.video_handler.show_machine_labels = not self.video_handler.show_machine_labels
+        elif key == ord("n"):
+            self.video_handler.image_annotator.config.show_names = not self.video_handler.image_annotator.config.show_names
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
@@ -248,8 +251,8 @@ if __name__ == "__main__":
     # data_path = "/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_11-54-23_skellyclicker_output.csv"
 
     # display machine labels (DLC predictions)
-    # machine_labels_path = None
-    machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
+    machine_labels_path = None
+    # machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
 
 
     viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)
