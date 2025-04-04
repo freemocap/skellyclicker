@@ -1,0 +1,2 @@
+PointNameString = str
+VideoNameString = str

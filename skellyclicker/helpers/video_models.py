@@ -5,6 +5,8 @@ import math
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
+from skellyclicker.skellyclicker_types import VideoNameString
+
 
 class VideoScalingParameters(BaseModel):
     """Parameters for scaling and positioning video frames in the grid."""
@@ -98,13 +100,15 @@ class GridParameters(BaseModel):
 
     @classmethod
     def calculate(
-        cls, videos: list[VideoPlaybackState], max_window_size: Tuple[int, int]
+        cls,
+            videos: dict[VideoNameString, VideoPlaybackState],
+            max_window_size: Tuple[int, int]
     ) -> "GridParameters":
         """Calculate grid parameters based on video sizes and window constraints."""
         max_width, max_height = max_window_size
         
-        avg_width = sum(video.metadata.width for video in videos) / len(videos)
-        avg_height = sum(video.metadata.height for video in videos) / len(videos)
+        avg_width = sum(video.metadata.width for video in videos.values()) / len(videos)
+        avg_height = sum(video.metadata.height for video in videos.values()) / len(videos)
 
         avg_aspect_ratio = avg_width / avg_height
         
@@ -117,7 +121,7 @@ class GridParameters(BaseModel):
             if avg_aspect_ratio > 1:
                 num_rows += 1
             else:
-                num_colums += 1
+                num_columns += 1
                 
         # remove empty space where possible
         while num_rows * num_columns > len(videos):

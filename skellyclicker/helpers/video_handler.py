@@ -12,6 +12,7 @@ from skellyclicker.helpers.click_handler import ClickHandler
 from skellyclicker.helpers.data_handler import DataHandler, DataHandlerConfig
 from skellyclicker.helpers.image_annotator import ImageAnnotator, ImageAnnotatorConfig
 from skellyclicker.helpers.video_models import VideoPlaybackState, GridParameters, VideoMetadata, VideoScalingParameters
+from skellyclicker.skellyclicker_types import VideoNameString
 
 logger = logging.getLogger(__name__)
 from copy import deepcopy
@@ -19,7 +20,7 @@ from copy import deepcopy
 
 class VideoHandler(BaseModel):
     video_folder: str
-    videos: list[VideoPlaybackState] = []
+    videos: dict[VideoNameString, VideoPlaybackState] = []
     click_handler: ClickHandler
     data_handler: DataHandler
     grid_parameters: GridParameters
@@ -30,7 +31,11 @@ class VideoHandler(BaseModel):
     machine_labels_annotator: ImageAnnotator | None
 
     @classmethod
-    def from_folder(cls, video_folder: str, max_window_size: tuple[int, int], data_handler_path: str, machine_labels_path: str | None = None):
+    def from_folder(cls,
+                    video_folder: str,
+                    max_window_size: tuple[int, int],
+                    data_handler_path: str,
+                    machine_labels_path: str | None = None):
 
         videos, grid_parameters, frame_count = cls._load_videos(video_folder, max_window_size)
 
@@ -42,7 +47,7 @@ class VideoHandler(BaseModel):
             data_handler = DataHandler.from_csv(data_handler_path)
         else:
             raise ValueError(f"Invalid data handler file: {data_handler_path}")
-        
+
         if machine_labels_path:
             machine_labels_handler = DataHandler.from_csv(machine_labels_path)
             machine_labels_annotator = ImageAnnotator(config=ImageAnnotatorConfig(
@@ -78,8 +83,10 @@ class VideoHandler(BaseModel):
         )
 
     @classmethod
-    def _load_videos(cls, video_folder: str, max_window_size: tuple[int, int]) -> tuple[
-        list[VideoPlaybackState], GridParameters, int]:
+    def _load_videos(cls,
+                     video_folder: str,
+                     max_window_size: tuple[int, int]) -> tuple[
+        dict[VideoNameString, VideoPlaybackState], GridParameters, int]:
         """Load all videos from the folder and calculate their scaling parameters."""
         video_files = []
         for file in os.listdir(video_folder):
@@ -91,14 +98,14 @@ class VideoHandler(BaseModel):
         if not video_files:
             raise ValueError(f"No videos found in {video_folder}")
 
-        videos: list[VideoPlaybackState] = []
+        videos: dict[VideoNameString, VideoPlaybackState] = {}
         image_counts = set()
 
         for video_name, video_path in zip(video_files, video_paths):
             cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
                 raise ValueError(f"Could not open video: {video_path}")
-            
+
             metadata = VideoMetadata(
                 path=video_path,
                 name=video_name,
@@ -109,17 +116,17 @@ class VideoHandler(BaseModel):
 
             image_counts.add(metadata.frame_count)
 
-            videos.append(VideoPlaybackState(
+            videos[video_name] = (VideoPlaybackState(
                 metadata=metadata,
                 cap=cap,
                 scaling_params=None
             ))
 
         grid_parameters = GridParameters.calculate(videos=videos,
-                                            max_window_size=max_window_size
-                                            )
+                                                   max_window_size=max_window_size
+                                                   )
 
-        for video in videos:
+        for video in videos.values():
             scaling_params = cls._calculate_scaling_parameters(
                 video.metadata.width,
                 video.metadata.height,
@@ -134,11 +141,10 @@ class VideoHandler(BaseModel):
         return videos, grid_parameters, image_counts.pop()
 
     @staticmethod
-    def _calculate_scaling_parameters(
-            orig_width: int,
-            orig_height: int,
-            cell_size: tuple[int, int]
-    ) -> VideoScalingParameters:
+    def _calculate_scaling_parameters(orig_width: int,
+                                      orig_height: int,
+                                      cell_size: tuple[int, int]
+                                      ) -> VideoScalingParameters:
         """Calculate scaling parameters for a video to fit in a grid cell."""
         cell_width, cell_height = cell_size
 
@@ -160,11 +166,12 @@ class VideoHandler(BaseModel):
             scaled_height=scaled_height
         )
 
-    def prepare_single_image(self, image: np.ndarray, frame_number: int, scaling_params: VideoScalingParameters) -> np.ndarray:
+    def prepare_single_image(self, image: np.ndarray, frame_number: int,
+                             scaling_params: VideoScalingParameters) -> np.ndarray:
         """Process a video image - resize and add overlays."""
         if image is None:
             return np.zeros(self.grid_parameters.cell_size + (3,), dtype=np.uint8)
-        
+
         # Resize image
         resized = cv2.resize(image, (scaling_params.scaled_width, scaling_params.scaled_height))
 
@@ -178,7 +185,7 @@ class VideoHandler(BaseModel):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         return padded
-    
+
     def handle_clicks(self, x: int, y: int, frame_number: int, auto_next_point: bool = False):
         click_data = self.click_handler.process_click(x, y, frame_number)
         if click_data is None:
@@ -191,17 +198,16 @@ class VideoHandler(BaseModel):
     def move_active_point_by_index(self, index_change: int):
         self.data_handler.move_active_point_by_index(index_change=index_change)
 
-
     def create_grid_image(self, frame_number: int, annotate_images: bool) -> np.ndarray:
         """Create a grid of video images."""
         # Create a deep copy of video states to prevent race conditions
-        video_states = [deepcopy(video.zoom_state) for video in self.videos]
+        video_states = [deepcopy(video.zoom_state) for video in self.videos.values()]
 
         grid_image = np.zeros((self.grid_parameters.total_height,
                                self.grid_parameters.total_width,
                                3), dtype=np.uint8)
 
-        for video_index, (video, zoom_state) in enumerate(zip(self.videos, video_states)):
+        for video_index, (video, zoom_state) in enumerate(zip(self.videos.values(), video_states)):
             # Calculate grid position
             row = video_index // self.grid_parameters.columns
             col = video_index % self.grid_parameters.columns
@@ -212,16 +218,17 @@ class VideoHandler(BaseModel):
 
             if success:
                 if annotate_images:
-                    image = self.image_annotator.annotate_image(
+                    image = self.image_annotator.annotate_single_image(
                         image,
-                        click_data=self.data_handler.get_data_by_video_frame(video_index=video_index, frame_number=frame_number),
-                        frame_number=frame_number
+                        click_data=self.data_handler.get_data_by_video_frame(video_index=video_index,
+                                                                             frame_number=frame_number),
+                        active_point=self.data_handler.active_point,
                     )
                     if self.show_machine_labels and self.machine_labels_handler is not None and self.machine_labels_annotator is not None:
-                        image = self.machine_labels_annotator.annotate_image(
+                        image = self.machine_labels_annotator.annotate_single_image(
                             image,
-                            click_data=self.machine_labels_handler.get_data_by_video_frame(video_index=video_index, frame_number=frame_number),
-                            frame_number=frame_number
+                            click_data=self.machine_labels_handler.get_data_by_video_frame(video_index=video_index,
+                                                                                           frame_number=frame_number),
                         )
 
                 if zoom_state.scale > 1.0:
@@ -233,8 +240,10 @@ class VideoHandler(BaseModel):
                     zoomed = cv2.resize(image, (zoomed_width, zoomed_height))
 
                     # Calculate the relative position within the actual image area
-                    relative_x = (zoom_state.center_x - video.scaling_params.x_offset) / video.scaling_params.scaled_width
-                    relative_y = (zoom_state.center_y - video.scaling_params.y_offset) / video.scaling_params.scaled_height
+                    relative_x = (
+                                         zoom_state.center_x - video.scaling_params.x_offset) / video.scaling_params.scaled_width
+                    relative_y = (
+                                         zoom_state.center_y - video.scaling_params.y_offset) / video.scaling_params.scaled_height
                     # Calculate the center point in the zoomed image
                     center_x = int(relative_x * zoomed_width)
                     center_y = int(relative_y * zoomed_height)
@@ -271,12 +280,14 @@ class VideoHandler(BaseModel):
                 except ValueError as e:
                     logger.error(f"Error placing image in grid: {e}")
 
-        return self.image_annotator.annotate_grid(image=grid_image, active_point=self.data_handler.active_point)
+        return self.image_annotator.annotate_image_grid(image=grid_image,
+                                                        active_point=self.data_handler.active_point,
+                                                        frame_number=frame_number)
 
     def close(self):
         """Clean up resources."""
         logger.info("VideoHandler closing")
-        for video in self.videos:
+        for video in self.videos.values():
             video.cap.release()
 
         while True:
@@ -286,10 +297,10 @@ class VideoHandler(BaseModel):
                 save_path.mkdir(exist_ok=True, parents=True)
                 csv_path = save_path / (datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_skellyclicker_output.csv")
                 self.data_handler.save_csv(output_path=str(csv_path))
-                break   
+                break
             else:
-                confirmation = input("Confirm your choice: Type 'yes' to prevent data loss or 'no' to delete this session forever (yes/no): ")
-                if confirmation == "no" or confirmation == "n":
+                confirmation = input(
+                    "Confirm your choice: Type 'yes' to prevent data loss or 'no' to delete this session forever (yes/no): ")
+                if confirmation.lower() == "no" or confirmation.lower() == "n":
                     logger.info("Data not saved.")
                     break
-

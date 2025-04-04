@@ -116,8 +116,11 @@ class SkellyClicker(BaseModel):
                 )
 
     def clear_current_point(self):
+        video_index = None
         if self.active_cell is not None:
             video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
+        if not video_index:
+            return
         self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
 
     def _jump_n_frames(self, num_frames: int = 1):

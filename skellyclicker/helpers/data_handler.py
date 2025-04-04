@@ -7,6 +7,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 from skellyclicker.helpers.video_models import VideoPlaybackState, ClickData
+from skellyclicker.skellyclicker_types import VideoNameString, PointNameString
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class DataHandlerConfig(BaseModel):
     tracked_point_names: list[str]
 
     @classmethod
-    def from_config_file(cls, videos: list[VideoPlaybackState], config_path: str):
+    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackState], config_path: str):
 
         with open(file=Path(config_path)) as file:
             config = json.load(file)
@@ -44,11 +45,14 @@ class DataHandlerConfig(BaseModel):
         )
 
 
+
+
+
 class DataHandler(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     config: DataHandlerConfig
     dataframe: pd.DataFrame
-    active_point: str
+    active_point: dict[VideoNameString, PointNameString]
 
     @classmethod
     def from_config(cls, config: DataHandlerConfig):
@@ -104,9 +108,8 @@ class DataHandler(BaseModel):
         logger.debug(f"Active point set to {self.active_point}")
 
     def update_dataframe(self, click_data: ClickData):
-        video_name = self.config.video_names[
-            click_data.video_index
-        ]  # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
+        video_name = self.config.video_names[click_data.video_index]
+        # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
         self.dataframe.loc[
             (video_name, click_data.frame_number), f"{self.active_point}_x"
         ] = click_data.x
@@ -166,7 +169,7 @@ if __name__ == "__main__":
     ).glob("*.mp4")
     config_file_path = Path("../../tracked_points.json")
 
-    videos = []
+    _videos = []
     image_counts = set()
 
     for video_path in video_paths:
@@ -192,13 +195,13 @@ if __name__ == "__main__":
             scaled_height=metadata.height,
         )
 
-        videos.append(
+        _videos.append(
             VideoPlaybackState(
                 metadata=metadata, cap=cap, scaling_params=scaling_params
             )
         )
     handler_config = DataHandlerConfig.from_config_file(
-        videos=videos, config_path=config_file_path
+        videos=_videos, config_path=config_file_path
     )
     handler = DataHandler.from_config(handler_config)
 
