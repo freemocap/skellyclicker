@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
     # display machine labels (DLC predictions)
     # machine_labels_path = None
-    machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/skellyclicker_output_iteration_0.csv"
+    machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
 
 
     viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)

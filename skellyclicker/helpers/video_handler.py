@@ -49,13 +49,6 @@ class VideoHandler(BaseModel):
                 marker_type=cv2.MARKER_CROSS,
                 marker_size=10,
                 marker_thickness=1,
-
-                text_color=(255, 255, 255),
-                text_size=1,
-                text_thickness=2,
-                text_font=cv2.FONT_HERSHEY_SIMPLEX,
-
-                show_help=False,
                 tracked_points=data_handler.config.tracked_point_names,
             ))
         else:
@@ -93,7 +86,7 @@ class VideoHandler(BaseModel):
             mime_type = mimetypes.guess_type(file)[0]
             if mime_type and mime_type.startswith('video'):
                 video_files.append(file)
-        video_paths = [str(Path(video_folder) / filename) for filename in video_files]
+        video_paths = sorted([str(Path(video_folder) / filename) for filename in video_files])
 
         if not video_files:
             raise ValueError(f"No videos found in {video_folder}")

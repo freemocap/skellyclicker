@@ -25,7 +25,7 @@ class DataHandlerConfig(BaseModel):
         logger.debug(f"Found tracked point names in file: {tracked_point_names}")
         return cls(
             num_frames=videos[0].metadata.frame_count,
-            video_names=[video.name for video in videos],
+            video_names=sorted([video.name for video in videos]),
             tracked_point_names=tracked_point_names,
         )
 
@@ -39,7 +39,7 @@ class DataHandlerConfig(BaseModel):
         logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
         return cls(
             num_frames=dataframe.index.get_level_values("frame").max(),
-            video_names=dataframe.index.get_level_values("video").unique().tolist(),
+            video_names=sorted(dataframe.index.get_level_values("video").unique().tolist()),
             tracked_point_names=tracked_point_names,
         )
 
