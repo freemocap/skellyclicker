@@ -53,12 +53,14 @@ class SkellyClicker(BaseModel):
             video_folder: str,
             max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
             data_handler_path: str = str(TRACKED_POINTS_JSON_PATH),
+            machine_labels_path: str | None = None
     ):
         return cls(
             video_handler=VideoHandler.from_folder(
                 video_folder = video_folder,
                 max_window_size = max_window_size,
                 data_handler_path = data_handler_path,
+                machine_labels_path = machine_labels_path
             ),
             video_folder=video_folder,
             max_window_size=max_window_size,
@@ -95,6 +97,8 @@ class SkellyClicker(BaseModel):
             self.clear_current_point()
         elif key == ord("c"):
             self.auto_next_point = not self.auto_next_point
+        elif key == ord("m"):
+            self.video_handler.show_machine_labels = not self.video_handler.show_machine_labels
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
@@ -241,7 +245,12 @@ if __name__ == "__main__":
     data_path = TRACKED_POINTS_JSON_PATH
 
     # To continue labeling an existing session:
-    # data_path = "/Users/philipqueen/skellyclicker_data/2025-03-27_16-35-43_skellyclicker_output.csv"
+    # data_path = "/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_11-54-23_skellyclicker_output.csv"
 
-    viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path))
+    # display machine labels (DLC predictions)
+    # machine_labels_path = None
+    machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/skellyclicker_output_iteration_0.csv"
+
+
+    viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)
     viewer.run()

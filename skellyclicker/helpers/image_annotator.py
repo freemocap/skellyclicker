@@ -17,7 +17,6 @@ class ImageAnnotatorConfig(BaseModel):
     show_help: bool = False
     tracked_points: list[str] = []
 
-
 class ImageAnnotator(BaseModel):
     config: ImageAnnotatorConfig = ImageAnnotatorConfig()
 
@@ -50,6 +49,7 @@ class ImageAnnotator(BaseModel):
             "Press 'u' to clear the data for active point\n"
             "for the current frame.\n"
             "Press 'c' to toggle auto next point.\n"
+            "Press 'm' to toggle machine labels.\n"
             "Press 'H' to toggle help text.\n"
             "Press 'Esc' to quit.\n"
             "You will be prompted to save the data in the terminal."

@@ -25,9 +25,12 @@ class VideoHandler(BaseModel):
     grid_parameters: GridParameters
     image_annotator: ImageAnnotator = ImageAnnotator()
     frame_count: int
+    show_machine_labels: bool = False
+    machine_labels_handler: DataHandler | None
+    machine_labels_annotator: ImageAnnotator | None
 
     @classmethod
-    def from_folder(cls, video_folder: str, max_window_size: tuple[int, int], data_handler_path: str):
+    def from_folder(cls, video_folder: str, max_window_size: tuple[int, int], data_handler_path: str, machine_labels_path: str | None = None):
 
         videos, grid_parameters, frame_count = cls._load_videos(video_folder, max_window_size)
 
@@ -39,6 +42,25 @@ class VideoHandler(BaseModel):
             data_handler = DataHandler.from_csv(data_handler_path)
         else:
             raise ValueError(f"Invalid data handler file: {data_handler_path}")
+        
+        if machine_labels_path:
+            machine_labels_handler = DataHandler.from_csv(machine_labels_path)
+            machine_labels_annotator = ImageAnnotator(config=ImageAnnotatorConfig(
+                marker_type=cv2.MARKER_CROSS,
+                marker_size=10,
+                marker_thickness=1,
+
+                text_color=(255, 255, 255),
+                text_size=1,
+                text_thickness=2,
+                text_font=cv2.FONT_HERSHEY_SIMPLEX,
+
+                show_help=False,
+                tracked_points=data_handler.config.tracked_point_names,
+            ))
+        else:
+            machine_labels_handler = None
+            machine_labels_annotator = None
 
         image_annotator = ImageAnnotator(
             config=ImageAnnotatorConfig(
@@ -56,7 +78,10 @@ class VideoHandler(BaseModel):
             data_handler=data_handler,
             grid_parameters=grid_parameters,
             frame_count=frame_count,
-            image_annotator=image_annotator
+            image_annotator=image_annotator,
+            show_machine_labels=False,
+            machine_labels_handler=machine_labels_handler,
+            machine_labels_annotator=machine_labels_annotator,
         )
 
     @classmethod
@@ -199,6 +224,12 @@ class VideoHandler(BaseModel):
                         click_data=self.data_handler.get_data_by_video_frame(video_index=video_index, frame_number=frame_number),
                         frame_number=frame_number
                     )
+                    if self.show_machine_labels and self.machine_labels_handler is not None and self.machine_labels_annotator is not None:
+                        image = self.machine_labels_annotator.annotate_image(
+                            image,
+                            click_data=self.machine_labels_handler.get_data_by_video_frame(video_index=video_index, frame_number=frame_number),
+                            frame_number=frame_number
+                        )
 
                 if zoom_state.scale > 1.0:
                     # Calculate zoomed dimensions
