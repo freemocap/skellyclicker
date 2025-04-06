@@ -5,7 +5,7 @@ import math
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker.skellyclicker_types import VideoNameString
+from skellyclicker.core.skellyclicker_types import VideoNameString
 
 
 class VideoScalingParameters(BaseModel):

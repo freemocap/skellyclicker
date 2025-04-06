@@ -8,11 +8,11 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from skellyclicker.helpers.click_handler import ClickHandler
-from skellyclicker.helpers.data_handler import DataHandler, DataHandlerConfig
-from skellyclicker.helpers.image_annotator import ImageAnnotator, ImageAnnotatorConfig
-from skellyclicker.helpers.video_models import VideoPlaybackState, GridParameters, VideoMetadata, VideoScalingParameters
-from skellyclicker.skellyclicker_types import VideoNameString
+from skellyclicker.core.click_handler import ClickHandler
+from skellyclicker.core.data_handler import DataHandler, DataHandlerConfig
+from skellyclicker.core.image_annotator import ImageAnnotator, ImageAnnotatorConfig
+from skellyclicker.core.video_models import VideoPlaybackState, GridParameters, VideoMetadata, VideoScalingParameters
+from skellyclicker.core.skellyclicker_types import VideoNameString
 
 logger = logging.getLogger(__name__)
 from copy import deepcopy

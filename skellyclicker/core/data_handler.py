@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker.helpers.video_models import VideoPlaybackState, ClickData
-from skellyclicker.skellyclicker_types import VideoNameString, PointNameString
+from skellyclicker.core.video_models import VideoPlaybackState, ClickData
+from skellyclicker.core.skellyclicker_types import VideoNameString, PointNameString
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.helpers.video_models import VideoMetadata, VideoScalingParameters
+    from skellyclicker.core.video_models import VideoMetadata, VideoScalingParameters
 
     video_paths = Path(
         Path.home()

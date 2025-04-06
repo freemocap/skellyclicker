@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 
@@ -6,8 +5,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from skellyclicker.helpers.video_handler import VideoHandler
-
+from skellyclicker.core.video_handler import VideoHandler
 
 logger = logging.getLogger(__name__)
 MAX_WINDOW_SIZE = (1920, 1080)
