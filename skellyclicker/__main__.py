@@ -8,12 +8,7 @@ from pydantic import BaseModel
 
 from skellyclicker.helpers.video_handler import VideoHandler
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+
 logger = logging.getLogger(__name__)
 MAX_WINDOW_SIZE = (1920, 1080)
 ZOOM_STEP = 1.1
@@ -231,16 +226,6 @@ class SkellyClicker(BaseModel):
 
 
 if __name__ == "__main__":
-    # if not DEMO_VIDEO_PATH.exists():
-    #     logger.error(f"Demo video path not found: {DEMO_VIDEO_PATH}")
-    #     exit(1)
-    # try:
-    #     viewer = SkellyClicker.create(video_folder=str(DEMO_VIDEO_PATH))
-    #     viewer.run()
-    # except Exception as e:
-    #     logger.error(f"Fatal error: {str(e)}", exc_info=True)
-    
-    # video_path = "/Users/philipqueen/test_ferrets"
     video_path = DEMO_VIDEO_PATH
 
     if not Path(video_path).exists():
