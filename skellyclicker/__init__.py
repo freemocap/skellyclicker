@@ -8,3 +8,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
+
+PointNameString = str
+VideoNameString = str
+VideoPathString = str
+ClickDataCSVPathString = str

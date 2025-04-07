@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import cv2
 
-from skellyclicker.__main__ import DEMO_VIDEO_PATH
+from skellyclicker.__old_main__ import DEMO_VIDEO_PATH
 
 import logging
 logger = logging.getLogger(__name__)

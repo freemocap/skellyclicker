@@ -3,15 +3,34 @@ from typing import List
 
 from pydantic import BaseModel
 
-from .video_models import ClickData, VideoPlaybackState, GridParameters
+from skellyclicker.core.video_handler.video_models import VideoPlaybackObject, VideoGridParameters
 
+
+
+class ClickData(BaseModel):
+    """Data associated with a mouse click."""
+
+    window_x: int
+    window_y: int
+    video_x: int
+    video_y: int
+    frame_number: int
+    video_index: int
+
+    @property
+    def x(self) -> int:
+        return int(self.video_x)
+
+    @property
+    def y(self) -> int:
+        return int(self.video_y)
 
 class ClickHandler(BaseModel):
     """Handles mouse click processing and data recording."""
 
     output_path: str
-    videos: List[VideoPlaybackState]
-    grid_parameters: GridParameters
+    videos: List[VideoPlaybackObject]
+    grid_parameters: VideoGridParameters
     clicks: dict[str, list[ClickData]] = {}
     csv_ready: bool = False
 
@@ -39,7 +58,7 @@ class ClickHandler(BaseModel):
             return None
 
         video = self.videos[video_idx]
-        scaling = video.scaling_params
+        scaling = video.scaling_parameters
         zoom_state = video.zoom_state
 
         # Get position within cell

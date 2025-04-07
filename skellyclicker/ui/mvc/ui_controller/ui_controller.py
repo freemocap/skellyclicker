@@ -1,7 +1,8 @@
 import os
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
+from skellyclicker.core.video_handler.video_handler import VideosHandler
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 
@@ -9,12 +10,19 @@ from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 @dataclass
 class SkellyClickerUIController:
     ui_view: SkellyClickerUIView
-    ui_model: SkellyClickerUIModel = field(default_factory=SkellyClickerUIModel)
+    ui_model: SkellyClickerUIModel
+
+    videos: VideosHandler | None = None
+
+    # deeplabcut_handler: None
+    # mouse_handler: None
+    # keyboard_handler: None
+    # click_data_handler: None
 
     def load_deeplabcut_project(self) -> None:
         project_path = filedialog.askdirectory(title="Select DeepLabCut Project Directory")
         if project_path:
-            self.ui_model.project_path=project_path
+            self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
             print(f"DeepLabCut project loaded from: {project_path}")
 
@@ -37,6 +45,11 @@ class SkellyClickerUIController:
             self.ui_model.video_files = list(video_files)
             self.ui_view.videos_directory_path_var.set(", ".join(video_files))
             print(f"Videos loaded: {len(video_files)} files")
+            if self.videos:
+                self.videos.close()
+            self.videos = VideosHandler.from_videos(self.ui_model.video_files)
+            self.videos.load_videos(video_files)
+            self.ui_view.set_current_image(self.videos.get_grid_image(frame_number=self.ui_model.current_frame))
 
     def play_video(self) -> None:
         if not self.ui_model.video_files:
@@ -78,4 +91,3 @@ class SkellyClickerUIController:
         if response:
             self.ui_model = SkellyClickerUIModel()
             print("Session cleared")
-

@@ -6,8 +6,9 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker.core.video_models import VideoPlaybackState, ClickData
-from skellyclicker.core.skellyclicker_types import VideoNameString, PointNameString
+from skellyclicker.core.video_handler.video_models import VideoPlaybackObject
+from skellyclicker.core.video_handler.click_data_models import ClickData
+from skellyclicker.skellyclicker_types import VideoNameString, PointNameString
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class DataHandlerConfig(BaseModel):
     tracked_point_names: list[str]
 
     @classmethod
-    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackState], config_path: str):
+    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackObject], config_path: str):
 
         with open(file=Path(config_path)) as file:
             config = json.load(file)
@@ -161,13 +162,13 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.core.video_models import VideoMetadata, VideoScalingParameters
+    from skellyclicker.core.video_handler.video_models import VideoMetadata, VideoScalingParameters
 
     video_paths = Path(
         Path.home()
         / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
     ).glob("*.mp4")
-    config_file_path = Path("../../tracked_points.json")
+    config_file_path = Path("../../../tracked_points.json")
 
     _videos = []
     image_counts = set()
@@ -196,8 +197,8 @@ if __name__ == "__main__":
         )
 
         _videos.append(
-            VideoPlaybackState(
-                metadata=metadata, cap=cap, scaling_params=scaling_params
+            VideoPlaybackObject(
+                metadata=metadata, cap=cap, scaling_parameters=scaling_params
             )
         )
     handler_config = DataHandlerConfig.from_config_file(
