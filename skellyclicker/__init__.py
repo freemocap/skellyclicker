@@ -1,3 +1,6 @@
+
+__url__ = "https://github.com/freemocap/skellyclicker"
+
 import logging
 # Configure logging
 logging.basicConfig(

@@ -1,10 +1,24 @@
 import tkinter as tk
 from dataclasses import dataclass, field
+from pathlib import Path
+import webbrowser
+from PIL import Image, ImageTk
 
+import skellyclicker
+
+SKELLYCLICKER_LOGO_PNG = str(Path(__file__).parent.parent / "assets" / "skellyclicker-logo.png")
+if not Path(SKELLYCLICKER_LOGO_PNG).exists():
+    raise RuntimeError(f"SkellyClicker logo not found at{str(SKELLYCLICKER_LOGO_PNG)}")
+import  logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SkellyClickerUIView:
     main_frame: tk.Frame = None
+
+    # Header frame
+    header_frame: tk.Frame = None
+    logo_image_tk: ImageTk = None
 
     # Load videos section
     videos_directory_path_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="No videos loaded"))
@@ -73,6 +87,7 @@ class SkellyClickerUIView:
         instance.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Create sections
+        instance._create_header()
         instance._create_deeplabcut_frame()
         instance._create_separator()
         instance._create_videos_frame()
@@ -83,13 +98,56 @@ class SkellyClickerUIView:
         instance._create_separator()
         instance._create_show_help_frame()
         return instance
+    def _create_header(self):
+        """Create the header with logo."""
+        self.header_frame = tk.Frame(self.main_frame)
+        self.header_frame.pack(fill=tk.X, pady=5)
 
+        self._add_logo()
+
+        # Create a frame to stack text vertically
+        text_frame = tk.Frame(self.header_frame)
+        text_frame.pack(side=tk.LEFT, padx=10)
+
+        # Create a title label above the image
+        title_text = "SkellyClicker"
+        subtitle_text = "for clicking on stuff"
+        link_text = skellyclicker.__url__
+        title_label = tk.Label(text_frame, text=title_text, font=("Arial", 14, "bold"))
+        subtitle_label = tk.Label(text_frame, text=subtitle_text, font=("Arial", 10))
+        link_label = tk.Label(text_frame, text=link_text, font=("Arial", 8, "underline"), fg="blue", cursor="hand2")
+
+        title_label.pack(anchor='w')
+        subtitle_label.pack(anchor='w')
+        link_label.pack(anchor='w')
+
+        # Bind click event to open the GitHub repository
+        link_label.bind("<Button-1>", lambda e: webbrowser.open(skellyclicker.__url__))
+
+    def _add_logo(self):
+        try:
+            # Load the logo image using PIL (you may need to install pillow: pip install pillow)
+            logo_img = Image.open(SKELLYCLICKER_LOGO_PNG)
+            # Resize the image to be smaller (adjust size as needed)
+            logo_img = logo_img.resize((100, 100), Image.Resampling.LANCZOS)
+            # Convert to PhotoImage that tkinter can display
+            self.logo_image_tk = ImageTk.PhotoImage(logo_img)
+
+            # Create a label to display the image
+            logo_label = tk.Label(self.header_frame, image=self.logo_image_tk, cursor="hand2")
+            logo_label.pack(side=tk.LEFT, padx=10)
+
+            # Bind click event to open the GitHub repository
+            logo_label.bind("<Button-1>", lambda e: webbrowser.open(skellyclicker.__url__))
+        except Exception as e:
+            logger.error(f"Error loading logo: {e} - continuing without it) ")
 
     def _create_separator(self):
         """Create a separator line."""
         separator = tk.Frame(self.main_frame, height=2, bd=1, relief=tk.SUNKEN)
         separator.pack(fill=tk.X, padx=5, pady=5)
         return separator
+
 
     def _create_deeplabcut_frame(self):
         self.deeplabcut_frame = tk.Frame(self.main_frame)

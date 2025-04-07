@@ -2,8 +2,8 @@ import os
 from dataclasses import field, dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.ui.ui_mvc.ui_model import SkellyClickerUIModel
-from skellyclicker.ui.ui_mvc.ui_view import SkellyClickerUIView
+from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
+from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 
 
 @dataclass
