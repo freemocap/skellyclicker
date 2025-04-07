@@ -1,7 +1,9 @@
+import platform
 import tkinter as tk
+import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
-import webbrowser
+
 from PIL import Image, ImageTk
 
 import skellyclicker
@@ -9,11 +11,17 @@ import skellyclicker
 SKELLYCLICKER_LOGO_PNG = str(Path(__file__).parent.parent / "assets" / "skellyclicker-logo.png")
 if not Path(SKELLYCLICKER_LOGO_PNG).exists():
     raise RuntimeError(f"SkellyClicker logo not found at{str(SKELLYCLICKER_LOGO_PNG)}")
+
+SKELLYCLICKER_LOGO_ICO = str(Path(__file__).parent.parent / "assets" / "skellyclicker-logo.ico")
+if not Path(SKELLYCLICKER_LOGO_ICO).exists():
+    raise RuntimeError(f"SkellyClicker logo not found at{str(SKELLYCLICKER_LOGO_ICO)}")
+
 import  logging
 logger = logging.getLogger(__name__)
 
 @dataclass
 class SkellyClickerUIView:
+    root: tk.Tk
     main_frame: tk.Frame = None
 
     # Header frame
@@ -82,11 +90,12 @@ class SkellyClickerUIView:
     @classmethod
     def create_ui(cls, root: tk.Tk):
         """Create the main UI frame."""
-        instance = cls()
+        instance = cls(root=root)
         instance.main_frame = tk.Frame(root)
         instance.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Create sections
+        instance.set_app_icon()
         instance._create_header()
         instance._create_deeplabcut_frame()
         instance._create_separator()
@@ -240,3 +249,37 @@ class SkellyClickerUIView:
         )
         self.clear_btn.pack(fill=tk.X)
 
+    def set_app_icon(self):
+        """
+        Set the application icon for the window across different platforms.
+
+        Args:
+            root: The main Tk root window that needs the icon
+        """
+        system = platform.system()
+
+        try:
+            if system == "Windows":
+                # Windows uses .ico files
+                if Path(SKELLYCLICKER_LOGO_ICO).exists():
+                    self.root.iconbitmap(SKELLYCLICKER_LOGO_ICO)
+                else:
+                    logger.warning(f"Windows icon file not found at {SKELLYCLICKER_LOGO_ICO}")
+
+            elif system == "Darwin" or system == "Linux" or True:  # macOS, Linux, or fallback
+                # Both macOS and Linux can use the PhotoImage approach
+                if Path(SKELLYCLICKER_LOGO_PNG).exists():
+                    # Load the logo image
+                    logo_img = Image.open(SKELLYCLICKER_LOGO_PNG)
+                    # Convert to PhotoImage that tkinter can display
+                    icon = ImageTk.PhotoImage(logo_img)
+                    # Set as window icon
+                    self.root.iconphoto(True, icon)
+
+                    # For macOS, this doesn't change the dock icon.
+                    # That would require bundling as a .app with py2app
+                else:
+                    logger.warning(f"PNG icon file not found at {SKELLYCLICKER_LOGO_PNG}")
+
+        except Exception as e:
+            logger.error(f"Error setting app icon: {e} - continuing without")
