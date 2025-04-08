@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -8,15 +7,14 @@ from pydantic import BaseModel
 
 from skellyclicker import VideoNameString
 from skellyclicker.core.image_annotator import ImageAnnotator
-from skellyclicker.core.video_handler.video_models import VideoPlaybackObject, VideoGridParameters, \
-    VideoScalingParameters
+from skellyclicker.core.video_handler.video_models import VideoPlaybackObject, VideoGridHelper, VideoGridScalingParameters
 
 logger = logging.getLogger(__name__)
 
 
-class VideosHandler(BaseModel):
+class VideoHandler(BaseModel):
     videos: dict[VideoNameString, VideoPlaybackObject] = []
-    video_grid_parameters: VideoGridParameters
+    video_grid_helper: VideoGridHelper
     image_annotator: ImageAnnotator = ImageAnnotator()
 
     # show_machine_labels: bool = False
@@ -36,9 +34,9 @@ class VideosHandler(BaseModel):
             )
         cls._validate_frame_counts(videos)
 
-        video_grid_parameters = VideoGridParameters.calculate(videos=videos)
+        video_grid_parameters = VideoGridHelper.calculate(videos=videos)
         for grid_index, video in enumerate(videos.values()):
-            video.scaling_parameters = cls._calculate_scaling_parameters(
+            video.grid_scale = cls._calculate_scaling_parameters(
                 original_width=video.metadata.width,
                 original_height=video.metadata.height,
                 grid_index=grid_index,
@@ -46,45 +44,54 @@ class VideosHandler(BaseModel):
             )
 
         return cls(videos=videos,
-                   video_grid_parameters=video_grid_parameters,
+                   video_grid_helper=video_grid_parameters,
                    )
 
     def get_grid_image(self, frame_number: int) -> np.ndarray:
         """Create a grid of video images."""
-        # Create a deep copy of video states to prevent race conditions
-
-        grid_image = np.zeros((self.video_grid.total_height,
-                               self.video_grid.total_width,
-                               3), dtype=np.uint8)
+        grid_image = self.video_grid_helper.create_blank_grid_image()
 
         for video_name, video in self.videos.items():
             image = video.get_frame(frame_number=frame_number)
             scaled_image = cv2.resize(image,
-                                      (video.scaled_width,
-                                       video.scaled_height))
+                                      (video.grid_scale.scaled_width,
+                                       video.grid_scale.scaled_height))
 
-            # Place image in grid
+            # Calculate actual dimensions to ensure we don't exceed grid boundaries
+            actual_height = min(scaled_image.shape[0],
+                                self.video_grid_helper.cell_height - video.grid_scale.y_offset)
+            actual_width = min(scaled_image.shape[1],
+                               self.video_grid_helper.cell_width - video.grid_scale.x_offset)
+
+            # Place image in grid with dimension checks
             try:
-                grid_image[video.y_start:video.y_start + scaled_image.shape[0],
-                video.x_start:video.x_start + scaled_image.shape[1]] = scaled_image
+                x_start = video.grid_scale.x_start
+                y_start = video.grid_scale.y_start
+
+                grid_image[y_start:y_start + actual_height,
+                x_start:x_start + actual_width] = scaled_image[:actual_height, :actual_width]
             except ValueError as e:
                 logger.error(f"Error placing image in grid: {e}")
+                logger.error(f"Grid shape: {grid_image.shape}, "
+                             f"Target area: {y_start}:{y_start + actual_height}, "
+                             f"{x_start}:{x_start + actual_width}, "
+                             f"Scaled image shape: {scaled_image.shape}")
                 raise ValueError(f"Error placing image in grid: {e}")
+
             # Draw grid lines
             cv2.rectangle(grid_image,
-                          (video.x_start, video.y_start),
-                          (video.x_start + video.scaled_width,
-                           video.y_start + video.scaled_height),
+                          (x_start, y_start),
+                          (x_start + actual_width, y_start + actual_height),
                           color=(0, 255, 0), thickness=2)
-            # Draw video name
+
+            # Draw video name - fixing reference to use scaling_parameters
             cv2.putText(grid_image,
                         str(video_name),
-                        (video.x_start + 10, video.y_start + 30),
+                        (x_start + 10, y_start + 30),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7, (255, 255, 255), 2)
 
         return grid_image
-
             #
             # if annotate_images:
             #     image = self.image_annotator.annotate_single_image(
@@ -148,8 +155,8 @@ class VideosHandler(BaseModel):
     def _calculate_scaling_parameters(original_width: int,
                                       original_height: int,
                                       grid_index: int,
-                                      video_grid_parameters: VideoGridParameters,
-                                      ) -> VideoScalingParameters:
+                                      video_grid_parameters: VideoGridHelper,
+                                      ) -> VideoGridScalingParameters:
 
         """Calculate scaling parameters for a video to fit in a grid cell."""
         cell_row = video_grid_parameters.get_row_by_index(grid_index)
@@ -167,7 +174,8 @@ class VideosHandler(BaseModel):
         x_offset = (cell_width - scaled_width) // 2
         y_offset = (cell_height - scaled_height) // 2
 
-        return VideoScalingParameters(
+        return VideoGridScalingParameters(
+            grid_index=grid_index,
             scale=scale,
             x_offset=x_offset,
             y_offset=y_offset,
@@ -187,7 +195,7 @@ class VideosHandler(BaseModel):
     def prepare_single_image(self,
                              image: np.ndarray,
                              frame_number: int,
-                             scaling_params: VideoScalingParameters) -> np.ndarray:
+                             scaling_params: VideoGridScalingParameters) -> np.ndarray:
         """Process a video image - resize and add overlays."""
         if image is None:
             return np.zeros(self.video_grid.cell_size + (3,), dtype=np.uint8)

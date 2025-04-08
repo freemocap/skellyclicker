@@ -162,7 +162,8 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.core.video_handler.video_models import VideoMetadata, VideoScalingParameters
+    from skellyclicker.core.video_handler.video_models import VideoMetadata
+    from skellyclicker.core.video_handler.video_helpers.video_grid_handler import VideoScalingParameters
 
     video_paths = Path(
         Path.home()
@@ -198,7 +199,7 @@ if __name__ == "__main__":
 
         _videos.append(
             VideoPlaybackObject(
-                metadata=metadata, cap=cap, scaling_parameters=scaling_params
+                metadata=metadata, cap=cap, grid_scale=scaling_params
             )
         )
     handler_config = DataHandlerConfig.from_config_file(

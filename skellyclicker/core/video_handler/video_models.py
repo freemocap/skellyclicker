@@ -1,40 +1,11 @@
 import math
 from pathlib import Path
-from typing import Tuple
 
 import cv2
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker import VideoPathString, VideoNameString
-
-MAX_WINDOW_SIZE = (1920, 1080)
-ZOOM_STEP = 1.1
-ZOOM_MIN = 1.0
-ZOOM_MAX = 10.0
-POSITION_EPSILON = 1e-6  # Small threshold for position changes
-
-
-class VideoScalingParameters(BaseModel):
-    """Parameters for scaling and positioning video frames in the grid."""
-
-    scale: float
-    x_offset: int
-    y_offset: int
-    scaled_width: int
-    scaled_height: int
-    cell_row: int = 0  # row in the grid where the video is displayed
-    cell_column: int = 0  # column in the grid where the video is displayed
-    cell_height: int = 0  # height of the cell in the grid
-    cell_width: int = 0  # width of the cell in the grid
-
-    @property
-    def x_start(self) -> int:
-        return int(self.cell_row * self.cell_height + self.y_offset)
-
-    @property
-    def y_start(self) -> int:
-        return int(self.cell_column * self.cell_width + self.x_offset)
+from skellyclicker import VideoPathString, VideoNameString, MAX_WINDOW_SIZE
 
 
 class VideoMetadata(BaseModel):
@@ -59,6 +30,26 @@ class ZoomState(BaseModel):
         self.center_x = 0
         self.center_y = 0
 
+class VideoGridScalingParameters(BaseModel):
+    """Parameters for scaling and positioning video frames in the grid."""
+    scale: float
+    grid_index: int  # index of the video in the grid
+    x_offset: int # offset from the left edge of the cell
+    y_offset: int # offset from the top edge of the cell
+    scaled_width: int # width of the video in the grid
+    scaled_height: int # height of the video in the grid
+    cell_row: int = 0  # row in the grid where the video is displayed
+    cell_column: int = 0  # column in the grid where the video is displayed
+    cell_height: int = 0  # height of the cell in the grid
+    cell_width: int = 0  # width of the cell in the grid
+
+    @property
+    def x_start(self) -> int: # x position of the video in the grid
+        return int(self.cell_column * self.cell_width + self.x_offset)
+
+    @property
+    def y_start(self) -> int: # y position of the video in the grid
+        return int(self.cell_row * self.cell_height + self.y_offset)
 
 class VideoPlaybackObject(BaseModel):
     """Current state of video playback."""
@@ -69,7 +60,7 @@ class VideoPlaybackObject(BaseModel):
     current_frame: np.ndarray | None = None
     processed_frame: np.ndarray | None = None
 
-    scaling_parameters: VideoScalingParameters | None = None
+    grid_scale: VideoGridScalingParameters | None = None
     zoom_state: ZoomState = ZoomState()  # how much the user has zoomed in on the video
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -111,18 +102,11 @@ class VideoPlaybackObject(BaseModel):
     def name(self) -> str:
         return self.metadata.name
 
-    @property
-    def scaled_width(self) -> int:
-        return self.scaling_parameters.scaled_width if self.scaling_parameters else self.metadata.width
-
-    @property
-    def scaled_height(self) -> int:
-        return self.scaling_parameters.scaled_height if self.scaling_parameters else self.metadata.height
 
 
-class VideoGridParameters(BaseModel):
+
+class VideoGridHelper(BaseModel):
     """Parameters defining the video grid layout."""
-
     rows: int
     columns: int
     cell_width: int
@@ -131,11 +115,11 @@ class VideoGridParameters(BaseModel):
     total_height: int
 
     @property
-    def cell_size(self) -> Tuple[int, int]:
+    def cell_size(self) -> tuple[int, int]:
         return self.cell_width, self.cell_height
 
     @property
-    def grid_size(self) -> Tuple[int, int]:
+    def grid_size(self) -> tuple[int, int]:
         return self.rows, self.columns
 
     def get_row_by_index(self, index: int):
@@ -149,30 +133,30 @@ class VideoGridParameters(BaseModel):
     @classmethod
     def calculate(cls,
                   videos: dict[VideoNameString, VideoPlaybackObject],
-                  max_window_size: Tuple[int, int] = MAX_WINDOW_SIZE
-                  ) -> "VideoGridParameters":
+                  max_window_size: tuple[int, int] = MAX_WINDOW_SIZE
+                  ) -> "VideoGridHelper":
         """Calculate grid parameters based on video sizes and window constraints."""
         max_width, max_height = max_window_size
 
-        avg_width = sum(video.metadata.width for video in videos.values()) / len(videos)
-        avg_height = sum(video.metadata.height for video in videos.values()) / len(videos)
+        mean_width = sum(video.metadata.width for video in videos.values()) / len(videos)
+        mean_height = sum(video.metadata.height for video in videos.values()) / len(videos)
 
-        avg_aspect_ratio = avg_width / avg_height
+        mean_aspect_ratio = mean_width / mean_height
 
         # make initial estimate
-        num_rows = round(math.sqrt(len(videos) * avg_aspect_ratio))
+        num_rows = round(math.sqrt(len(videos) * mean_aspect_ratio))
         num_columns = math.ceil(len(videos) / num_rows)
 
         # make sure all videos fit
         while num_rows * num_columns < len(videos):
-            if avg_aspect_ratio > 1:
+            if mean_aspect_ratio > 1:
                 num_rows += 1
             else:
                 num_columns += 1
 
         # remove empty space where possible
         while num_rows * num_columns > len(videos):
-            if avg_aspect_ratio < 1:  # remove rows first for vertical videos
+            if mean_aspect_ratio < 1:  # remove rows first for vertical videos
                 if (num_rows - 1) * num_columns >= len(videos):
                     num_rows -= 1
                 elif num_rows * (num_columns - 1) >= len(videos):
@@ -199,3 +183,14 @@ class VideoGridParameters(BaseModel):
             total_width=cell_width * num_columns,
             total_height=cell_height * num_rows,
         )
+
+    def create_blank_grid_image(self) -> np.ndarray:
+        grid_image = np.zeros((self.total_height,
+                               self.total_width,
+                               3), dtype=np.uint8)
+
+        # sete the elements along cell edges to 1
+        grid_image[::self.cell_height, :] = 1
+        grid_image[:, ::self.cell_width] = 1
+        return grid_image
+

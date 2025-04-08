@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from skellyclicker.core.video_handler.video_handler import VideosHandler
+from skellyclicker.core.video_handler.video_handler import VideoHandler
 from skellyclicker.core.video_handler.video_models import POSITION_EPSILON
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ if not TRACKED_POINTS_JSON_PATH.exists():
 class SkellyClicker(BaseModel):
     video_folder: str
     max_window_size: tuple[int, int]
-    video_handler: VideosHandler
+    video_handler: VideoHandler
     frame_number: int = 0
     is_playing: bool = True
     step_size: int = 1
@@ -139,7 +139,7 @@ class SkellyClicker(BaseModel):
         video_idx = cell_y * self.video_handler.video_grid.columns + cell_x
         if video_idx < len(self.video_handler.videos):
             video = self.video_handler.videos[video_idx]
-            scaling = video.scaling_parameters
+            scaling = video.grid_scale
             zoom_state = video.zoom_state
 
             # Get relative position within cell

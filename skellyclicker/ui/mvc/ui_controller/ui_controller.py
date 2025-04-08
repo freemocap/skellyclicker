@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.core.video_handler.video_handler import VideosHandler
+from skellyclicker.core.video_handler.video_handler import VideoHandler
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 
@@ -12,7 +12,7 @@ class SkellyClickerUIController:
     ui_view: SkellyClickerUIView
     ui_model: SkellyClickerUIModel
 
-    videos: VideosHandler | None = None
+    videos: VideoHandler | None = None
 
     # deeplabcut_handler: None
     # mouse_handler: None
@@ -47,8 +47,7 @@ class SkellyClickerUIController:
             print(f"Videos loaded: {len(video_files)} files")
             if self.videos:
                 self.videos.close()
-            self.videos = VideosHandler.from_videos(self.ui_model.video_files)
-            self.videos.load_videos(video_files)
+            self.videos = VideoHandler.from_videos(self.ui_model.video_files)
             self.ui_view.set_current_image(self.videos.get_grid_image(frame_number=self.ui_model.current_frame))
 
     def play_video(self) -> None:
