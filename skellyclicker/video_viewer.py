@@ -1,12 +1,13 @@
 import logging
+import threading
 from pathlib import Path
 
 import cv2
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
+from skellyclicker import MAX_WINDOW_SIZE, POSITION_EPSILON
 from skellyclicker.core.video_handler.video_handler import VideoHandler
-from skellyclicker.core.video_handler.video_models import POSITION_EPSILON
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ if not TRACKED_POINTS_JSON_PATH.exists():
 
 
 
-class SkellyClicker(BaseModel):
+class VideoViewer(BaseModel):
     video_folder: str
     max_window_size: tuple[int, int]
     video_handler: VideoHandler
@@ -35,24 +36,30 @@ class SkellyClicker(BaseModel):
     show_help: bool = False
     auto_next_point: bool = True
     show_names: bool = True
+    video_thread: threading.Thread | None = None
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    def launch_video_thread(self):
+        self.video_thread = threading.Thread(target=self.run)
+        self.video_thread.daemon = True
+        self.video_thread.start()
 
     @classmethod
-    def create(
+    def from_videos(
             cls,
-            video_folder: str,
+            video_paths: list[str],
             max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
             data_handler_path: str = str(TRACKED_POINTS_JSON_PATH),
             machine_labels_path: str | None = None
     ):
         return cls(
-            video_handler=VideoHandler.from_folder(
-                video_folder = video_folder,
+            video_handler=VideoHandler.from_videos(
+                video_paths = video_paths,
                 max_window_size = max_window_size,
                 data_handler_path = data_handler_path,
-                machine_labels_path = machine_labels_path
+                # machine_labels_path = machine_labels_path
             ),
-            video_folder=video_folder,
+            video_folder=str(Path(video_paths[0]).parent),
             max_window_size=max_window_size,
         )
 
@@ -120,8 +127,8 @@ class SkellyClicker(BaseModel):
 
     def _mouse_callback(self, event, x, y, flags, param):
         # Calculate which grid cell contains the mouse
-        cell_x = x // self.video_handler.video_grid.cell_width
-        cell_y = y // self.video_handler.video_grid.cell_height
+        cell_x = x // self.video_handler.grid_parameters.cell_width
+        cell_y = y // self.video_handler.grid_parameters.cell_height
 
         # Store current cell
         self.active_cell = (cell_x, cell_y)
@@ -207,7 +214,7 @@ class SkellyClicker(BaseModel):
                 key = cv2.waitKey(1) & 0xFF
                 if not self._handle_keypress(key):
                     break
-                grid_image = self.video_handler.get_grid_image(
+                grid_image = self.video_handler.create_grid_image(
                     self.frame_number, annotate_images=True
                 )
                 cv2.imshow(str(self.video_folder), grid_image)
@@ -233,9 +240,9 @@ if __name__ == "__main__":
     # data_path = "/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_11-54-23_skellyclicker_output.csv"
 
     # display machine labels (DLC predictions)
-    machine_labels_path = None
+    # machine_labels_path = None
     # machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
 
 
-    viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)
+    viewer = VideoViewer.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)
     viewer.run()

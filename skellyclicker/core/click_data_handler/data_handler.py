@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker.core.video_handler.video_models import VideoPlaybackObject
-from skellyclicker.core.video_handler.click_data_models import ClickData
-from skellyclicker.skellyclicker_types import VideoNameString, PointNameString
+from skellyclicker import VideoNameString, PointNameString
+from skellyclicker.core.video_handler.old_video_models import VideoPlaybackObject
+from skellyclicker.core.video_handler.video_models import ClickData
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,10 @@ class DataHandlerConfig(BaseModel):
             config = json.load(file)
         tracked_point_names = config["tracked_point_names"]
         logger.debug(f"Found tracked point names in file: {tracked_point_names}")
+        first_video = next(iter(videos.values()))
         return cls(
-            num_frames=videos[0].metadata.frame_count,
-            video_names=sorted([video.name for video in videos]),
+            num_frames=next(iter(videos.values())).metadata.frame_count,
+            video_names=sorted([video.name for video in videos.values()]),
             tracked_point_names=tracked_point_names,
         )
 
@@ -53,7 +54,7 @@ class DataHandler(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     config: DataHandlerConfig
     dataframe: pd.DataFrame
-    active_point: dict[VideoNameString, PointNameString]
+    active_point: PointNameString
 
     @classmethod
     def from_config(cls, config: DataHandlerConfig):
@@ -162,7 +163,7 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.core.video_handler.video_models import VideoMetadata
+    from skellyclicker.core.video_handler.old_video_models import VideoMetadata
     from skellyclicker.core.video_handler.video_helpers.video_grid_handler import VideoScalingParameters
 
     video_paths = Path(

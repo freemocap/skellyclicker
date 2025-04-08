@@ -49,7 +49,11 @@ class SkellyClickerUi:
 
         ui_view.show_help_checkbox.config(command=ui_controller.on_show_help_toggle)
 
+    def on_closing(self):
+        self.ui_controller.finish_and_close()
+        self.root.destroy()
 
 if __name__ == "__main__":
     _ui = SkellyClickerUi.create_ui()
+    _ui.root.protocol("WM_DELETE_WINDOW", _ui.on_closing)
     _ui.root.mainloop()

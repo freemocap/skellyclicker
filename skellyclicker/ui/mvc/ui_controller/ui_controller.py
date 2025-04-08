@@ -1,10 +1,12 @@
 import os
+import threading
 from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.core.video_handler.video_handler import VideoHandler
+from skellyclicker.core.video_handler.old_video_handler import VideoHandler
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
+from skellyclicker.video_viewer import VideoViewer
 
 
 @dataclass
@@ -12,8 +14,7 @@ class SkellyClickerUIController:
     ui_view: SkellyClickerUIView
     ui_model: SkellyClickerUIModel
 
-    videos: VideoHandler | None = None
-
+    video_viewer: VideoViewer | None = None
     # deeplabcut_handler: None
     # mouse_handler: None
     # keyboard_handler: None
@@ -45,10 +46,10 @@ class SkellyClickerUIController:
             self.ui_model.video_files = list(video_files)
             self.ui_view.videos_directory_path_var.set(", ".join(video_files))
             print(f"Videos loaded: {len(video_files)} files")
-            if self.videos:
-                self.videos.close()
-            self.videos = VideoHandler.from_videos(self.ui_model.video_files)
-            self.ui_view.set_current_image(self.videos.get_grid_image(frame_number=self.ui_model.current_frame))
+            if self.video_viewer:
+                self.video_viewer.close()
+            self.video_viewer = VideoViewer.from_videos(self.ui_model.video_files)
+            self.video_viewer.launch_video_thread()
 
     def play_video(self) -> None:
         if not self.ui_model.video_files:
@@ -90,3 +91,7 @@ class SkellyClickerUIController:
         if response:
             self.ui_model = SkellyClickerUIModel()
             print("Session cleared")
+
+    def finish_and_close(self):
+        if self.video_handler:
+            self.video_handler.close()
