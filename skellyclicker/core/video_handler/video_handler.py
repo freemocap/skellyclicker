@@ -21,6 +21,7 @@ from copy import deepcopy
 
 
 class VideoHandler(BaseModel):
+    video_folder: str
     videos: dict[VideoPathString, VideoPlaybackState] = {}
     click_handler: ClickHandler
     data_handler: DataHandler
@@ -68,6 +69,7 @@ class VideoHandler(BaseModel):
         )
 
         return cls(
+            video_folder=str(Path(list(videos.keys())[0]).parent),
             videos=videos,
             click_handler=ClickHandler(output_path=str(Path(video_paths[0]).parent / "clicks.csv", ),
                                        grid_helper=grid_parameters,

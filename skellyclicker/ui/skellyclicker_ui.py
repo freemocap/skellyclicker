@@ -40,8 +40,8 @@ class SkellyClickerUi:
         ui_view.create_deeplabcut_button.config(command=ui_controller.create_deeplabcut_project)
         ui_view.train_deeplabcut_model_button.config(command=ui_controller.train_model)
 
-        ui_view.play_button.config(command=ui_controller.play_video)
-        ui_view.pause_button.config(command=ui_controller.pause_video)
+        # ui_view.play_button.config(command=ui_controller.play_video)
+        # ui_view.pause_button.config(command=ui_controller.pause_video)
 
         ui_view.autosave_checkbox.config(command=ui_controller.on_autosave_toggle)
         ui_view.save_csv_button.config(command=ui_controller.save_file)

@@ -105,8 +105,8 @@ class SkellyClickerUIView:
         instance._create_deeplabcut_frame()
         instance._create_separator()
 
-        instance._create_playback_section()
-        instance._create_separator()
+        # instance._create_playback_section()
+        # instance._create_separator()
 
         instance._create_save_option_frame()
         instance._create_separator()
