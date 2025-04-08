@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-def create_new_project(
+def create_new_deeplabcut_project(
     project: str,
     experimenter: str,
     videos: list[str] | None = None,
@@ -74,7 +74,7 @@ def create_new_project(
 
     Create a project without videos:
 
-    >>> deeplabcut.create_new_project(
+    >>> deeplabcut.create_new_deeplabcut_project(
             project='reaching-task',
             experimenter='Linus',
             working_directory='/analysis/project/',
@@ -82,7 +82,7 @@ def create_new_project(
 
     Create a project with videos:
 
-    >>> deeplabcut.create_new_project(
+    >>> deeplabcut.create_new_deeplabcut_project(
             project='reaching-task',
             experimenter='Linus',
             videos=[
@@ -384,7 +384,7 @@ def create_new_project(
 if __name__ == '__main__':
     from pathlib import Path
 
-    create_new_project(
+    create_new_deeplabcut_project(
         project='your-project-name',
         experimenter='Aaron',
         working_directory= Path(r'C:\Users\Aaron\Documents'),

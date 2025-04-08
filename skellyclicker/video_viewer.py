@@ -38,7 +38,7 @@ class VideoViewer(BaseModel):
     show_names: bool = True
     video_thread: threading.Thread | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
+    should_continue: bool = True
     def launch_video_thread(self):
         self.video_thread = threading.Thread(target=self.run)
         self.video_thread.daemon = True
@@ -114,7 +114,7 @@ class VideoViewer(BaseModel):
     def clear_current_point(self):
         video_index = None
         if self.active_cell is not None:
-            video_index = self.active_cell[1] * self.video_handler.video_grid.columns + self.active_cell[0]
+            video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
         if not video_index:
             return
         self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
@@ -143,15 +143,15 @@ class VideoViewer(BaseModel):
             self._zoom(x, y, flags, cell_x, cell_y)
 
     def _zoom(self, x, y, flags, cell_x, cell_y):
-        video_idx = cell_y * self.video_handler.video_grid.columns + cell_x
+        video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
         if video_idx < len(self.video_handler.videos):
             video = self.video_handler.videos[video_idx]
             scaling = video.grid_scale
             zoom_state = video.zoom_state
 
             # Get relative position within cell
-            cell_relative_x = x % self.video_handler.video_grid.cell_width
-            cell_relative_y = y % self.video_handler.video_grid.cell_height
+            cell_relative_x = x % self.video_handler.grid_parameters.cell_width
+            cell_relative_y = y % self.video_handler.grid_parameters.cell_height
 
             if zoom_state.scale > 1.0:
                 # Calculate current visible region
@@ -210,7 +210,7 @@ class VideoViewer(BaseModel):
         )
 
         try:
-            while True:
+            while self.should_continue:
                 key = cv2.waitKey(1) & 0xFF
                 if not self._handle_keypress(key):
                     break
@@ -225,6 +225,8 @@ class VideoViewer(BaseModel):
             cv2.waitKey(1)
             self.video_handler.close()
 
+    def stop(self):
+        self.should_continue = False
 
 if __name__ == "__main__":
     video_path = DEMO_VIDEO_PATH

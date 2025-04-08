@@ -17,12 +17,12 @@ def iterate_model(
     training_config: TrainingConfig | None = None,
 ) -> None:
     config = auxiliaryfunctions.read_config(config_path)
-    project = ProjectConfig.from_config(config)
-    data = DataConfig.from_config(config)
+    project = ProjectConfig.from_deeplabcut_config(config)
+    data = DataConfig.from_deeplabcut_config(config)
     if training_config:
         training = training_config
     else:
-        training = TrainingConfig.from_config(config)
+        training = TrainingConfig.from_deeplabcut_config(config)
 
     data.labels_csv_path = Path(clicker_csv_path)
     

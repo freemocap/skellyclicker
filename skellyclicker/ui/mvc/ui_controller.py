@@ -51,16 +51,7 @@ class SkellyClickerUIController:
             self.video_viewer = VideoViewer.from_videos(self.ui_model.video_files)
             self.video_viewer.launch_video_thread()
 
-    def play_video(self) -> None:
-        if not self.ui_model.video_files:
-            messagebox.showinfo("No Videos", "Please load videos first")
-            return
-        self.ui_model.is_playing = True
-        print("Playing video")
 
-    def pause_video(self) -> None:
-        self.ui_model.is_playing = False
-        print("Video paused")
 
     def train_model(self) -> None:
         if not self.ui_model.project_path:
@@ -93,5 +84,5 @@ class SkellyClickerUIController:
             print("Session cleared")
 
     def finish_and_close(self):
-        if self.video_handler:
-            self.video_handler.close()
+        if self.video_viewer:
+            self.video_viewer.stop()

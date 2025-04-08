@@ -11,45 +11,45 @@ from deeplabcut.utils import auxiliaryfunctions
 
 
 @dataclass
-class ProjectConfig:
+class SimpleDeeplabcutProjectConfig:
     """Configuration for project setup"""
 
     # Basic project information
     name: str
-    experimenter: str = "user"
-    working_directory: Optional[Union[Path, str]] = None
+    experimenter: str = "human"
+    working_directory: str|None = None
 
     # Anatomical configuration
     bodyparts: List[str] = field(default_factory=list)
-    skeleton: Optional[List[List[str]]] = None
+    skeleton: list[list[str]]|None = None
 
     def __post_init__(self):
         if isinstance(self.working_directory, str):
-            self.working_directory = Path(self.working_directory)
+            self.working_directory = self.working_directory
         elif self.working_directory is None:
-            self.working_directory = Path.cwd()
+            self.working_directory = str(Path.cwd())
 
-        self.working_directory.mkdir(exist_ok=True, parents=True)
+        Path(self.working_directory).mkdir(exist_ok=True, parents=True)
     
     @classmethod
-    def from_config(cls, config: dict) -> "ProjectConfig":
+    def from_deeplabcut_config(cls, deeplabcut_config: dict) -> "SimpleDeeplabcutProjectConfig":
         return cls(
-            name=config["Task"],
-            experimenter=config["scorer"],
-            working_directory=config["project_path"],
-            bodyparts=config["bodyparts"],
-            skeleton=config["skeleton"],
+            name=deeplabcut_config["Task"],
+            experimenter=deeplabcut_config["scorer"],
+            working_directory=deeplabcut_config["project_path"],
+            bodyparts=deeplabcut_config["bodyparts"],
+            skeleton=deeplabcut_config["skeleton"],
         )
 
     @classmethod
-    def from_config_yaml(cls, config_path: str | Path) -> "ProjectConfig":
-        config = auxiliaryfunctions.read_config(config_path)
+    def from_deeplabcut_config_yaml(cls, deeplabcut_config_path: str | Path) -> "SimpleDeeplabcutProjectConfig":
+        config = auxiliaryfunctions.read_config(deeplabcut_config_path)
 
-        return cls.from_config(config)
+        return cls.from_deeplabcut_config(config)
 
 
 @dataclass
-class DataConfig:
+class SkellyclickerDataConfig:
     """Configuration for data processing"""
 
     folder_of_videos: Path
@@ -62,14 +62,14 @@ class DataConfig:
             self.labels_csv_path = Path(self.labels_csv_path)
 
     @classmethod
-    def from_config(cls, config: dict) -> "DataConfig":
+    def from_config(cls, config: dict) -> "SkellyclickerDataConfig":
         return cls(
             folder_of_videos=config["skellyclicker_folder_of_videos"],
             labels_csv_path=config["skellyclicker_labels_csv_path"],
         )
 
     @classmethod
-    def from_config_yaml(cls, config_path: str | Path) -> "DataConfig":
+    def from_config_yaml(cls, config_path: str | Path) -> "SkellyclickerDataConfig":
         config = auxiliaryfunctions.read_config(config_path)
 
         return cls.from_config(config)
