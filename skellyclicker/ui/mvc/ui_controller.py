@@ -6,7 +6,7 @@ from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_c
     SimpleDeeplabcutProjectConfig
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
-from skellyclicker.video_viewer import VideoViewer
+from skellyclicker.core.video_viewer import VideoViewer
 
 
 
