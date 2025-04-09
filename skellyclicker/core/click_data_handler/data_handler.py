@@ -7,8 +7,8 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 from skellyclicker import VideoNameString, PointNameString
-from skellyclicker.core.video_handler.old_video_models import VideoPlaybackObject
-from skellyclicker.core.video_handler.video_models import ClickData
+from skellyclicker.core.video_handler.video_models import ClickData, VideoPlaybackState, VideoMetadata, \
+    VideoScalingParameters
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class DataHandlerConfig(BaseModel):
     tracked_point_names: list[str]
 
     @classmethod
-    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackObject], config_path: str):
+    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackState], config_path: str):
 
         with open(file=Path(config_path)) as file:
             config = json.load(file)
@@ -163,8 +163,6 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.core.video_handler.old_video_models import VideoMetadata
-    from skellyclicker.core.video_handler.video_helpers.video_grid_handler import VideoScalingParameters
 
     video_paths = Path(
         Path.home()
@@ -199,7 +197,7 @@ if __name__ == "__main__":
         )
 
         _videos.append(
-            VideoPlaybackObject(
+            VideoPlaybackState(
                 metadata=metadata, cap=cap, grid_scale=scaling_params
             )
         )

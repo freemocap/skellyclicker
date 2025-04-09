@@ -4,8 +4,7 @@ from pydantic import BaseModel
 
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_config import \
     create_new_deeplabcut_project
-from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import \
-    SimpleDeeplabcutProjectConfig
+
 
 logger = logging.getLogger(__name__)
 

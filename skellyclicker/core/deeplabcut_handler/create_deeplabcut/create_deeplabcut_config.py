@@ -131,7 +131,7 @@ def _create_deeplabcut_config(project_path: str,
                               individuals: list[str] | None = None,
                               bodyparts: list[str] | None = None,
                               skeleton: list[list[str]] | None = None):
-    if multianimal:  # parameters specific to multianimal project
+    if multianimal:  # parameters specific to multi-animal project
         config_file_contents = _initialize_multi_animal_config(bodyparts=bodyparts,
                                                                individuals=individuals,
                                                                multianimal=multianimal,

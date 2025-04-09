@@ -2,14 +2,10 @@ import os
 from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import \
-    SimpleDeeplabcutProjectConfig
+from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 from skellyclicker.core.video_handler.video_viewer import VideoViewer
-
-
-
 
 
 @dataclass
@@ -37,7 +33,7 @@ class SkellyClickerUIController:
                 full_project_path = os.path.join(project_path, project_name)
                 self.ui_model.project_path = full_project_path
                 self.ui_view.deeplabcut_project_path_var.set(full_project_path)
-                self.deeplabcut_handler.create_deeplabcut_project(deeplabcut_project_path=full_project_path)
+                # self.deeplabcut_handler.create_deeplabcut_project(deeplabcut_project_path=full_project_path)
                 print(f"Creating new deeplabcut project: {full_project_path}")
 
     def load_videos(self) -> None:
