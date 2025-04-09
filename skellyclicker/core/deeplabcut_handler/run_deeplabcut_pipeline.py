@@ -6,7 +6,7 @@ import deeplabcut
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_config import create_new_deeplabcut_project
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_project_data import \
     fill_in_labelled_data_folder
-from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import SimpleDeeplabcutProjectConfig, SkellyclickerDataConfig, \
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import SimpleDeeplabcutProjectConfig, SkellyClickerDataConfig, \
     TrainingConfig
 
 # Configure logging
@@ -18,22 +18,22 @@ logger = logging.getLogger(__name__)
 
 def run_dlc_pipeline(
     project: SimpleDeeplabcutProjectConfig,
-    data: SkellyclickerDataConfig,
+    data: SkellyClickerDataConfig,
     training: TrainingConfig
 ):
 
     timestamp = datetime.now().strftime("%Y%m%d") 
     full_project_name = f"{project.name}_{project.experimenter}_{timestamp}"
-    project_path = Path(project.working_directory)/full_project_name
+    project_path = Path(project.config_yaml_path) / full_project_name
 
     logger.info(f"Starting DLC pipeline for project: {full_project_name}")
     
     # Step 1: Create project
     logger.info("Creating deeplabcut project structure...")
     config_path = create_new_deeplabcut_project(
-        project=full_project_name,
+        project_name=full_project_name,
         experimenter=project.experimenter,
-        working_directory=project.working_directory,
+        project_parent_directory=project.config_yaml_path,
         bodyparts=project.bodyparts,
         skeleton=project.skeleton
     )
@@ -44,7 +44,7 @@ def run_dlc_pipeline(
     labeled_frames = fill_in_labelled_data_folder(
         path_to_videos_for_training=data.folder_of_videos,
         path_to_dlc_project_folder=project_path,
-        path_to_image_labels_csv=data.labels_csv_path,
+        path_to_image_labels_csv=data.click_data_csv_path,
         scorer_name= project.experimenter
     )
     
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     project_config = SimpleDeeplabcutProjectConfig(
         name = "sample_data_test2",
         experimenter= "user", #can probably look into removing the experimenter/scorer entirely
-        working_directory= "/Users/philipqueen/DLCtest", #optional, defaults to CWD otherwise
+        config_yaml_path="/Users/philipqueen/DLCtest", #optional, defaults to CWD otherwise
         bodyparts=[
             'right_eye_inner', 'left_eye_inner', 'nose',
         ],
@@ -95,9 +95,9 @@ if __name__ == "__main__":
         ], #skeleton is optional 
     )
     
-    data_config = SkellyclickerDataConfig(
+    data_config = SkellyClickerDataConfig(
         folder_of_videos= Path("/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos/"),
-        labels_csv_path= Path("/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_17-25-38_skellyclicker_output.csv")
+        click_data_csv_path= Path("/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_17-25-38_skellyclicker_output.csv")
     )
 
     training_config = TrainingConfig(

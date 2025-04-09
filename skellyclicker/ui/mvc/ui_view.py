@@ -1,19 +1,16 @@
 # skellyclicker/ui/mvc/ui_view.py
+import logging
 import platform
 import tkinter as tk
 import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
-from tkinter import ttk
 
-import numpy as np
 from PIL import Image, ImageTk
 
 import skellyclicker
 from skellyclicker.ui.assets.logo_paths import SKELLYCLICKER_LOGO_PNG, SKELLYCLICKER_LOGO_ICO
 
-
-import logging
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -99,6 +96,9 @@ class SkellyClickerUIView:
 
         # Create components inside the sidebar
         instance._create_header()
+        instance._create_separator()
+        instance._create_separator()
+
         instance._create_videos_frame()
         instance._create_separator()
 
@@ -108,10 +108,10 @@ class SkellyClickerUIView:
         # instance._create_playback_section()
         # instance._create_separator()
 
-        instance._create_save_option_frame()
-        instance._create_separator()
-
-        instance._create_show_help_frame()
+        # instance._create_save_option_frame()
+        # instance._create_separator()
+        #
+        # instance._create_show_help_frame()
 
 
         return instance

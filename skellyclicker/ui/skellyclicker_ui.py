@@ -43,11 +43,11 @@ class SkellyClickerUi:
         # ui_view.play_button.config(command=ui_controller.play_video)
         # ui_view.pause_button.config(command=ui_controller.pause_video)
 
-        ui_view.autosave_checkbox.config(command=ui_controller.on_autosave_toggle)
-        ui_view.save_csv_button.config(command=ui_controller.save_file)
-        ui_view.clear_session_button.config(command=ui_controller.clear_session)
-
-        ui_view.show_help_checkbox.config(command=ui_controller.on_show_help_toggle)
+        # ui_view.autosave_checkbox.config(command=ui_controller.on_autosave_toggle)
+        # ui_view.save_csv_button.config(command=ui_controller.save_file)
+        # ui_view.clear_session_button.config(command=ui_controller.clear_session)
+        #
+        # ui_view.show_help_checkbox.config(command=ui_controller.on_show_help_toggle)
 
     def on_closing(self):
         self.ui_controller.finish_and_close()

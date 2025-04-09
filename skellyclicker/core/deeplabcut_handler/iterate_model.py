@@ -24,9 +24,9 @@ def iterate_model(
     else:
         training = TrainingConfig.from_deeplabcut_config(config)
 
-    data.labels_csv_path = Path(clicker_csv_path)
+    data.click_data_csv_path = Path(clicker_csv_path)
     
-    project_path = Path(project.working_directory)
+    project_path = Path(project.config_yaml_path)
 
     shuffles_path = project_path / "training-datasets"
     results_path = project_path / "dlc-models"
@@ -55,7 +55,7 @@ def iterate_model(
     labeled_frames = fill_in_labelled_data_folder(
         path_to_videos_for_training=Path(data.folder_of_videos),
         path_to_dlc_project_folder=project_path,
-        path_to_image_labels_csv=Path(data.labels_csv_path),
+        path_to_image_labels_csv=Path(data.click_data_csv_path),
         scorer_name=project.experimenter,
     )
 

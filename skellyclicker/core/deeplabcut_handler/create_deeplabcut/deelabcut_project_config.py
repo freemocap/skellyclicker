@@ -1,75 +1,29 @@
-"""
-Configuration classes for DeepLabCut pipeline
----------------------------------------------
-Classes to organize and manage configuration settings for the DeepLabCut pipeline.
-"""
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from pydantic import BaseModel
 from deeplabcut.utils import auxiliaryfunctions
 
 
-@dataclass
-class SimpleDeeplabcutProjectConfig:
-    """Configuration for project setup"""
 
-    # Basic project information
-    name: str
-    experimenter: str = "human"
-    working_directory: str|None = None
-
-    # Anatomical configuration
-    bodyparts: List[str] = field(default_factory=list)
-    skeleton: list[list[str]]|None = None
-
-    def __post_init__(self):
-        if isinstance(self.working_directory, str):
-            self.working_directory = self.working_directory
-        elif self.working_directory is None:
-            self.working_directory = str(Path.cwd())
-
-        Path(self.working_directory).mkdir(exist_ok=True, parents=True)
-    
-    @classmethod
-    def from_deeplabcut_config(cls, deeplabcut_config: dict) -> "SimpleDeeplabcutProjectConfig":
-        return cls(
-            name=deeplabcut_config["Task"],
-            experimenter=deeplabcut_config["scorer"],
-            working_directory=deeplabcut_config["project_path"],
-            bodyparts=deeplabcut_config["bodyparts"],
-            skeleton=deeplabcut_config["skeleton"],
-        )
-
-    @classmethod
-    def from_deeplabcut_config_yaml(cls, deeplabcut_config_path: str | Path) -> "SimpleDeeplabcutProjectConfig":
-        config = auxiliaryfunctions.read_config(deeplabcut_config_path)
-
-        return cls.from_deeplabcut_config(config)
-
-
-@dataclass
-class SkellyclickerDataConfig:
+class SkellyClickerDataConfig(BaseModel):
     """Configuration for data processing"""
 
-    folder_of_videos: Path
-    labels_csv_path: Path
+    video_paths: list[str]
+    click_data_csv_path: str
 
-    def __post_init__(self):
-        if isinstance(self.folder_of_videos, str):
-            self.folder_of_videos = Path(self.folder_of_videos)
-        if isinstance(self.labels_csv_path, str):
-            self.labels_csv_path = Path(self.labels_csv_path)
 
     @classmethod
-    def from_config(cls, config: dict) -> "SkellyclickerDataConfig":
+    def from_config(cls, config: dict) -> "SkellyClickerDataConfig":
         return cls(
-            folder_of_videos=config["skellyclicker_folder_of_videos"],
-            labels_csv_path=config["skellyclicker_labels_csv_path"],
+            video_paths=config["skellyclicker_folder_of_videos"],
+            click_data_csv_path=config["skellyclicker_labels_csv_path"],
         )
 
     @classmethod
-    def from_config_yaml(cls, config_path: str | Path) -> "SkellyclickerDataConfig":
+    def from_config_yaml(cls, config_path: str ) -> "SkellyClickerDataConfig":
+        if not Path(config_path).is_file() and config_path.endswith(".yaml"):
+            raise ValueError(f"`{config_path} is not a path to a valid yaml file")
+
         config = auxiliaryfunctions.read_config(config_path)
 
         return cls.from_config(config)
@@ -78,14 +32,13 @@ class SkellyclickerDataConfig:
         auxiliaryfunctions.edit_config(
             config_path,
             {
-                "skellyclicker_folder_of_videos": str(self.folder_of_videos),
-                "skellyclicker_labels_csv_path": str(self.labels_csv_path),
+                "skellyclicker_folder_of_videos": str(self.videos),
+                "skellyclicker_labels_csv_path": str(self.click_data_csv_path),
             },
         )
 
 
-@dataclass
-class TrainingConfig:
+class DeeplabcutTrainingConfig(BaseModel):
     """Configuration for model training"""
 
     # Network settings
@@ -97,7 +50,7 @@ class TrainingConfig:
     batch_size: int = 1  # this seems to be similar to batch/multi processing (higher number = faster if your gpu can handle it?)
     
     @classmethod
-    def from_config(cls, config: dict, epochs: int = 200, save_epochs: int = 20) -> "TrainingConfig":
+    def from_config(cls, config: dict, epochs: int = 200, save_epochs: int = 20):
         return cls(
             model_type=config["default_net_type"],
             epochs=config.get("skellyclicker_epochs", epochs),
@@ -106,7 +59,7 @@ class TrainingConfig:
         )
     
     @classmethod
-    def from_config_yaml(cls, config_path: str | Path, epochs: int = 200, save_epochs: int = 20) -> "TrainingConfig":
+    def from_config_yaml(cls, config_path: str | Path, epochs: int = 200, save_epochs: int = 20):
         config = auxiliaryfunctions.read_config(config_path)
 
         return cls.from_config(config, epochs, save_epochs)

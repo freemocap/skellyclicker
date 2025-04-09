@@ -1,12 +1,15 @@
 import os
-import threading
 from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.core.video_handler.old_video_handler import VideoHandler
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import \
+    SimpleDeeplabcutProjectConfig
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 from skellyclicker.video_viewer import VideoViewer
+
+
+
 
 
 @dataclass
@@ -15,9 +18,7 @@ class SkellyClickerUIController:
     ui_model: SkellyClickerUIModel
 
     video_viewer: VideoViewer | None = None
-    # deeplabcut_handler: None
-    # mouse_handler: None
-    # keyboard_handler: None
+    deeplabcut_handler: DeeplabcutHandler| None = None
     # click_data_handler: None
 
     def load_deeplabcut_project(self) -> None:
@@ -25,6 +26,7 @@ class SkellyClickerUIController:
         if project_path:
             self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
+            self.deeplabcut_handler.load_project(project_path=project_path)
             print(f"DeepLabCut project loaded from: {project_path}")
 
     def create_deeplabcut_project(self) -> None:
@@ -35,6 +37,7 @@ class SkellyClickerUIController:
                 full_project_path = os.path.join(project_path, project_name)
                 self.ui_model.project_path = full_project_path
                 self.ui_view.deeplabcut_project_path_var.set(full_project_path)
+                self.deeplabcut_handler.create_deeplabcut_project(deeplabcut_project_path=full_project_path)
                 print(f"Creating new deeplabcut project: {full_project_path}")
 
     def load_videos(self) -> None:
@@ -58,6 +61,7 @@ class SkellyClickerUIController:
             messagebox.showinfo("No Project", "Please load or create a project first")
             return
         print("Training model...")
+        self.deeplabcut_handler.train_model(project_path=self.ui_model.project_path)
 
     def save_file(self) -> None:
         file_path = filedialog.asksaveasfilename(
