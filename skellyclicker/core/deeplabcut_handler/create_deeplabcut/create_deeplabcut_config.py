@@ -1,7 +1,6 @@
 import os
 
-from deeplabcut.core.engine import Engine
-from deeplabcut.utils import auxiliaryfunctions
+
 
 HUMAN_EXPERIMENTER_NAME: str = "human"
 
@@ -63,7 +62,8 @@ def create_new_deeplabcut_project(
         Path to the new project configuration file.
 
     """
-
+    from deeplabcut.core.engine import Engine
+    from deeplabcut.utils import auxiliaryfunctions
     project_parent_directory = Path(project_parent_directory).resolve()
     project_name = project_name
     project_path = project_parent_directory / project_name
