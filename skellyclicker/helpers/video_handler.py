@@ -44,7 +44,7 @@ class VideoHandler(BaseModel):
             raise ValueError(f"Invalid data handler file: {data_handler_path}")
         
         if machine_labels_path:
-            machine_labels_handler = DataHandler.from_csv(machine_labels_path)
+            machine_labels_handler = DataHandler.from_csv(str(machine_labels_path))
             machine_labels_annotator = ImageAnnotator(config=ImageAnnotatorConfig(
                 marker_type=cv2.MARKER_CROSS,
                 marker_size=10,

@@ -237,22 +237,22 @@ if __name__ == "__main__":
     # except Exception as e:
     #     logger.error(f"Fatal error: {str(e)}", exc_info=True)
     
-    # video_path = "/Users/philipqueen/test_ferrets"
-    video_path = DEMO_VIDEO_PATH
+    video_path = "/home/scholl-lab/recordings/session_2025-3-17/ferret_6873_NoImplant_test/synchronized_videos"
+    # video_path = DEMO_VIDEO_PATH
 
     if not Path(video_path).exists():
         logger.error(f"Video path not found: {video_path}")
         exit(1)
     
     # To label a new session:
-    data_path = TRACKED_POINTS_JSON_PATH
+    # data_path = TRACKED_POINTS_JSON_PATH
 
     # To continue labeling an existing session:
-    # data_path = "/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_11-54-23_skellyclicker_output.csv"
+    data_path = "/home/scholl-lab/recordings/session_2025-3-17/ferret_6873_NoImplant_test/skellyclicker_data/2025-04-10_11-26-19_skellyclicker_output.csv"
 
     # display machine labels (DLC predictions)
-    machine_labels_path = None
-    # machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
+    # machine_labels_path = None
+    machine_labels_path = "/home/scholl-lab/deeplabcut_data/philip_test_Philip_20250410/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
 
 
     viewer = SkellyClicker.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)

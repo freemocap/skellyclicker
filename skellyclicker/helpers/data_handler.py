@@ -37,9 +37,10 @@ class DataHandlerConfig(BaseModel):
             tracked_point_names.add(name)
         tracked_point_names = list(tracked_point_names)
         logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
+        video_names = sorted(dataframe.index.get_level_values("video").unique().tolist())
         return cls(
             num_frames=dataframe.index.get_level_values("frame").max(),
-            video_names=sorted(dataframe.index.get_level_values("video").unique().tolist()),
+            video_names=video_names,
             tracked_point_names=tracked_point_names,
         )
 
@@ -62,6 +63,7 @@ class DataHandler(BaseModel):
     @classmethod
     def from_csv(cls, input_path: str | Path):
         dataframe = pd.read_csv(input_path)
+        dataframe["video"] = dataframe["video"].astype(str)
         dataframe = dataframe.set_index(["video", "frame"])
 
         config = DataHandlerConfig.from_dataframe(dataframe)
@@ -130,11 +132,15 @@ class DataHandler(BaseModel):
         self, video_index: int, frame_number: int
     ) -> dict[str, ClickData]:
         video_name = self.config.video_names[video_index]
-        video_frame_row = self.dataframe.loc[(video_name, frame_number)]
+        video_frame_row = self.dataframe.loc[(video_name, frame_number)] 
+
+        if len(video_frame_row.shape) > 1:
+            video_frame_row = video_frame_row.iloc[0]
         click_data = {}
         for point_name in self.config.tracked_point_names:
             x = video_frame_row[f"{point_name}_x"]
             y = video_frame_row[f"{point_name}_y"]
+        
             if not np.isnan(x) and not np.isnan(y):
                 click_data[point_name] = ClickData(
                     video_index=video_index,
