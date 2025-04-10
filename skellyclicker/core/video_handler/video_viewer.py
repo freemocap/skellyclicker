@@ -1,4 +1,5 @@
 import logging
+import sys
 import threading
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from skellyclicker.core.video_handler.video_handler import VideoHandler
 
 logger = logging.getLogger(__name__)
 
-TRACKED_POINTS_JSON_PATH = Path(__file__).parent.parent / "tracked_points.json"
+TRACKED_POINTS_JSON_PATH = Path(__file__).parent.parent.parent.parent / "tracked_points.json"
 DEMO_VIDEO_PATH = (
         Path.home()
         / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
@@ -40,9 +41,12 @@ class VideoViewer(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     should_continue: bool = True
     def launch_video_thread(self):
-        self.video_thread = threading.Thread(target=self.run)
-        self.video_thread.daemon = True
-        self.video_thread.start()
+        if sys.platform == "darwin":
+            self.run()
+        else:
+            self.video_thread = threading.Thread(target=self.run)
+            self.video_thread.daemon = True
+            self.video_thread.start()
 
     @classmethod
     def from_videos(

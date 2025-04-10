@@ -2,8 +2,8 @@ import os
 from dataclasses import dataclass
 from tkinter import filedialog, simpledialog, messagebox
 
-from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
+from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 from skellyclicker.core.video_handler.video_viewer import VideoViewer
 
@@ -14,7 +14,7 @@ class SkellyClickerUIController:
     ui_model: SkellyClickerUIModel
 
     video_viewer: VideoViewer | None = None
-    deeplabcut_handler: DeeplabcutHandler| None = None
+    deeplabcut_handler: DeeplabcutHandler | None = None
     # click_data_handler: None
 
     def load_deeplabcut_project(self) -> None:
