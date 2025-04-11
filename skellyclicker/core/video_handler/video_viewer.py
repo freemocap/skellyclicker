@@ -41,7 +41,8 @@ class VideoViewer(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     should_continue: bool = True
     def launch_video_thread(self):
-        if sys.platform == "darwin":
+        if sys.platform == "darwin": # OpenCV GUI can only open in main thread on Mac
+            self.video_thread = None
             self.run()
         else:
             self.video_thread = threading.Thread(target=self.run)
@@ -61,7 +62,7 @@ class VideoViewer(BaseModel):
                 video_paths = video_paths,
                 max_window_size = max_window_size,
                 data_handler_path = data_handler_path,
-                # machine_labels_path = machine_labels_path
+                machine_labels_path = machine_labels_path
             ),
             video_folder=str(Path(video_paths[0]).parent),
             max_window_size=max_window_size,
