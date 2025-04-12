@@ -46,18 +46,37 @@ class SkellyClickerUIController:
             self.ui_view.videos_directory_path_var.set(", ".join(video_files))
             print(f"Videos loaded: {len(video_files)} files")
             if self.video_viewer:
-                self.video_viewer.close()
+                self.video_viewer.close()  # TODO: no close method implemented
             self.video_viewer = VideoViewer.from_videos(self.ui_model.video_files)
+            self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
+            # TODO: have save dialog show up as gui popup
 
+    def video_viewer_on_complete(self) -> None:
+        if self.video_viewer is None:
+            print("Video viewer closed while not initialized")
+            return
+        save_data = messagebox.askyesno("Save Data", "Would you like to save the data?")
+        if save_data is False:
+            save_data = messagebox.askyesno("Save Data Confirmation", "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:")
+        save_path = self.video_viewer.video_handler.close(save_data=save_data)
 
+        if save_data:
+            self.ui_model.csv_saved_path = save_path
+            messagebox.showinfo("Data Saved", f"Data saved to: {save_path}")
+        else:
+            messagebox.showinfo("Data Not Saved", "Data not saved.")
 
     def train_model(self) -> None:
         if not self.ui_model.project_path:
             messagebox.showinfo("No Project", "Please load or create a project first")
             return
         print("Training model...")
+        if self.deeplabcut_handler is None:
+            messagebox.showinfo("No DeepLabCut Handler", "DeepLabCut handler not initialized")
+            return
         self.deeplabcut_handler.train_model(project_path=self.ui_model.project_path)
+
 
     def save_file(self) -> None:
         file_path = filedialog.asksaveasfilename(

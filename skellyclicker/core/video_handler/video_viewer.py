@@ -2,6 +2,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
+from typing import Callable
 
 import cv2
 import numpy as np
@@ -12,15 +13,16 @@ from skellyclicker.core.video_handler.video_handler import VideoHandler
 
 logger = logging.getLogger(__name__)
 
-TRACKED_POINTS_JSON_PATH = Path(__file__).parent.parent.parent.parent / "tracked_points.json"
+TRACKED_POINTS_JSON_PATH = (
+    Path(__file__).parent.parent.parent.parent / "tracked_points.json"
+)
 DEMO_VIDEO_PATH = (
-        Path.home()
-        / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
+    Path.home()
+    / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
 )
 if not TRACKED_POINTS_JSON_PATH.exists():
     logger.error(f"Tracked points JSON file not found: {TRACKED_POINTS_JSON_PATH}")
     exit(1)
-
 
 
 class VideoViewer(BaseModel):
@@ -40,8 +42,10 @@ class VideoViewer(BaseModel):
     video_thread: threading.Thread | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
     should_continue: bool = True
+    on_complete: Callable | None = None
+
     def launch_video_thread(self):
-        if sys.platform == "darwin": # OpenCV GUI can only open in main thread on Mac
+        if sys.platform == "darwin":  # OpenCV GUI can only open in main thread on Mac
             self.video_thread = None
             self.run()
         else:
@@ -51,18 +55,18 @@ class VideoViewer(BaseModel):
 
     @classmethod
     def from_videos(
-            cls,
-            video_paths: list[str],
-            max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
-            data_handler_path: str = str(TRACKED_POINTS_JSON_PATH),
-            machine_labels_path: str | None = None
+        cls,
+        video_paths: list[str],
+        max_window_size: tuple[int, int] = MAX_WINDOW_SIZE,
+        data_handler_path: str = str(TRACKED_POINTS_JSON_PATH),
+        machine_labels_path: str | None = None,
     ):
         return cls(
             video_handler=VideoHandler.from_videos(
-                video_paths = video_paths,
-                max_window_size = max_window_size,
-                data_handler_path = data_handler_path,
-                machine_labels_path = machine_labels_path
+                video_paths=video_paths,
+                max_window_size=max_window_size,
+                data_handler_path=data_handler_path,
+                machine_labels_path=machine_labels_path,
             ),
             video_folder=str(Path(video_paths[0]).parent),
             max_window_size=max_window_size,
@@ -78,7 +82,7 @@ class VideoViewer(BaseModel):
         elif key == 32:  # spacebar
             self.is_playing = not self.is_playing
         elif key == ord("r"):  # reset zoom
-            for video in self.video_handler.videos:
+            for video in self.video_handler.videos.values():
                 video.zoom_state.reset()
         elif key == ord("a"):
             self._jump_n_frames(-1)
@@ -89,7 +93,7 @@ class VideoViewer(BaseModel):
         elif key == ord("s"):
             self.video_handler.move_active_point_by_index(index_change=1)
         elif key == ord("q"):
-            self.keyboard_zoom(zoom_in=False) # Zoom out
+            self.keyboard_zoom(zoom_in=False)  # Zoom out
         elif key == ord("e"):
             self.keyboard_zoom(zoom_in=True)
         elif key == ord("h"):
@@ -100,29 +104,38 @@ class VideoViewer(BaseModel):
         elif key == ord("c"):
             self.auto_next_point = not self.auto_next_point
         elif key == ord("m"):
-            self.video_handler.show_machine_labels = not self.video_handler.show_machine_labels
+            self.video_handler.show_machine_labels = (
+                not self.video_handler.show_machine_labels
+            )
         elif key == ord("n"):
-            self.video_handler.image_annotator.config.show_names = not self.video_handler.image_annotator.config.show_names
+            self.video_handler.image_annotator.config.show_names = (
+                not self.video_handler.image_annotator.config.show_names
+            )
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
         flags = 1 if zoom_in else -1
         if self.active_cell is not None and self.last_mouse_position is not None:
             self._zoom(
-                    self.last_mouse_position[0],
-                    self.last_mouse_position[1],
-                    flags=flags,
-                    cell_x=self.active_cell[0],
-                    cell_y=self.active_cell[1],
-                )
+                self.last_mouse_position[0],
+                self.last_mouse_position[1],
+                flags=flags,
+                cell_x=self.active_cell[0],
+                cell_y=self.active_cell[1],
+            )
 
     def clear_current_point(self):
         video_index = None
         if self.active_cell is not None:
-            video_index = self.active_cell[1] * self.video_handler.grid_parameters.columns + self.active_cell[0]
+            video_index = (
+                self.active_cell[1] * self.video_handler.grid_parameters.columns
+                + self.active_cell[0]
+            )
         if not video_index:
             return
-        self.video_handler.data_handler.clear_current_point(video_index=video_index, frame_number=self.frame_number)
+        self.video_handler.data_handler.clear_current_point(
+            video_index=video_index, frame_number=self.frame_number
+        )
 
     def _jump_n_frames(self, num_frames: int = 1):
         self.is_playing = False
@@ -149,9 +162,9 @@ class VideoViewer(BaseModel):
 
     def _zoom(self, x, y, flags, cell_x, cell_y):
         video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
-        if video_idx < len(self.video_handler.videos):
-            video = self.video_handler.videos[video_idx]
-            scaling = video.grid_scale
+        if video_idx < len(self.video_handler.videos.values()):
+            video = list(self.video_handler.videos.values())[video_idx]
+            scaling = video.scaling_params
             zoom_state = video.zoom_state
 
             # Get relative position within cell
@@ -161,11 +174,11 @@ class VideoViewer(BaseModel):
             if zoom_state.scale > 1.0:
                 # Calculate current visible region
                 relative_x = (
-                                     zoom_state.center_x - scaling.x_offset
-                             ) / scaling.scaled_width
+                    zoom_state.center_x - scaling.x_offset
+                ) / scaling.scaled_width
                 relative_y = (
-                                     zoom_state.center_y - scaling.y_offset
-                             ) / scaling.scaled_height
+                    zoom_state.center_y - scaling.y_offset
+                ) / scaling.scaled_height
 
                 # Calculate center point in zoomed coordinates
                 zoomed_width = int(scaling.scaled_width * zoom_state.scale)
@@ -224,14 +237,20 @@ class VideoViewer(BaseModel):
                 )
                 cv2.imshow(str(self.video_folder), grid_image)
                 if self.is_playing:
-                    self.frame_number = (self.frame_number + self.step_size) % self.frame_count
+                    self.frame_number = (
+                        self.frame_number + self.step_size
+                    ) % self.frame_count
         finally:
             cv2.destroyAllWindows()
             cv2.waitKey(1)
-            self.video_handler.close()
+            if self.on_complete:
+                self.on_complete()
+            else:
+                self.video_handler.close(save_data=None)
 
     def stop(self):
         self.should_continue = False
+
 
 if __name__ == "__main__":
     video_path = DEMO_VIDEO_PATH
@@ -239,7 +258,9 @@ if __name__ == "__main__":
     if not Path(video_path).exists():
         logger.error(f"Video path not found: {video_path}")
         exit(1)
-    
+
+    video_paths = sorted([str(path) for path in Path(video_path).glob("*.mp4")])
+
     # To label a new session:
     data_path = TRACKED_POINTS_JSON_PATH
 
@@ -247,9 +268,12 @@ if __name__ == "__main__":
     # data_path = "/Users/philipqueen/freemocap_data/recording_sessions/freemocap_test_data/skellyclicker_data/2025-04-03_11-54-23_skellyclicker_output.csv"
 
     # display machine labels (DLC predictions)
-    # machine_labels_path = None
+    machine_labels_path = None
     # machine_labels_path = "/Users/philipqueen/DLCtest/sample_data_test2_user_20250403/model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv"
 
-
-    viewer = VideoViewer.create(video_folder=str(video_path), data_handler_path=str(data_path), machine_labels_path=machine_labels_path)
+    viewer = VideoViewer.from_videos(
+        video_paths=video_paths,
+        data_handler_path=str(data_path),
+        machine_labels_path=machine_labels_path,
+    )
     viewer.run()

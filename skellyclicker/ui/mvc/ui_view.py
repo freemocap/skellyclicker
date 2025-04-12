@@ -76,6 +76,10 @@ class SkellyClickerUIView:
     save_csv_button: tk.Button = None
     clear_session_button: tk.Button = None
 
+    # Load section
+    load_model_frame: tk.Frame = None
+    load_model_button: tk.Button = None
+
     # Info section
     show_help_frame: tk.Frame = None
     show_help_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
@@ -108,8 +112,11 @@ class SkellyClickerUIView:
         # instance._create_playback_section()
         # instance._create_separator()
 
-        # instance._create_save_option_frame()
-        # instance._create_separator()
+        instance._create_save_option_frame()
+        instance._create_separator()
+
+        instance._create_load_model_frame()
+        instance._create_separator()
         #
         # instance._create_show_help_frame()
 
@@ -270,6 +277,13 @@ class SkellyClickerUIView:
             wraplength=200,  # Wrap text to fit sidebar
         )
         self.click_save_path_label.pack(fill=tk.X, padx=5, pady=2)
+
+    def _create_load_model_frame(self):
+        self.load_model_frame = tk.Frame(self.main_frame)
+        self.load_model_frame.pack(fill=tk.X, pady=5)
+
+        self.load_model_button = tk.Button(self.load_model_frame, text="Load Model")
+        self.load_model_button.pack(side=tk.LEFT, padx=5)
 
     def _create_show_help_frame(self):
         """Create the help section."""

@@ -268,23 +268,36 @@ class VideoHandler(BaseModel):
 
         return self.image_annotator.annotate_image_grid(image=grid_image, active_point=self.data_handler.active_point, frame_number=frame_number)
 
-    def close(self):
+    def close(self, save_data: bool | None = None) -> str | None:
         """Clean up resources."""
         logger.info("VideoHandler closing")
         for video in self.videos.values():
             video.cap.release()
 
-        while True:
-            save_data = input("Save data? (yes/no): ")
-            if save_data.lower() == "yes" or save_data.lower() == "y":
-                save_path = Path(self.video_folder).parent / "skellyclicker_data"
-                save_path.mkdir(exist_ok=True, parents=True)
-                csv_path = save_path / (datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_skellyclicker_output.csv")
-                self.data_handler.save_csv(output_path=str(csv_path))
-                break   
-            else:
-                confirmation = input("Confirm your choice: Type 'yes' to prevent data loss or 'no' to delete this session forever (yes/no): ")
-                if confirmation == "no" or confirmation == "n":
-                    logger.info("Data not saved.")
-                    break
+        if save_data is True:
+            save_path = self._save_data()
+        elif save_data is None:
+            while True:
+                save_data_input = input("Save data? (yes/no): ")
+                if save_data_input.lower() == "yes" or save_data_input.lower() == "y":
+                    save_path = self._save_data()
+                    break   
+                else:
+                    confirmation = input("Confirm your choice: Type 'yes' to prevent data loss or 'no' to delete this session forever (yes/no): ")
+                    if confirmation == "no" or confirmation == "n":
+                        logger.info("Data not saved.")
+                        save_path = None
+                        break
+        else:
+            save_path = None
+
+        return save_path
+
+    def _save_data(self) -> str:
+        save_path = Path(self.video_folder).parent / "skellyclicker_data"
+        save_path.mkdir(exist_ok=True, parents=True)
+        csv_path = save_path / (datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_skellyclicker_output.csv")
+        self.data_handler.save_csv(output_path=str(csv_path))
+
+        return str(csv_path)
 
