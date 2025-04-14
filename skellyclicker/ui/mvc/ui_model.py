@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 
 class SkellyClickerUIModel(BaseModel):
+    session_saved_path: str | None = None
     csv_saved_path: str | None = None
     is_playing: bool = False
     project_path: str | None = None

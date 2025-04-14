@@ -1,6 +1,9 @@
 import os
 from dataclasses import dataclass
-from tkinter import filedialog, simpledialog, messagebox
+from pathlib import Path
+from tkinter import filedialog, simpledialog, messagebox, NORMAL, DISABLED
+
+from pydantic import ValidationError
 
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
@@ -15,13 +18,11 @@ class SkellyClickerUIController:
 
     video_viewer: VideoViewer | None = None
     deeplabcut_handler: DeeplabcutHandler | None = None
-    # click_data_handler: None
-
-    def __post_init__(self):
-        self.ui_view.autosave_checkbox.configure(command=self.on_autosave_toggle)
 
     def load_deeplabcut_project(self) -> None:
-        project_path = filedialog.askdirectory(title="Select DeepLabCut Project Directory")
+        project_path = filedialog.askdirectory(
+            title="Select DeepLabCut Project Directory"
+        )
         if project_path:
             self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
@@ -29,9 +30,13 @@ class SkellyClickerUIController:
             print(f"DeepLabCut project loaded from: {project_path}")
 
     def create_deeplabcut_project(self) -> None:
-        project_path = filedialog.askdirectory(title="Select Directory for New DeepLabCut Project")
+        project_path = filedialog.askdirectory(
+            title="Select Directory for New DeepLabCut Project"
+        )
         if project_path:
-            project_name = simpledialog.askstring("DeepLabCut Project Name", "Enter name for new deeplabcut project:")
+            project_name = simpledialog.askstring(
+                "DeepLabCut Project Name", "Enter name for new deeplabcut project:"
+            )
             if project_name:
                 full_project_path = os.path.join(project_path, project_name)
                 self.ui_model.project_path = full_project_path
@@ -42,15 +47,31 @@ class SkellyClickerUIController:
     def load_videos(self) -> None:
         video_files = filedialog.askopenfilenames(
             title="Select Videos",
-            filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")]
+            filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
         )
         if video_files:
             self.ui_model.video_files = list(video_files)
-            self.ui_view.videos_directory_path_var.set(", ".join(video_files))
-            print(f"Videos loaded: {len(video_files)} files")
+            self.ui_view.open_videos_button.config(state=NORMAL)
+            self.open_videos()
+
+    def open_videos(self) -> None:
+        if self.ui_model.video_files:
+            self.ui_model.video_files = list(self.ui_model.video_files)
+            self.ui_view.videos_directory_path_var.set(
+                ", ".join(self.ui_model.video_files)
+            )
+            print(f"Videos loaded: {len(self.ui_model.video_files)} files")
             if self.video_viewer:
                 self.video_viewer.close()  # TODO: no close method implemented
-            self.video_viewer = VideoViewer.from_videos(self.ui_model.video_files)
+            if self.ui_model.csv_saved_path:
+                self.video_viewer = VideoViewer.from_videos(
+                    video_paths=self.ui_model.video_files,
+                    data_handler_path=self.ui_model.csv_saved_path,
+                )
+            else:
+                self.video_viewer = VideoViewer.from_videos(
+                    video_paths=self.ui_model.video_files
+                )
             self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
 
@@ -58,12 +79,14 @@ class SkellyClickerUIController:
         if self.video_viewer is None:
             print("Video viewer closed while not initialized")
             return
-        if self.ui_model.auto_save:
-            save_data = True
-        else:
-            save_data = messagebox.askyesno("Save Data", "Would you like to save the data?")
-            if save_data is False:
-                save_data = messagebox.askyesno("Save Data Confirmation", "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:")
+        save_data = messagebox.askyesno(
+            "Save Data", "Would you like to save the data?"
+        )
+        if save_data is False:
+            save_data = messagebox.askyesno(
+                "Save Data Confirmation",
+                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:",
+            )
         save_path = self.video_viewer.video_handler.close(save_data=save_data)
 
         if save_data and save_path:
@@ -79,20 +102,72 @@ class SkellyClickerUIController:
             return
         print("Training model...")
         if self.deeplabcut_handler is None:
-            messagebox.showinfo("No DeepLabCut Handler", "DeepLabCut handler not initialized")
+            messagebox.showinfo(
+                "No DeepLabCut Handler", "DeepLabCut handler not initialized"
+            )
             return
         self.deeplabcut_handler.train_model(project_path=self.ui_model.project_path)
-
 
     def set_save_path(self) -> None:
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
         if file_path:
             self.ui_model.csv_saved_path = file_path
             self.ui_view.click_save_path_var.set(file_path)
             print(f"New save path set to: {file_path}")
+
+    def save_session(self) -> None:
+        output_directory = Path(self.ui_model.session_saved_path).parent if self.ui_model.session_saved_path else None
+        output_filename = Path(self.ui_model.session_saved_path).name if self.ui_model.session_saved_path else None
+
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")], 
+            initialdir=output_directory,
+            initialfile=output_filename,
+        )
+        json_data = self.ui_model.model_dump_json()
+
+        with open(output_path, "w") as f:
+            f.write(json_data)
+
+        print(f"Session successfully saved to: {output_path}")
+
+    def load_session(self) -> None:
+        json_file = filedialog.askopenfilename(
+            title="Select Session File",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        with open(json_file, "r") as f:
+            json_data = f.read()
+
+        try:
+            self.ui_model = SkellyClickerUIModel.model_validate_json(json_data)
+            self.ui_model.session_saved_path = json_file
+        except ValidationError as e:
+            print(f"Error loading session: {e}")
+            return
+
+        self.sync_ui_with_model()
+
+        print(f"Session successfully loaded from: {json_file}")
+
+    def sync_ui_with_model(self) -> None:
+        self.ui_view.autosave_boolean_var.set(self.ui_model.auto_save)
+        self.ui_view.show_help_boolean_var.set(self.ui_model.show_help)
+        if self.ui_model.video_files:
+            self.ui_view.videos_directory_path_var.set(
+                ", ".join(self.ui_model.video_files)
+            )
+            self.ui_view.open_videos_button.config(state=NORMAL)
+        else:
+            self.ui_view.open_videos_button.config(state=DISABLED)
+        if self.ui_model.csv_saved_path:
+            self.ui_view.click_save_path_var.set(self.ui_model.csv_saved_path)
+        if self.ui_model.project_path:
+            self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
 
     def on_autosave_toggle(self) -> None:
         self.ui_model.auto_save = self.ui_view.autosave_boolean_var.get()
@@ -103,11 +178,30 @@ class SkellyClickerUIController:
         print(f"Show help set to: {self.ui_model.show_help}")
 
     def clear_session(self) -> None:
-        response = messagebox.askyesno("Confirmation", "Are you sure you want to clear the session?")
+        response = messagebox.askyesno(
+            "Confirmation", "Are you sure you want to clear the session?"
+        )
         if response:
             self.ui_model = SkellyClickerUIModel()
+            self.sync_ui_with_model()
             print("Session cleared")
 
     def finish_and_close(self):
         if self.video_viewer:
             self.video_viewer.stop()
+
+        if self.ui_model.auto_save:
+            self.save_session()
+            return
+        
+        save_session_answer = messagebox.askyesno(
+            "Save Session", "Would you like to save this session?"
+        )
+        if save_session_answer is False:
+            save_session_answer = messagebox.askyesno(
+                "Save Session Confirmation",
+                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:",
+            )
+
+        if save_session_answer:
+            self.save_session()

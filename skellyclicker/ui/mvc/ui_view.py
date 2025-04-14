@@ -26,6 +26,7 @@ class SkellyClickerUIView:
     videos_directory_path_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="No videos loaded"))
     load_videos_frame: tk.Frame = None
     load_videos_button: tk.Button = None
+    open_videos_button: tk.Button = None
     videos_directory_label: tk.Label = None
 
     # Playback section
@@ -73,12 +74,9 @@ class SkellyClickerUIView:
     autosave_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     click_save_path_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="No file saved"))
     click_save_path_label: tk.Label = None
-    save_csv_button: tk.Button = None
+    save_session_button: tk.Button = None
+    load_session_button: tk.Button = None
     clear_session_button: tk.Button = None
-
-    # Load section
-    load_model_frame: tk.Frame = None
-    load_model_button: tk.Button = None
 
     # Info section
     show_help_frame: tk.Frame = None
@@ -115,7 +113,6 @@ class SkellyClickerUIView:
         instance._create_save_option_frame()
         instance._create_separator()
 
-        instance._create_load_model_frame()
         instance._create_separator()
         #
         # instance._create_show_help_frame()
@@ -179,11 +176,11 @@ class SkellyClickerUIView:
         self.deeplabcut_frame = tk.Frame(self.main_frame)
         self.deeplabcut_frame.pack(fill=tk.X, pady=5)
 
-        self.load_deeplabcut_button = tk.Button(self.deeplabcut_frame, text="Load")
-        self.load_deeplabcut_button.pack(side=tk.LEFT, padx=5)
-
         self.create_deeplabcut_button = tk.Button(self.deeplabcut_frame, text="Create")
         self.create_deeplabcut_button.pack(side=tk.LEFT, padx=5)
+
+        self.load_deeplabcut_button = tk.Button(self.deeplabcut_frame, text="Load")
+        self.load_deeplabcut_button.pack(side=tk.LEFT, padx=5)
 
         self.deeplabcut_project_label = tk.Label(self.deeplabcut_frame, text="Deeplabcut Project")
         self.deeplabcut_project_label.pack(side=tk.LEFT, padx=5)
@@ -198,6 +195,10 @@ class SkellyClickerUIView:
 
         self.load_videos_button = tk.Button(self.load_videos_frame, text="Load Videos")
         self.load_videos_button.pack(side=tk.LEFT, padx=5)
+
+        self.open_videos_button = tk.Button(self.load_videos_frame, text="Open Videos")
+        self.open_videos_button.pack(side=tk.LEFT, padx=5)
+        self.open_videos_button.config(state=tk.DISABLED)
 
         self.videos_directory_label = tk.Label(self.load_videos_frame, textvariable=self.videos_directory_path_var, wraplength=200)
         self.videos_directory_label.pack(side=tk.LEFT, padx=5)
@@ -252,11 +253,17 @@ class SkellyClickerUIView:
         )
         self.autosave_checkbox.pack(side=tk.LEFT)
 
-        self.save_csv_button = tk.Button(
+        self.save_session_button = tk.Button(
             self.save_options_frame,
-            text="Save Labels to CSV",
+            text="Save Session",
         )
-        self.save_csv_button.pack(side=tk.LEFT, padx=10)
+        self.save_session_button.pack(side=tk.LEFT, padx=10)
+
+        self.load_session_button = tk.Button(
+            self.save_options_frame,
+            text="Load Session",
+        )
+        self.load_session_button.pack(side=tk.LEFT, padx=10)
 
         self.clear_session_button = tk.Button(
             self.save_options_frame,
@@ -277,13 +284,6 @@ class SkellyClickerUIView:
             wraplength=200,  # Wrap text to fit sidebar
         )
         self.click_save_path_label.pack(fill=tk.X, padx=5, pady=2)
-
-    def _create_load_model_frame(self):
-        self.load_model_frame = tk.Frame(self.main_frame)
-        self.load_model_frame.pack(fill=tk.X, pady=5)
-
-        self.load_model_button = tk.Button(self.load_model_frame, text="Load Model")
-        self.load_model_button.pack(side=tk.LEFT, padx=5)
 
     def _create_show_help_frame(self):
         """Create the help section."""
