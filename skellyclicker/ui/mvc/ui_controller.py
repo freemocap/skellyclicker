@@ -17,6 +17,9 @@ class SkellyClickerUIController:
     deeplabcut_handler: DeeplabcutHandler | None = None
     # click_data_handler: None
 
+    def __post_init__(self):
+        self.ui_view.autosave_checkbox.configure(command=self.on_autosave_toggle)
+
     def load_deeplabcut_project(self) -> None:
         project_path = filedialog.askdirectory(title="Select DeepLabCut Project Directory")
         if project_path:
@@ -50,19 +53,22 @@ class SkellyClickerUIController:
             self.video_viewer = VideoViewer.from_videos(self.ui_model.video_files)
             self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
-            # TODO: have save dialog show up as gui popup
 
     def video_viewer_on_complete(self) -> None:
         if self.video_viewer is None:
             print("Video viewer closed while not initialized")
             return
-        save_data = messagebox.askyesno("Save Data", "Would you like to save the data?")
-        if save_data is False:
-            save_data = messagebox.askyesno("Save Data Confirmation", "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:")
+        if self.ui_model.auto_save:
+            save_data = True
+        else:
+            save_data = messagebox.askyesno("Save Data", "Would you like to save the data?")
+            if save_data is False:
+                save_data = messagebox.askyesno("Save Data Confirmation", "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:")
         save_path = self.video_viewer.video_handler.close(save_data=save_data)
 
-        if save_data:
+        if save_data and save_path:
             self.ui_model.csv_saved_path = save_path
+            self.ui_view.click_save_path_var.set(save_path)
             messagebox.showinfo("Data Saved", f"Data saved to: {save_path}")
         else:
             messagebox.showinfo("Data Not Saved", "Data not saved.")
@@ -78,7 +84,7 @@ class SkellyClickerUIController:
         self.deeplabcut_handler.train_model(project_path=self.ui_model.project_path)
 
 
-    def save_file(self) -> None:
+    def set_save_path(self) -> None:
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
@@ -86,7 +92,7 @@ class SkellyClickerUIController:
         if file_path:
             self.ui_model.csv_saved_path = file_path
             self.ui_view.click_save_path_var.set(file_path)
-            print(f"File saved to: {file_path}")
+            print(f"New save path set to: {file_path}")
 
     def on_autosave_toggle(self) -> None:
         self.ui_model.auto_save = self.ui_view.autosave_boolean_var.get()

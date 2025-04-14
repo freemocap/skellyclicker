@@ -268,7 +268,7 @@ class SkellyClickerUIView:
         path_frame = tk.Frame(self.main_frame)
         path_frame.pack(fill=tk.X, pady=2)
 
-        path_label = tk.Label(path_frame, text="Save Path:")
+        path_label = tk.Label(path_frame, text="Last Saved Path:")
         path_label.pack(anchor='w', padx=5)
 
         self.click_save_path_label = tk.Label(
