@@ -46,6 +46,8 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: Path,
 
         # TODO: be able to look in different locations to handle multiple video folders
         # Or is it better to run this function for each video set (each with own CSV?)
+
+        # TODO: change this to be able to take in a list of videos
         video_path = path_to_videos_for_training / f"{video_name}"
         if not video_path.exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")

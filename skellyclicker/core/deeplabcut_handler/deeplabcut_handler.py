@@ -56,5 +56,5 @@ class DeeplabcutHandler(BaseModel):
     def update_project_data(self):
         pass
 
-    def train_model(self):
+    def train_model(self, project_path: str):
         pass

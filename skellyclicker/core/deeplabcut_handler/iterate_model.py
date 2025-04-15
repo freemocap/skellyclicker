@@ -5,28 +5,30 @@ from deeplabcut import DEBUG
 import deeplabcut
 from deeplabcut.utils import auxiliaryfunctions
 
-from scholl_lab.dlc_utils.create_dlc_project_data import fill_in_labelled_data_folder
-from scholl_lab.dlc_utils.project_config import DataConfig, ProjectConfig, TrainingConfig
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_project_data import fill_in_labelled_data_folder
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import (
+    SkellyClickerDataConfig,
+    DeeplabcutTrainingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def iterate_model(
     config_path: str | Path,
-    clicker_csv_path: str | Path,
-    training_config: TrainingConfig | None = None,
+    clicker_csv_path: str,
+    training_config: DeeplabcutTrainingConfig | None = None,
 ) -> None:
     config = auxiliaryfunctions.read_config(config_path)
-    project = ProjectConfig.from_deeplabcut_config(config)
-    data = DataConfig.from_deeplabcut_config(config)
+    data = SkellyClickerDataConfig.from_config(config)
     if training_config:
         training = training_config
     else:
-        training = TrainingConfig.from_deeplabcut_config(config)
+        training = DeeplabcutTrainingConfig.from_config(config)
 
-    data.click_data_csv_path = Path(clicker_csv_path)
-    
-    project_path = Path(project.config_yaml_path)
+    data.click_data_csv_path = clicker_csv_path
+
+    project_path = config["project_path"]
 
     shuffles_path = project_path / "training-datasets"
     results_path = project_path / "dlc-models"
@@ -50,13 +52,12 @@ def iterate_model(
     data.update_config_yaml(config_path)
     logger.info(f"Saved updated config file: {config_path}")
 
-
     logger.info("Processing labeled frames...")
     labeled_frames = fill_in_labelled_data_folder(
-        path_to_videos_for_training=Path(data.folder_of_videos),
+        path_to_videos_for_training=data.video_paths,
         path_to_dlc_project_folder=project_path,
         path_to_image_labels_csv=Path(data.click_data_csv_path),
-        scorer_name=project.experimenter,
+        scorer_name=config["scorer"],
     )
 
     # make new training dataset
@@ -71,7 +72,7 @@ def iterate_model(
         config=config_path,
         epochs=training.epochs,
         save_epochs=training.save_epochs,
-        batch_size=training.batch_size
+        batch_size=training.batch_size,
     )
 
 
