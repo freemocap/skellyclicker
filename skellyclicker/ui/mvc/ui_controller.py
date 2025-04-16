@@ -26,7 +26,7 @@ class SkellyClickerUIController:
         if project_path:
             self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
-            self.deeplabcut_handler.load_project(project_path=project_path)
+            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=project_path)
             print(f"DeepLabCut project loaded from: {project_path}")
 
     def create_deeplabcut_project(self) -> None:
@@ -41,7 +41,19 @@ class SkellyClickerUIController:
                 full_project_path = os.path.join(project_path, project_name)
                 self.ui_model.project_path = full_project_path
                 self.ui_view.deeplabcut_project_path_var.set(full_project_path)
-                # self.deeplabcut_handler.create_deeplabcut_project(deeplabcut_project_path=full_project_path)
+                
+                if self.video_viewer:
+                    tracked_point_names = self.video_viewer.video_handler.data_handler.config.tracked_point_names
+                else:
+                    print("No tracked point names available, load and label videos before creating deeplabcut project")
+                    return
+                self.deeplabcut_handler = DeeplabcutHandler.create_deeplabcut_project(
+                    project_name=project_name,
+                    project_parent_directory=project_path,
+                    tracked_point_names=tracked_point_names,
+                    connections=None, # TODO: Handle connections somehow
+                )
+                    
                 print(f"Creating new deeplabcut project: {full_project_path}")
 
     def load_videos(self) -> None:
@@ -157,6 +169,14 @@ class SkellyClickerUIController:
         except ValidationError as e:
             print(f"Error loading session: {e}")
             return
+        
+        if self.deeplabcut_handler:
+            print("WARNING: Project loaded while deeplabcut handler already initialized, closing deeplabcut project")
+        if self.ui_model.project_path:
+            self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
+            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=self.ui_model.project_path)
+        else:
+            self.deeplabcut_handler = None
 
         self.sync_ui_with_model()
 

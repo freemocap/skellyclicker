@@ -27,9 +27,9 @@ def build_dlc_formatted_header(labels_dataframe: pd.DataFrame, scorer_name: str)
     return header_df, joint_names
 
 
-def fill_in_labelled_data_folder(path_to_videos_for_training: Path,
-                                 path_to_dlc_project_folder: Path,
-                                 path_to_image_labels_csv: Path,
+def fill_in_labelled_data_folder(path_to_videos_for_training: str,
+                                 path_to_dlc_project_folder: str,
+                                 path_to_image_labels_csv: str,
                                  scorer_name: str = "scorer"
                                  ):
     labels_dataframe = pd.read_csv(path_to_image_labels_csv)
@@ -41,14 +41,14 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: Path,
     labeled_frames_per_video = {}
     for video_name, video_df in per_video_dataframe.items():
         video_name_wo_extension = str(video_name).split('.')[0]
-        dlc_video_folder_path = path_to_dlc_project_folder / 'labeled-data' / video_name_wo_extension
+        dlc_video_folder_path = Path(path_to_dlc_project_folder) / 'labeled-data' / video_name_wo_extension
         dlc_video_folder_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: be able to look in different locations to handle multiple video folders
         # Or is it better to run this function for each video set (each with own CSV?)
 
         # TODO: change this to be able to take in a list of videos
-        video_path = path_to_videos_for_training / f"{video_name}"
+        video_path = Path(path_to_videos_for_training) / f"{video_name}"
         if not video_path.exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")
 
