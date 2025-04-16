@@ -67,10 +67,12 @@ class SkellyClickerUIController:
                 self.video_viewer = VideoViewer.from_videos(
                     video_paths=self.ui_model.video_files,
                     data_handler_path=self.ui_model.csv_saved_path,
+                    machine_labels_path=self.ui_model.machine_labels_path,
                 )
             else:
                 self.video_viewer = VideoViewer.from_videos(
-                    video_paths=self.ui_model.video_files
+                    video_paths=self.ui_model.video_files,
+                    machine_labels_path=self.ui_model.machine_labels_path,
                 )
             self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
@@ -79,9 +81,7 @@ class SkellyClickerUIController:
         if self.video_viewer is None:
             print("Video viewer closed while not initialized")
             return
-        save_data = messagebox.askyesno(
-            "Save Data", "Would you like to save the data?"
-        )
+        save_data = messagebox.askyesno("Save Data", "Would you like to save the data?")
         if save_data is False:
             save_data = messagebox.askyesno(
                 "Save Data Confirmation",
@@ -119,12 +119,20 @@ class SkellyClickerUIController:
             print(f"New save path set to: {file_path}")
 
     def save_session(self) -> None:
-        output_directory = Path(self.ui_model.session_saved_path).parent if self.ui_model.session_saved_path else None
-        output_filename = Path(self.ui_model.session_saved_path).name if self.ui_model.session_saved_path else None
+        output_directory = (
+            Path(self.ui_model.session_saved_path).parent
+            if self.ui_model.session_saved_path
+            else None
+        )
+        output_filename = (
+            Path(self.ui_model.session_saved_path).name
+            if self.ui_model.session_saved_path
+            else None
+        )
 
         output_path = filedialog.asksaveasfilename(
             defaultextension=".json",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")], 
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
             initialdir=output_directory,
             initialfile=output_filename,
         )
@@ -193,7 +201,7 @@ class SkellyClickerUIController:
         if self.ui_model.auto_save:
             self.save_session()
             return
-        
+
         save_session_answer = messagebox.askyesno(
             "Save Session", "Would you like to save this session?"
         )
