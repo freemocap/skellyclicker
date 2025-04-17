@@ -264,12 +264,11 @@ class VideoHandler(BaseModel):
                         and self.machine_labels_handler is not None
                         and self.machine_labels_annotator is not None
                     ):
-                        image = self.machine_labels_annotator.annotate_image(
+                        image = self.machine_labels_annotator.annotate_single_image(
                             image,
                             click_data=self.machine_labels_handler.get_data_by_video_frame(
                                 video_index=video_index, frame_number=frame_number
                             ),
-                            frame_number=frame_number,
                         )
 
                 if zoom_state.scale > 1.0:

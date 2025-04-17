@@ -67,6 +67,9 @@ class SkellyClickerUIView:
     load_deeplabcut_button: tk.Button = None
     deeplabcut_project_label: tk.Label = None
     train_deeplabcut_model_button: tk.Button = None
+    analyze_videos_button: tk.Button = None
+    annotate_videos_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
+    annotate_videos_checkbox: tk.Checkbutton = None
 
     # Save section
     save_options_frame: tk.Frame = None
@@ -188,6 +191,12 @@ class SkellyClickerUIView:
 
         self.train_deeplabcut_model_button = tk.Button(self.deeplabcut_frame, text="Train DLC Model")
         self.train_deeplabcut_model_button.pack(side=tk.LEFT, padx=5)
+
+        self.analyze_videos_button = tk.Button(self.deeplabcut_frame, text="Analyze Videos")
+        self.analyze_videos_button.pack(side=tk.LEFT, padx=5)
+
+        self.annotate_videos_checkbox = tk.Checkbutton(self.deeplabcut_frame, text="Annotate Videos", variable=self.annotate_videos_boolean_var)
+        self.annotate_videos_checkbox.pack(side=tk.LEFT, padx=5)
 
     def _create_videos_frame(self):
         self.load_videos_frame = tk.Frame(self.main_frame)

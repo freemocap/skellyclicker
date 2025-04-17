@@ -1,3 +1,4 @@
+import time
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,7 +77,10 @@ class SkellyClickerUIController:
             )
             print(f"Videos loaded: {len(self.ui_model.video_files)} files")
             if self.video_viewer:
-                self.video_viewer.close()  # TODO: no close method implemented
+                self.video_viewer.stop()  # TODO: no close method implemented
+                while self.video_viewer:
+                    time.sleep(0.1)
+
             if self.ui_model.csv_saved_path:
                 self.video_viewer = VideoViewer.from_videos(
                     video_paths=self.ui_model.video_files,
@@ -110,6 +114,8 @@ class SkellyClickerUIController:
         else:
             messagebox.showinfo("Data Not Saved", "Data not saved.")
 
+        self.video_viewer = None
+
     def train_model(self) -> None:
         if not self.ui_model.project_path:
             messagebox.showinfo("No Project", "Please load or create a project first")
@@ -130,6 +136,44 @@ class SkellyClickerUIController:
         self.deeplabcut_handler.train_model(labels_csv_path=self.ui_model.csv_saved_path, video_paths=self.ui_model.video_files)
 
         print("Model completed training")
+
+    def analyze_videos(self) -> None:
+        if not self.ui_model.project_path:
+            messagebox.showinfo("No Project", "Please load or create a project first")
+            return
+        print("Analyzing videos...")
+        if self.deeplabcut_handler is None:
+            messagebox.showinfo(
+                "No DeepLabCut Handler", "DeepLabCut handler not initialized"
+            )
+            return 
+        
+        analyze_training_videos_dialog = messagebox.askyesnocancel(
+            "Analyze training videos",
+            "Would you like to analyze the training videos?",
+        )
+
+        if analyze_training_videos_dialog is None:
+            return
+        elif analyze_training_videos_dialog is True:
+            video_paths = self.ui_model.video_files
+            copy_to_machine_labels = True
+        else:
+            copy_to_machine_labels = False
+            video_paths = filedialog.askopenfilenames(
+                title="Select Videos",
+                filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
+            )
+
+        if video_paths is None or len(video_paths) == 0:
+            messagebox.showinfo("No Videos", "No videos selected for analysis")
+            return
+
+        machine_labels_path = self.deeplabcut_handler.analyze_videos(video_paths=video_paths, annotate_videos=self.ui_model.annotate_videos)
+
+        if copy_to_machine_labels:
+            self.ui_model.machine_labels_path = machine_labels_path
+        print("Videos analyzed")
 
     def set_save_path(self) -> None:
         file_path = filedialog.asksaveasfilename(
@@ -196,6 +240,7 @@ class SkellyClickerUIController:
     def sync_ui_with_model(self) -> None:
         self.ui_view.autosave_boolean_var.set(self.ui_model.auto_save)
         self.ui_view.show_help_boolean_var.set(self.ui_model.show_help)
+        self.ui_view.annotate_videos_boolean_var.set(self.ui_model.annotate_videos)
         if self.ui_model.video_files:
             self.ui_view.videos_directory_path_var.set(
                 ", ".join(self.ui_model.video_files)
@@ -215,6 +260,10 @@ class SkellyClickerUIController:
     def on_show_help_toggle(self) -> None:
         self.ui_model.show_help = self.ui_view.show_help_boolean_var.get()
         print(f"Show help set to: {self.ui_model.show_help}")
+
+    def on_annotate_videos_toggle(self) -> None:
+        self.ui_model.annotate_videos = self.ui_view.annotate_videos_boolean_var.get()
+        print(f"Annotate videos set to: {self.ui_model.annotate_videos}")
 
     def clear_session(self) -> None:
         response = messagebox.askyesno(

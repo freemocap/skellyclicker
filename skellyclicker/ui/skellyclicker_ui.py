@@ -46,6 +46,8 @@ class SkellyClickerUi:
         ui_view.load_deeplabcut_button.config(command=ui_controller.load_deeplabcut_project)
         ui_view.create_deeplabcut_button.config(command=ui_controller.create_deeplabcut_project)
         ui_view.train_deeplabcut_model_button.config(command=ui_controller.train_model)
+        ui_view.analyze_videos_button.config(command=ui_controller.analyze_videos)
+        ui_view.annotate_videos_checkbox.config(command=ui_controller.on_annotate_videos_toggle)
 
         # ui_view.play_button.config(command=ui_controller.play_video)
         # ui_view.pause_button.config(command=ui_controller.pause_video)
