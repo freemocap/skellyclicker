@@ -1,5 +1,7 @@
 import os
 
+from pathlib import Path
+
 from deeplabcut.core.engine import Engine
 from deeplabcut.utils import auxiliaryfunctions
 
@@ -122,6 +124,8 @@ def create_new_deeplabcut_project(
     if skeleton is not None:
         print(f"\nUsing custom skeleton configuration with {len(skeleton)} connections")
 
+    print(f"Created project at: {project_path}")
+
     return project_config_file_path
 
 
@@ -181,6 +185,7 @@ def _initialize_default_config(bodyparts: list[str],
                                skeleton: list[list[str]] | None = None) -> dict[str, object]:
     config_file_contents, _ = auxiliaryfunctions.create_config_template()
     config_file_contents["multianimalproject"] = False
+    config_file_contents["video_sets"] = {}
     # Use custom bodyparts if provided, otherwise use defaults
     default_sa_bodyparts = ["bodypart1", "bodypart2", "bodypart3", "objectA"]
     config_file_contents["bodyparts"] = bodyparts if bodyparts is not None else default_sa_bodyparts

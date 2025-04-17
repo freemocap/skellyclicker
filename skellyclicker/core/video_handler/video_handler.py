@@ -115,7 +115,7 @@ class VideoHandler(BaseModel):
         image_counts = set()
 
         for video_path in video_paths:
-            video_name = Path(video_path).stem
+            video_name = Path(video_path).name
             cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
                 raise ValueError(f"Could not open video: {video_path}")

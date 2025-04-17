@@ -47,9 +47,10 @@ class DeeplabcutHandler(BaseModel):
                                   project_parent_directory: str,
                                   tracked_point_names: list[str],
                                   connections: list[PointConnection] | None = None):
-        logger.info(f"Starting DLC pipeline for project: {project_name}")
-
         logger.info("Creating deeplabcut project structure...")
+
+        if connections is None:
+            connections = []
         return cls(project_name=project_name,
                    connections=connections,
                    iteration=0,
@@ -107,14 +108,16 @@ class DeeplabcutHandler(BaseModel):
                 raise ValueError("All videos must be in the same folder for training")
             video_folder = video_folders.pop()
 
-            if (Path(self.project_config_path) / "dlc-models-pytorch" / f"iteration-{self.iteration}").exists():
+            parent_directory = Path(self.project_config_path).parent
+
+            if (parent_directory / "dlc-models-pytorch" / f"iteration-{self.iteration}").exists():
                 logger.info("Model detected for current iteration, bumping to next iteration")
                 self._bump_iteration()
 
             logger.info("Processing labeled frames...")
             fill_in_labelled_data_folder(
                 path_to_videos_for_training=str(video_folder),
-                path_to_dlc_project_folder=self.project_config_path,
+                path_to_dlc_project_folder=str(parent_directory),
                 path_to_image_labels_csv=labels_csv_path,
             )
 
@@ -156,7 +159,7 @@ class DeeplabcutHandler(BaseModel):
         for csv in Path(csv_folder_path).glob("*.csv"):
             df = pd.read_csv(csv)
 
-            video_name = Path(csv).stem.split("DLC_")[0]
+            video_name = Path(csv).name.split("DLC_")[0]
 
             bodyparts = df.iloc[0, :].unique()[1:]
 

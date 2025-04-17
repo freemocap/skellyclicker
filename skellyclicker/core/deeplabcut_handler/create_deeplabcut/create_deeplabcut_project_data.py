@@ -4,6 +4,8 @@ from pathlib import Path
 import cv2
 import pandas as pd
 
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_config import HUMAN_EXPERIMENTER_NAME
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +32,7 @@ def build_dlc_formatted_header(labels_dataframe: pd.DataFrame, scorer_name: str)
 def fill_in_labelled_data_folder(path_to_videos_for_training: str,
                                  path_to_dlc_project_folder: str,
                                  path_to_image_labels_csv: str,
-                                 scorer_name: str = "scorer"
+                                 scorer_name: str = HUMAN_EXPERIMENTER_NAME
                                  ):
     labels_dataframe = pd.read_csv(path_to_image_labels_csv)
     per_video_dataframe = dict(

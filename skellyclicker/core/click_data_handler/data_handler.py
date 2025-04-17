@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
         metadata = VideoMetadata(
             path=str(video_path),
-            name=video_path.stem,
+            name=video_path.name,
             width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
             height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
             frame_count=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),

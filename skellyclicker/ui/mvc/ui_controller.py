@@ -10,6 +10,8 @@ from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutH
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
 from skellyclicker.core.video_handler.video_viewer import VideoViewer
 
+DEEPLABCUT_CONFIG_FILE_NAME = "config.yaml"
+
 
 @dataclass
 class SkellyClickerUIController:
@@ -26,7 +28,7 @@ class SkellyClickerUIController:
         if project_path:
             self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
-            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=project_path)
+            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(Path(project_path) / DEEPLABCUT_CONFIG_FILE_NAME))
             print(f"DeepLabCut project loaded from: {project_path}")
 
     def create_deeplabcut_project(self) -> None:
@@ -117,8 +119,17 @@ class SkellyClickerUIController:
             messagebox.showinfo(
                 "No DeepLabCut Handler", "DeepLabCut handler not initialized"
             )
+            return 
+        if not self.ui_model.video_files:
+            messagebox.showinfo("No Videos", "Attempted to train model without loading videos, must load videos and label before training")
             return
-        self.deeplabcut_handler.train_model(project_path=self.ui_model.project_path)
+        if not self.ui_model.csv_saved_path:
+            messagebox.showinfo("No Data", "Attempted to train model without saving data, must label videos before training")
+            return
+        # TODO: make training config gui options
+        self.deeplabcut_handler.train_model(labels_csv_path=self.ui_model.csv_saved_path, video_paths=self.ui_model.video_files)
+
+        print("Model completed training")
 
     def set_save_path(self) -> None:
         file_path = filedialog.asksaveasfilename(
@@ -174,7 +185,7 @@ class SkellyClickerUIController:
             print("WARNING: Project loaded while deeplabcut handler already initialized, closing deeplabcut project")
         if self.ui_model.project_path:
             self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
-            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=self.ui_model.project_path)
+            self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(Path(self.ui_model.project_path) / DEEPLABCUT_CONFIG_FILE_NAME))
         else:
             self.deeplabcut_handler = None
 

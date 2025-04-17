@@ -8,7 +8,7 @@ def merge_csvs_for_skellyclicker(csv_folder_path: str | Path, output_path: str |
     for csv in Path(csv_folder_path).glob("*.csv"):
         df = pd.read_csv(csv)
 
-        video_name = Path(csv).stem.split("DLC_")[0]
+        video_name = Path(csv).name.split("DLC_")[0]
 
         bodyparts = df.iloc[0, :].unique()[1:]
 

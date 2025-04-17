@@ -97,6 +97,7 @@ class VideoViewer(BaseModel):
         elif key == ord("e"):
             self.keyboard_zoom(zoom_in=True)
         elif key == ord("h"):
+            # TODO: fix help depending on video height
             self.show_help = not self.show_help
             self.video_handler.image_annotator.config.show_help = self.show_help
         elif key == ord("u"):
