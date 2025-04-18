@@ -68,6 +68,7 @@ class DataHandler(BaseModel):
     @classmethod
     def from_csv(cls, input_path: str | Path):
         dataframe = pd.read_csv(input_path)
+        dataframe["video"] = dataframe["video"].astype(str)
         dataframe = dataframe.set_index(["video", "frame"])
 
         config = DataHandlerConfig.from_dataframe(dataframe)
@@ -136,6 +137,10 @@ class DataHandler(BaseModel):
     ) -> dict[str, ClickData]:
         video_name = self.config.video_names[video_index]
         video_frame_row = self.dataframe.loc[(video_name, frame_number)]
+
+        # TODO: There is some error in the DLC machine labels that sometimes returns duplicate data, this pulls the first occurence for each row
+        if len(video_frame_row.shape) > 1:
+            video_frame_row = video_frame_row.iloc[0]
         click_data = {}
         for point_name in self.config.tracked_point_names:
             x = video_frame_row[f"{point_name}_x"]
