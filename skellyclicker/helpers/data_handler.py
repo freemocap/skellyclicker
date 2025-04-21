@@ -22,7 +22,7 @@ class DataHandlerConfig(BaseModel):
         with open(file=Path(config_path)) as file:
             config = json.load(file)
         tracked_point_names = config["tracked_point_names"]
-        logger.debug(f"Found tracked point names in file: {tracked_point_names}")
+        logger.debug(f"Found tracked point names {tracked_point_names} in file: {config_path}")
         return cls(
             num_frames=videos[0].metadata.frame_count,
             video_names=sorted([video.name for video in videos]),
