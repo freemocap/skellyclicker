@@ -17,3 +17,4 @@ class SkellyClickerUIModel(BaseModel):
     frames_per_second: int = 30  # Default FPS for video playback
     frame_count: int = 0  # Total number of frames in the video
     annotate_videos: bool = False  # To create annotated videos with DLC while analyzing
+    tracked_point_names: List[str] | None = None

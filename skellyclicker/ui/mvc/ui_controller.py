@@ -45,15 +45,13 @@ class SkellyClickerUIController:
                 self.ui_model.project_path = full_project_path
                 self.ui_view.deeplabcut_project_path_var.set(full_project_path)
                 
-                if self.video_viewer:
-                    tracked_point_names = self.video_viewer.video_handler.data_handler.config.tracked_point_names
-                else:
+                if self.ui_model.tracked_point_names is None or len(self.ui_model.tracked_point_names) == 0:
                     print("No tracked point names available, load and label videos before creating deeplabcut project")
                     return
                 self.deeplabcut_handler = DeeplabcutHandler.create_deeplabcut_project(
                     project_name=project_name,
                     project_parent_directory=project_path,
-                    tracked_point_names=tracked_point_names,
+                    tracked_point_names=self.ui_model.tracked_point_names,
                     connections=None, # TODO: Handle connections somehow
                 )
                     
@@ -77,7 +75,7 @@ class SkellyClickerUIController:
             )
             print(f"Videos loaded: {len(self.ui_model.video_files)} files")
             if self.video_viewer:
-                self.video_viewer.stop()  # TODO: no close method implemented
+                self.video_viewer.stop()
                 while self.video_viewer:
                     time.sleep(0.1)
 
@@ -92,6 +90,7 @@ class SkellyClickerUIController:
                     video_paths=self.ui_model.video_files,
                     machine_labels_path=self.ui_model.machine_labels_path,
                 )
+            self.ui_model.tracked_point_names = self.video_viewer.video_handler.data_handler.config.tracked_point_names
             self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
 
@@ -215,6 +214,8 @@ class SkellyClickerUIController:
             title="Select Session File",
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
         )
+        if json_file is None or json_file == "":
+            return
         with open(json_file, "r") as f:
             json_data = f.read()
 
