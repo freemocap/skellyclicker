@@ -110,7 +110,7 @@ class ImageAnnotator(BaseModel):
         else:
             help_text = SHORT_HELP_TEXT
         draw_doubled_text(image=image,
-                          text=f"Frame Number: {frame_number}",
+                          text=f"Frame Number: {frame_number}\n {active_point}",
                           x=(image.shape[1] // 10) * 8,
                           y=(image.shape[0] // 10) * 9,
                           font_scale=self.config.text_size,
