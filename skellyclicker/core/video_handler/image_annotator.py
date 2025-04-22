@@ -85,7 +85,7 @@ def get_colors(keys: list[str]) -> dict[str, tuple[int, ...]]:
 
 class ImageAnnotatorConfig(BaseModel):
     marker_type: int = cv2.MARKER_DIAMOND
-    marker_size: int = 10
+    marker_size: int = 15
     marker_thickness: int = 1
 
     text_color: tuple[int, int, int] = (215, 115, 40)
@@ -148,8 +148,8 @@ class ImageAnnotator(BaseModel):
                 position=(click.x, click.y),
                 color=(1, 1, 1),
                 markerType=self.config.marker_type,
-                markerSize=self.config.marker_size + 1,
-                thickness=self.config.marker_thickness + 1,
+                markerSize=int(self.config.marker_size * 1.3),
+                thickness=int(self.config.marker_thickness * 1.3),
             )
             cv2.drawMarker(
                 annotated_image,
@@ -162,9 +162,9 @@ class ImageAnnotator(BaseModel):
             if self.config.show_names:
                 draw_doubled_text(image=annotated_image,
                                   text=point_name,
-                                  x=click.x + 5,
-                                  y=click.y - 5,
-                                  font_scale=self.config.text_size * .5,
+                                  x=click.x + self.config.marker_size,
+                                  y=click.y - self.config.marker_size,
+                                  font_scale=self.config.text_size * .7,
                                   color=marker_color,
                                   thickness=1,
                                   )
