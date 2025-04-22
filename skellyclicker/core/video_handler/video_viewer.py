@@ -132,7 +132,7 @@ class VideoViewer(BaseModel):
                 self.active_cell[1] * self.video_handler.grid_parameters.columns
                 + self.active_cell[0]
             )
-        if not video_index:
+        if video_index is None:
             return
         self.video_handler.data_handler.clear_current_point(
             video_index=video_index, frame_number=self.frame_number

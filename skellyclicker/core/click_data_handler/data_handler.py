@@ -25,7 +25,6 @@ class DataHandlerConfig(BaseModel):
             config = json.load(file)
         tracked_point_names = config["tracked_point_names"]
         logger.debug(f"Found tracked point names in file: {tracked_point_names}")
-        first_video = next(iter(videos.values()))
         return cls(
             num_frames=next(iter(videos.values())).metadata.frame_count,
             video_names=sorted([video.name for video in videos.values()]),
@@ -129,7 +128,7 @@ class DataHandler(BaseModel):
             np.nan
         )
         logger.debug(
-            f"Cleared point {self.active_point} for all videos, frame {frame_number}"
+            f"Cleared point {self.active_point} for video {video_name}, frame {frame_number}"
         )
 
     def get_data_by_video_frame(
