@@ -120,7 +120,7 @@ class ImageAnnotator(BaseModel):
         draw_doubled_text(image=image,
                           text=help_text,
                           x=10,
-                          y=(image.shape[0] // 10) * 9,
+                          y=(image.shape[0] // 10) * 3,
                           font_scale=self.config.text_size,
                           color=self.config.text_color,
                           thickness=self.config.text_thickness)
