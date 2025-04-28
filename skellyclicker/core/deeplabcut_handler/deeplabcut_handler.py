@@ -159,19 +159,21 @@ class DeeplabcutHandler(BaseModel):
         annotate_videos: bool = False,
     ) -> str:
         config = auxiliaryfunctions.read_config(self.project_config_path)
+        output_folder = (
+            Path(config["project_path"])
+            / f"model_outputs_iteration_{config['iteration']}"
+        )
+        output_folder.mkdir(parents=True, exist_ok=True)
 
         deeplabcut.analyze_videos(
             config=str(self.project_config_path),
             videos=video_paths,
             videotype=".mp4",
             save_as_csv=True,
+            destfolder = str(output_folder)
         )
 
-        output_folder = (
-            Path(config["project_path"])
-            / f"model_outputs_iteration_{config['iteration']}"
-        )
-        output_folder.mkdir(parents=True, exist_ok=True)
+
         if annotate_videos:
             print(
                 f"Annotating videos {video_paths}, saving to {output_folder}"
