@@ -16,6 +16,8 @@ class VideoScalingParameters(BaseModel):
     y_offset: int
     scaled_width: int
     scaled_height: int
+    original_width: int
+    original_height: int
 
 
 class VideoMetadata(BaseModel):

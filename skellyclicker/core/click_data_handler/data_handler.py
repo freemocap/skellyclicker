@@ -198,6 +198,8 @@ if __name__ == "__main__":
             y_offset=0,
             scaled_width=metadata.width,
             scaled_height=metadata.height,
+            original_width=metadata.width,
+            original_height=metadata.height,
         )
 
         _videos.append(
