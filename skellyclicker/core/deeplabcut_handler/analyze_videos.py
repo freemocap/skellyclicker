@@ -51,7 +51,7 @@ def analyze_videos(config_path: str | Path, path_to_recording_folder: str | Path
         save_as_csv=True,
     )
 
-    output_folder = Path(config["project_path"]) / f"model_outputs_iteration_{config['iteration']}"
+    output_folder = Path(config["project_path"]) / "model_outputs" / f"model_outputs_iteration_{config['iteration']}"
     output_folder.mkdir(parents=True, exist_ok=True)
     if annotate_videos:
         print(f"Annotating videos in {path_to_recording_folder}, saving to {output_folder}")
