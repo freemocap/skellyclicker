@@ -216,6 +216,10 @@ class SkellyClickerUIController:
         )
         json_data = self.ui_model.model_dump_json(indent=4)
 
+        if output_path is None or output_path == "":
+            print("No valid path selected, session not saved")
+            return
+
         with open(output_path, "w") as f:
             f.write(json_data)
 

@@ -104,6 +104,13 @@ class VideoViewer(BaseModel):
             self.clear_current_point()
         elif key == ord("c"):
             self.auto_next_point = not self.auto_next_point
+        elif key == ord("v"):
+            self.video_handler.copy_frame_data_from_machine_labels(
+                self.frame_number,
+                video_index=self.active_cell[1]
+                * self.video_handler.grid_parameters.columns
+                + self.active_cell[0],
+            )
         elif key == ord("m"):
             self.video_handler.show_machine_labels = (
                 not self.video_handler.show_machine_labels

@@ -232,6 +232,22 @@ class VideoHandler(BaseModel):
     def move_active_point_by_index(self, index_change: int):
         self.data_handler.move_active_point_by_index(index_change=index_change)
 
+    def copy_frame_data_from_machine_labels(
+        self, frame_number: int, video_index: int
+    ) -> None:
+        if self.machine_labels_handler is not None:
+            machine_labels_data = self.machine_labels_handler.get_data_by_video_frame(
+                    video_index=video_index, frame_number=frame_number
+                )
+            for name, click_data in machine_labels_data.items():
+                try:
+                    self.data_handler.update_dataframe(
+                        click_data=click_data,
+                        point_name=name,
+                    )
+                except (ValueError, KeyError) as e:
+                    logger.error(f"Error updating data with point name {name}: {e}")
+
     def create_grid_image(
         self, frame_number: int, annotate_images: bool = True
     ) -> np.ndarray:

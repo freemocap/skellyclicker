@@ -109,14 +109,16 @@ class DataHandler(BaseModel):
         self.active_point = self.config.tracked_point_names[new_position]
         logger.debug(f"Active point set to {self.active_point}")
 
-    def update_dataframe(self, click_data: ClickData):
+    def update_dataframe(self, click_data: ClickData, point_name: str | None = None):
         video_name = self.config.video_names[click_data.video_index]
         # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
+        if point_name is None:
+            point_name = self.active_point
         self.dataframe.loc[
-            (video_name, click_data.frame_number), f"{self.active_point}_x"
+            (video_name, click_data.frame_number), f"{point_name}_x"
         ] = click_data.x
         self.dataframe.loc[
-            (video_name, click_data.frame_number), f"{self.active_point}_y"
+            (video_name, click_data.frame_number), f"{point_name}_y"
         ] = click_data.y
 
     def clear_current_point(self, video_index: int, frame_number: int):
