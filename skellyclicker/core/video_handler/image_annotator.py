@@ -94,6 +94,7 @@ class ImageAnnotatorConfig(BaseModel):
     text_font: int = cv2.FONT_HERSHEY_SIMPLEX
 
     show_help: bool = False
+    show_clicks: bool = True
     show_names: bool = True
     tracked_points: list[str] = []
 
@@ -169,25 +170,26 @@ class ImageAnnotator(BaseModel):
                                   thickness=1,
                                   )
 
-        # List the markers on the image, with a check or x based on if they are labeled
-        label_string = ""
-        for tracked_point in self.config.tracked_points:
-            if tracked_point in click_data:
-                label_string += f"{tracked_point}: {click_data[tracked_point].x}, {click_data[tracked_point].y} "
-            else:
-                label_string += f"{tracked_point}: (?, ?) "
+        if self.config.show_clicks:
+            # List the markers on the image, with a check or x based on if they are labeled
+            label_string = ""
+            for tracked_point in self.config.tracked_points:
+                if tracked_point in click_data:
+                    label_string += f"{tracked_point}: {click_data[tracked_point].x}, {click_data[tracked_point].y} "
+                else:
+                    label_string += f"{tracked_point}: (?, ?) "
 
-            if active_point and tracked_point == active_point:
-                label_string += " <-(active)"
-            label_string += "\n"
+                if active_point and tracked_point == active_point:
+                    label_string += " <-(active)"
+                label_string += "\n"
 
-        draw_doubled_text(image=annotated_image,
-                          text=label_string,
-                          x=text_offset,
-                          y=text_offset,
-                          font_scale=self.config.text_size*.75,
-                          color= (255, 150, 55),
-                          thickness=self.config.text_thickness,
-                          line_spacing=30,
-                          )
+            draw_doubled_text(image=annotated_image,
+                            text=label_string,
+                            x=text_offset,
+                            y=text_offset,
+                            font_scale=self.config.text_size*.75,
+                            color= (255, 150, 55),
+                            thickness=self.config.text_thickness,
+                            line_spacing=30,
+                            )
         return annotated_image

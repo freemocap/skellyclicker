@@ -74,6 +74,7 @@ class VideoHandler(BaseModel):
                     marker_size=10,
                     marker_thickness=1,
                     tracked_points=data_handler.config.tracked_point_names,
+                    show_clicks=False,
                 )
             )
         else:
