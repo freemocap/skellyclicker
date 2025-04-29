@@ -161,6 +161,7 @@ class DeeplabcutHandler(BaseModel):
         config = auxiliaryfunctions.read_config(self.project_config_path)
         output_folder = (
             Path(config["project_path"])
+            / "model_outputs"
             / f"model_outputs_iteration_{config['iteration']}"
         )
         output_folder.mkdir(parents=True, exist_ok=True)
@@ -222,6 +223,7 @@ class DeeplabcutHandler(BaseModel):
 
             # remove first two rows
             df = df.iloc[2:, :]
+            # TODO: consider filtering for confidence
 
             df = df.drop(columns=[f"{bodypart}_likelihood" for bodypart in bodyparts])
 

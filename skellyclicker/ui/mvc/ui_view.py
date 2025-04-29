@@ -71,6 +71,22 @@ class SkellyClickerUIView:
     annotate_videos_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     annotate_videos_checkbox: tk.Checkbutton = None
 
+    deeplabcut_options_frame: tk.Frame = None
+    current_iteration_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="None"))
+    current_iteration_header_label: tk.Label = None
+    current_iteration_label: tk.Label = None
+
+    deeplabcut_training_frame: tk.Frame = None
+    deeplabcut_epochs_label: tk.Label = None
+    deeplabcut_epochs_spinbox: tk.Spinbox = None
+    deeplabcut_epochs_var: tk.IntVar = field(default_factory=lambda: tk.IntVar(value=200))
+    deeplabcut_save_epochs_label: tk.Label = None
+    deeplabcut_save_epochs_spinbox: tk.Spinbox = None
+    deeplabcut_save_epochs_var: tk.IntVar = field(default_factory=lambda: tk.IntVar(value=20))
+    deeplabcut_batch_size_label: tk.Label = None
+    deeplabcut_batch_size_spinbox: tk.Spinbox = None
+    deeplabcut_batch_size_var: tk.IntVar = field(default_factory=lambda: tk.IntVar(value=1))
+
     # Save section
     save_options_frame: tk.Frame = None
     autosave_checkbox: tk.Checkbutton = None
@@ -108,6 +124,8 @@ class SkellyClickerUIView:
         instance._create_separator()
 
         instance._create_deeplabcut_frame()
+        instance._create_deeplabcut_options_frame()
+        instance._create_deeplabcut_training_frame()
         instance._create_separator()
 
         # instance._create_playback_section()
@@ -192,11 +210,45 @@ class SkellyClickerUIView:
         self.train_deeplabcut_model_button = tk.Button(self.deeplabcut_frame, text="Train DLC Model")
         self.train_deeplabcut_model_button.pack(side=tk.LEFT, padx=5)
 
-        self.analyze_videos_button = tk.Button(self.deeplabcut_frame, text="Analyze Videos")
+    def _create_deeplabcut_options_frame(self):
+        self.deeplabcut_options_frame = tk.Frame(self.main_frame)
+        self.deeplabcut_options_frame.pack(fill=tk.X, pady=5)
+
+        self.analyze_videos_button = tk.Button(self.deeplabcut_options_frame, text="Analyze Videos")
         self.analyze_videos_button.pack(side=tk.LEFT, padx=5)
 
-        self.annotate_videos_checkbox = tk.Checkbutton(self.deeplabcut_frame, text="Annotate Videos", variable=self.annotate_videos_boolean_var)
+        self.annotate_videos_checkbox = tk.Checkbutton(self.deeplabcut_options_frame, text="Annotate Videos", variable=self.annotate_videos_boolean_var)
         self.annotate_videos_checkbox.pack(side=tk.LEFT, padx=5)
+
+        self.current_iteration_header_label = tk.Label(self.deeplabcut_options_frame, text="Current Iteration:")
+        self.current_iteration_header_label.pack(side=tk.LEFT, padx=5)
+        self.current_iteration_header_label.pack(fill=tk.X)
+
+        self.current_iteration_label = tk.Label(self.deeplabcut_options_frame, textvariable=self.current_iteration_var)
+        self.current_iteration_label.pack(side=tk.LEFT, padx=5)
+        self.current_iteration_label.pack(fill=tk.X)
+
+    def _create_deeplabcut_training_frame(self):
+        self.deeplabcut_training_frame = tk.Frame(self.main_frame)
+        self.deeplabcut_training_frame.pack(fill=tk.X, pady=5)
+
+        self.deeplabcut_epochs_label = tk.Label(self.deeplabcut_training_frame, text="Epochs:")
+        self.deeplabcut_epochs_label.pack(side=tk.LEFT, padx=5)
+
+        self.deeplabcut_epochs_spinbox = tk.Spinbox(self.deeplabcut_training_frame, from_=1, to=1000, textvariable=self.deeplabcut_epochs_var)
+        self.deeplabcut_epochs_spinbox.pack(side=tk.LEFT, padx=5)
+
+        self.deeplabcut_save_epochs_label = tk.Label(self.deeplabcut_training_frame, text="Save Epochs:")
+        self.deeplabcut_save_epochs_label.pack(side=tk.LEFT, padx=5)
+
+        self.deeplabcut_save_epochs_spinbox = tk.Spinbox(self.deeplabcut_training_frame, from_=1, to=1000, textvariable=self.deeplabcut_save_epochs_var)
+        self.deeplabcut_save_epochs_spinbox.pack(side=tk.LEFT, padx=5)
+
+        self.deeplabcut_batch_size_label = tk.Label(self.deeplabcut_training_frame, text="Batch Size:")
+        self.deeplabcut_batch_size_label.pack(side=tk.LEFT, padx=5) 
+
+        self.deeplabcut_batch_size_spinbox = tk.Spinbox(self.deeplabcut_training_frame, from_=1, to=1000, textvariable=self.deeplabcut_batch_size_var)
+        self.deeplabcut_batch_size_spinbox.pack(side=tk.LEFT, padx=5)
 
     def _create_videos_frame(self):
         self.load_videos_frame = tk.Frame(self.main_frame)

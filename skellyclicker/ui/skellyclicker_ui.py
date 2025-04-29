@@ -48,6 +48,9 @@ class SkellyClickerUi:
         ui_view.train_deeplabcut_model_button.config(command=ui_controller.train_model)
         ui_view.analyze_videos_button.config(command=ui_controller.analyze_videos)
         ui_view.annotate_videos_checkbox.config(command=ui_controller.on_annotate_videos_toggle)
+        ui_view.deeplabcut_epochs_spinbox.config(command=ui_controller.on_training_epochs_change)
+        ui_view.deeplabcut_save_epochs_spinbox.config(command=ui_controller.on_training_save_epochs_change)
+        ui_view.deeplabcut_batch_size_spinbox.config(command=ui_controller.on_training_batch_size_change)
 
         # ui_view.play_button.config(command=ui_controller.play_video)
         # ui_view.pause_button.config(command=ui_controller.pause_video)

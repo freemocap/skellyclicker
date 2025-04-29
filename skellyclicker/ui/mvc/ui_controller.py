@@ -6,6 +6,7 @@ from tkinter import filedialog, simpledialog, messagebox, NORMAL, DISABLED
 
 from pydantic import ValidationError
 
+from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import DeeplabcutTrainingConfig
 from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
 from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
@@ -30,6 +31,7 @@ class SkellyClickerUIController:
             self.ui_model.project_path = project_path
             self.ui_view.deeplabcut_project_path_var.set(project_path)
             self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(Path(project_path) / DEEPLABCUT_CONFIG_FILE_NAME))
+            self.ui_view.current_iteration_var.set(str(self.deeplabcut_handler.iteration))
             print(f"DeepLabCut project loaded from: {project_path}")
 
     def create_deeplabcut_project(self) -> None:
@@ -54,6 +56,7 @@ class SkellyClickerUIController:
                     tracked_point_names=self.ui_model.tracked_point_names,
                     connections=None, # TODO: Handle connections somehow
                 )
+                self.ui_view.current_iteration_var.set(str(self.deeplabcut_handler.iteration))
                     
                 print(f"Creating new deeplabcut project: {full_project_path}")
 
@@ -102,7 +105,7 @@ class SkellyClickerUIController:
         if save_data is False:
             save_data = messagebox.askyesno(
                 "Save Data Confirmation",
-                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:",
+                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to discard the labeled data:",
             )
         save_path = self.video_viewer.video_handler.close(save_data=save_data)
 
@@ -131,8 +134,17 @@ class SkellyClickerUIController:
         if not self.ui_model.csv_saved_path:
             messagebox.showinfo("No Data", "Attempted to train model without saving data, must label videos before training")
             return
-        # TODO: make training config gui options
-        self.deeplabcut_handler.train_model(labels_csv_path=self.ui_model.csv_saved_path, video_paths=self.ui_model.video_files)
+        training_config = DeeplabcutTrainingConfig(
+            epochs=self.ui_model.training_epochs,
+            save_epochs=self.ui_model.training_save_epochs,
+            batch_size=self.ui_model.training_batch_size,
+        )
+        self.deeplabcut_handler.train_model(
+            labels_csv_path=self.ui_model.csv_saved_path, 
+            video_paths=self.ui_model.video_files,
+            training_config=training_config,
+        )
+        self.ui_view.current_iteration_var.set(str(self.deeplabcut_handler.iteration))
 
         print("Model completed training")
 
@@ -202,7 +214,7 @@ class SkellyClickerUIController:
             initialdir=output_directory,
             initialfile=output_filename,
         )
-        json_data = self.ui_model.model_dump_json()
+        json_data = self.ui_model.model_dump_json(indent=4)
 
         with open(output_path, "w") as f:
             f.write(json_data)
@@ -231,8 +243,10 @@ class SkellyClickerUIController:
         if self.ui_model.project_path:
             self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
             self.deeplabcut_handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(Path(self.ui_model.project_path) / DEEPLABCUT_CONFIG_FILE_NAME))
+            self.ui_view.current_iteration_var.set(str(self.deeplabcut_handler.iteration))
         else:
             self.deeplabcut_handler = None
+            self.ui_view.current_iteration_var.set("None")
 
         self.sync_ui_with_model()
 
@@ -253,6 +267,12 @@ class SkellyClickerUIController:
             self.ui_view.click_save_path_var.set(self.ui_model.csv_saved_path)
         if self.ui_model.project_path:
             self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
+        if self.ui_model.training_epochs:
+            self.ui_view.deeplabcut_epochs_var.set(self.ui_model.training_epochs)
+        if self.ui_model.training_save_epochs:
+            self.ui_view.deeplabcut_save_epochs_var.set(self.ui_model.training_save_epochs)
+        if self.ui_model.training_batch_size:
+            self.ui_view.deeplabcut_batch_size_var.set(self.ui_model.training_batch_size)
 
     def on_autosave_toggle(self) -> None:
         self.ui_model.auto_save = self.ui_view.autosave_boolean_var.get()
@@ -265,6 +285,39 @@ class SkellyClickerUIController:
     def on_annotate_videos_toggle(self) -> None:
         self.ui_model.annotate_videos = self.ui_view.annotate_videos_boolean_var.get()
         print(f"Annotate videos set to: {self.ui_model.annotate_videos}")
+
+    def on_training_epochs_change(self) -> None:
+        try:
+            training_epochs = int(self.ui_view.deeplabcut_epochs_var.get())
+            if training_epochs < 1:
+                raise ValueError("Training epochs must be at least 1")
+            self.ui_model.training_epochs = training_epochs
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid integer for epochs")
+            return
+        print(f"Training epochs set to: {self.ui_model.training_epochs}")
+
+    def on_training_save_epochs_change(self) -> None:
+        try:
+            save_epochs = int(self.ui_view.deeplabcut_save_epochs_var.get())
+            if save_epochs < 1:
+                raise ValueError("Save epochs must be at least 1")
+            self.ui_model.training_save_epochs = save_epochs
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid integer for save epochs")
+            return
+        print(f"Training save epochs set to: {self.ui_model.training_save_epochs}")
+
+    def on_training_batch_size_change(self) -> None:
+        try:
+            batch_size = int(self.ui_view.deeplabcut_batch_size_var.get())
+            if batch_size < 1:
+                raise ValueError("Batch size must be at least 1")
+            self.ui_model.training_batch_size = batch_size
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid integer for batch size")
+            return
+        print(f"Training batch size set to: {self.ui_model.training_batch_size}")
 
     def clear_session(self) -> None:
         response = messagebox.askyesno(
@@ -289,7 +342,7 @@ class SkellyClickerUIController:
         if save_session_answer is False:
             save_session_answer = messagebox.askyesno(
                 "Save Session Confirmation",
-                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to delete this session forever:",
+                "Confirm your choice: Click 'yes' to prevent data loss or 'no' to discard session data:",
             )
 
         if save_session_answer:

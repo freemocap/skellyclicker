@@ -18,3 +18,6 @@ class SkellyClickerUIModel(BaseModel):
     frame_count: int = 0  # Total number of frames in the video
     annotate_videos: bool = False  # To create annotated videos with DLC while analyzing
     tracked_point_names: List[str] | None = None
+    training_epochs: int = 200
+    training_save_epochs: int = 20
+    training_batch_size: int = 1
