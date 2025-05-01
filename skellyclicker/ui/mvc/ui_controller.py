@@ -79,8 +79,8 @@ class SkellyClickerUIController:
             print(f"Videos loaded: {len(self.ui_model.video_files)} files")
             if self.video_viewer:
                 self.video_viewer.stop()
-                while self.video_viewer:
-                    time.sleep(0.1)
+                # while self.video_viewer:
+                    # time.sleep(0.1)
 
             if self.ui_model.csv_saved_path:
                 self.video_viewer = VideoViewer.from_videos(
