@@ -72,13 +72,14 @@ class SkellyClickerUIController:
 
     def open_videos(self) -> None:
         if self.ui_model.video_files:
-            self.ui_model.video_files = list(self.ui_model.video_files)
             self.ui_view.videos_directory_path_var.set(
                 ", ".join(self.ui_model.video_files)
             )
             print(f"Videos loaded: {len(self.ui_model.video_files)} files")
             if self.video_viewer:
+                print("Stopping previous video viewer")
                 self.video_viewer.stop()
+                print("Previous video viewer stopped")
                 # while self.video_viewer:
                     # time.sleep(0.1)
 
