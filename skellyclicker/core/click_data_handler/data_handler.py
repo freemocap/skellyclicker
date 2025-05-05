@@ -35,7 +35,7 @@ class DataHandlerConfig(BaseModel):
     def from_dataframe(cls, dataframe: pd.DataFrame):
         tracked_point_names = set()
         for name in dataframe.columns:
-            name = name.strip("_x").strip("_y")
+            name = name.removesuffix("_x").removesuffix("_y")
             tracked_point_names.add(name)
         tracked_point_names = list(tracked_point_names)
         logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
@@ -143,6 +143,7 @@ class DataHandler(BaseModel):
         if len(video_frame_row.shape) > 1:
             video_frame_row = video_frame_row.iloc[0]
         click_data = {}
+        print(self.config.tracked_point_names)
         for point_name in self.config.tracked_point_names:
             x = video_frame_row[f"{point_name}_x"]
             y = video_frame_row[f"{point_name}_y"]
