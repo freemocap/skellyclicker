@@ -208,11 +208,9 @@ class SkellyClickerUIController:
             )
             return
 
-        analyze_training_videos_dialog = messagebox.askquestion(
+        analyze_training_videos_dialog = messagebox.askyesnocancel(
             "Analyze training videos",
             "Would you like to analyze the training videos?",
-            icon=messagebox.QUESTION,
-            type=messagebox.YESNOCANCEL,
             detail="Click 'yes' to analyze training videos, 'no' to select videos to analyze, or 'cancel' to cancel the operation.",
         )
 
