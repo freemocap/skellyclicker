@@ -143,7 +143,6 @@ class DataHandler(BaseModel):
         if len(video_frame_row.shape) > 1:
             video_frame_row = video_frame_row.iloc[0]
         click_data = {}
-        print(self.config.tracked_point_names)
         for point_name in self.config.tracked_point_names:
             x = video_frame_row[f"{point_name}_x"]
             y = video_frame_row[f"{point_name}_y"]

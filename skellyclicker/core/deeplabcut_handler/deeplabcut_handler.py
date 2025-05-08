@@ -193,10 +193,9 @@ class DeeplabcutHandler(BaseModel):
         video_folders = set(Path(video_path).parent for video_path in video_paths)
         if len(video_folders) > 1:
             raise ValueError("All videos must be in the same folder for training")
-        path_to_recording_folder = video_folders.pop()
 
         self.merge_csvs_for_skellyclicker(
-            csv_folder_path=path_to_recording_folder,
+            csv_folder_path=str(output_folder),
             output_path=str(csv_path),
         )
 
