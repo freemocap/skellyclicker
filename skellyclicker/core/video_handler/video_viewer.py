@@ -115,6 +115,7 @@ class VideoViewer(BaseModel):
             self.video_handler.show_machine_labels = (
                 not self.video_handler.show_machine_labels
             )
+            print(f"Machine labels visibility: {self.video_handler.show_machine_labels}")
         elif key == ord("n"):
             self.video_handler.image_annotator.config.show_names = (
                 not self.video_handler.image_annotator.config.show_names

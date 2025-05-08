@@ -93,6 +93,12 @@ class SkellyClickerUIView:
     autosave_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     click_save_path_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="No file saved"))
     click_save_path_label: tk.Label = None
+    load_click_data_button: tk.Button = None
+    clear_click_data_button: tk.Button = None
+    machine_labels_path_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="No file saved"))
+    machine_labels_path_label: tk.Label = None
+    load_machine_labels_button: tk.Button = None
+    clear_machine_labels_button: tk.Button = None
     save_session_button: tk.Button = None
     load_session_button: tk.Button = None
     clear_session_button: tk.Button = None
@@ -120,6 +126,9 @@ class SkellyClickerUIView:
         instance._create_separator()
         instance._create_separator()
 
+        instance._create_save_option_frame()
+        instance._create_separator()
+
         instance._create_videos_frame()
         instance._create_separator()
 
@@ -130,9 +139,6 @@ class SkellyClickerUIView:
 
         # instance._create_playback_section()
         # instance._create_separator()
-
-        instance._create_save_option_frame()
-        instance._create_separator()
 
         instance._create_separator()
         #
@@ -332,11 +338,38 @@ class SkellyClickerUIView:
         )
         self.clear_session_button.pack(side=tk.LEFT, padx=5)
 
+        data_handling_frame = tk.Frame(self.main_frame)
+        data_handling_frame.pack(fill=tk.X, pady=5)
+        self.load_click_data_button = tk.Button(
+            data_handling_frame,
+            text="Load Click Data",
+        )
+        self.load_click_data_button.pack(side=tk.LEFT, padx=5)
+
+        self.clear_click_data_button = tk.Button(
+            data_handling_frame,
+            text="Clear Click Data",
+        )
+        self.clear_click_data_button.pack(side=tk.LEFT, padx=5)
+
+        self.load_machine_labels_button = tk.Button(
+            data_handling_frame,
+            text="Load Machine Labels",
+        )
+        self.load_machine_labels_button.pack(side=tk.LEFT, padx=5)
+        self.clear_machine_labels_button = tk.Button(
+            data_handling_frame,
+            text="Clear Machine Labels",
+        )
+        self.clear_machine_labels_button.pack(side=tk.LEFT, padx=5)
+
+
+
         # Path label in its own frame for better display
         path_frame = tk.Frame(self.main_frame)
         path_frame.pack(fill=tk.X, pady=2)
 
-        path_label = tk.Label(path_frame, text="Last Saved Path:")
+        path_label = tk.Label(path_frame, text="Active Click Data Path:")
         path_label.pack(anchor='w', padx=5)
 
         self.click_save_path_label = tk.Label(
@@ -345,6 +378,17 @@ class SkellyClickerUIView:
             wraplength=200,  # Wrap text to fit sidebar
         )
         self.click_save_path_label.pack(fill=tk.X, padx=5, pady=2)
+
+
+        machine_path_label = tk.Label(path_frame, text="Active Machine Labels Path:")
+        machine_path_label.pack(anchor='w', padx=5)
+
+        self.machine_labels_path_label = tk.Label(
+            path_frame,
+            textvariable=self.machine_labels_path_var,
+            wraplength=200,  # Wrap text to fit sidebar
+        )
+        self.machine_labels_path_label.pack(fill=tk.X, padx=5, pady=2)
 
     def _create_show_help_frame(self):
         """Create the help section."""

@@ -59,6 +59,10 @@ class SkellyClickerUi:
         ui_view.save_session_button.config(command=ui_controller.save_session)
         ui_view.load_session_button.config(command=ui_controller.load_session)
         ui_view.clear_session_button.config(command=ui_controller.clear_session)
+        ui_view.load_click_data_button.config(command=ui_controller.load_labels_csv)
+        ui_view.load_machine_labels_button.config(command=ui_controller.load_machine_labels_csv)
+        ui_view.clear_click_data_button.config(command=ui_controller.clear_labels_csv)
+        ui_view.clear_machine_labels_button.config(command=ui_controller.clear_machine_labels_csv)
         #
         # ui_view.show_help_checkbox.config(command=ui_controller.on_show_help_toggle)
 

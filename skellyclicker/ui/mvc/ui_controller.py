@@ -70,6 +70,54 @@ class SkellyClickerUIController:
             self.ui_view.open_videos_button.config(state=NORMAL)
             self.open_videos()
 
+    def load_labels_csv(self) -> None:
+        csv_file = filedialog.askopenfilename(
+            title="Select Labels CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if csv_file and Path(csv_file).exists() and Path(csv_file).is_file() and Path(csv_file).suffix == ".csv":
+            self.ui_model.csv_saved_path = csv_file
+            self.ui_view.click_save_path_var.set(csv_file)
+            print(f"Labels CSV loaded from: {csv_file}")
+        else:
+            print("Invalid CSV file selected or file does not exist")
+
+    def load_machine_labels_csv(self) -> None:
+        machine_labels_file = filedialog.askopenfilename(
+            title="Select Machine Labels CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if machine_labels_file and Path(machine_labels_file).exists() and Path(machine_labels_file).is_file() and Path(machine_labels_file).suffix == ".csv":
+            self.ui_model.machine_labels_path = machine_labels_file
+            print(f"Machine labels CSV loaded from: {machine_labels_file}")
+            self.ui_view.machine_labels_path_var.set(machine_labels_file)
+        else:
+            print("Invalid CSV file selected or file does not exist")
+
+    def clear_labels_csv(self) -> None:
+        confirmation = messagebox.askyesno(
+            "Clear Labels CSV",
+            "Are you sure you want to clear the labels CSV?",
+        )
+        if not confirmation:
+            return
+        print(f"Clearing labels CSV {self.ui_model.csv_saved_path}")
+        self.ui_model.csv_saved_path = None
+        self.ui_view.click_save_path_var.set("")
+        print("Labels CSV cleared")
+    
+    def clear_machine_labels_csv(self) -> None:
+        confirmation = messagebox.askyesno(
+            "Clear Machine Labels CSV",
+            "Are you sure you want to clear the machine labels CSV?",
+        )
+        if not confirmation:
+            return
+        print(f"Clearing machine labels CSV {self.ui_model.machine_labels_path}")
+        self.ui_model.machine_labels_path = None
+        self.ui_view.machine_labels_path_var.set("")
+        print("Machine labels CSV cleared")
+
     def open_videos(self) -> None:
         if self.ui_model.video_files:
             self.ui_view.videos_directory_path_var.set(
@@ -180,6 +228,8 @@ class SkellyClickerUIController:
         if video_paths is None or len(video_paths) == 0:
             messagebox.showinfo("No Videos", "No videos selected for analysis")
             return
+        
+        video_paths = list(video_paths)
 
         machine_labels_path = self.deeplabcut_handler.analyze_videos(video_paths=video_paths, annotate_videos=self.ui_model.annotate_videos)
 
@@ -270,6 +320,8 @@ class SkellyClickerUIController:
             self.ui_view.open_videos_button.config(state=DISABLED)
         if self.ui_model.csv_saved_path:
             self.ui_view.click_save_path_var.set(self.ui_model.csv_saved_path)
+        if self.ui_model.machine_labels_path:
+            self.ui_view.machine_labels_path_var.set(self.ui_model.machine_labels_path)
         if self.ui_model.project_path:
             self.ui_view.deeplabcut_project_path_var.set(self.ui_model.project_path)
         if self.ui_model.training_epochs:
