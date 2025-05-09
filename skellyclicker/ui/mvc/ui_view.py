@@ -70,6 +70,8 @@ class SkellyClickerUIView:
     analyze_videos_button: tk.Button = None
     annotate_videos_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     annotate_videos_checkbox: tk.Checkbutton = None
+    deeplabcut_filter_predictions_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
+    deeplabcut_filter_predictions_checkbox: tk.Checkbutton = None
 
     deeplabcut_options_frame: tk.Frame = None
     current_iteration_var: tk.StringVar = field(default_factory=lambda: tk.StringVar(value="None"))
@@ -225,6 +227,9 @@ class SkellyClickerUIView:
 
         self.annotate_videos_checkbox = tk.Checkbutton(self.deeplabcut_options_frame, text="Annotate Videos", variable=self.annotate_videos_boolean_var)
         self.annotate_videos_checkbox.pack(side=tk.LEFT, padx=5)
+
+        self.deeplabcut_filter_predictions_checkbox = tk.Checkbutton(self.deeplabcut_options_frame, text="Filter Predictions", variable=self.deeplabcut_filter_predictions_var)
+        self.deeplabcut_filter_predictions_checkbox.pack(side=tk.LEFT, padx=5)
 
         self.current_iteration_header_label = tk.Label(self.deeplabcut_options_frame, text="Current Iteration:")
         self.current_iteration_header_label.pack(side=tk.LEFT, padx=5)

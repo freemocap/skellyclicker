@@ -157,6 +157,7 @@ class DeeplabcutHandler(BaseModel):
         self,
         video_paths: list[str],
         annotate_videos: bool = False,
+        filter_videos: bool = True,
     ) -> str:
         config = auxiliaryfunctions.read_config(self.project_config_path)
         output_folder = (
@@ -174,6 +175,16 @@ class DeeplabcutHandler(BaseModel):
             destfolder = str(output_folder)
         )
 
+        if filter_videos:
+            deeplabcut.filterpredictions(
+                str(self.project_config_path),
+                video_paths,
+                videotype=".mp4",
+                filtertype="median",
+                windowlength=5,
+                destfolder=str(output_folder),
+            )
+
 
         if annotate_videos:
             print(
@@ -184,6 +195,7 @@ class DeeplabcutHandler(BaseModel):
                 videos=video_paths,
                 videotype=".mp4",
                 destfolder=str(output_folder),
+                filtered=filter_videos,
             )
         else:
             print("Skipping video annotation")
@@ -197,15 +209,24 @@ class DeeplabcutHandler(BaseModel):
         self.merge_csvs_for_skellyclicker(
             csv_folder_path=str(output_folder),
             output_path=str(csv_path),
+            filtered=filter_videos,
         )
 
         return str(csv_path)
 
     def merge_csvs_for_skellyclicker(
-        self, csv_folder_path: str | Path, output_path: str | Path
+        self, csv_folder_path: str | Path, output_path: str | Path, filtered: bool = False
     ):
         dataframe_list = []
-        for csv in Path(csv_folder_path).glob("*.csv"):
+        if filtered:
+            csv_paths = Path(csv_folder_path).glob("*_filtered.csv")
+        else:
+            csv_paths = Path(csv_folder_path).glob("*.csv")
+        if not csv_paths:
+            raise FileNotFoundError(
+                f"No matching CSV files found in {csv_folder_path}. Please check the path."
+            )
+        for csv in csv_paths:
             df = pd.read_csv(csv)
 
             video_name = Path(csv).name.split("DLC_")[0]

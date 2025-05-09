@@ -21,3 +21,4 @@ class SkellyClickerUIModel(BaseModel):
     training_epochs: int = 200
     training_save_epochs: int = 20
     training_batch_size: int = 1
+    filter_predictions: bool = False
