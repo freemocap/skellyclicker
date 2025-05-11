@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from pydantic import BaseModel
-from deeplabcut.utils import auxiliaryfunctions
+
 
 
 
@@ -23,7 +23,7 @@ class SkellyClickerDataConfig(BaseModel):
     def from_config_yaml(cls, config_path: str ) -> "SkellyClickerDataConfig":
         if not Path(config_path).is_file() and config_path.endswith(".yaml"):
             raise ValueError(f"`{config_path} is not a path to a valid yaml file")
-
+        from deeplabcut.utils import auxiliaryfunctions
         config = auxiliaryfunctions.read_config(config_path)
 
         return cls.from_config(config)

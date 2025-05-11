@@ -1,9 +1,9 @@
 import tkinter as tk
 from dataclasses import dataclass
 
-from skellyclicker.ui.mvc.ui_controller import SkellyClickerUIController
-from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
-from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
+from skellyclicker.tk_ui.mvc.ui_controller import SkellyClickerUIController
+from skellyclicker.tk_ui.mvc.ui_model import SkellyClickerUIModel
+from skellyclicker.tk_ui.mvc.ui_view import SkellyClickerUIView
 
 
 @dataclass

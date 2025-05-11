@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker import MAX_WINDOW_SIZE, POSITION_EPSILON
+from skellyclicker.models.skellyclicker_types import MAX_WINDOW_SIZE, POSITION_EPSILON
 from skellyclicker.core.video_handler.video_handler import VideoHandler
 
 logger = logging.getLogger(__name__)

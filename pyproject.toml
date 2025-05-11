@@ -3,14 +3,16 @@ name = "skellyclicker"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11, <3.13"
 dependencies = [
-    "colorbrewer>=0.3",
-    "deeplabcut==3.0.0rc7",
+    "fastapi>=0.115.12",
     "numpy==1.26.2",
+    "numpydantic>=1.6.9",
     "opencv-contrib-python>=4.8.1.78",
     "pandas==2.1.4",
     "pillow>=11.1.0",
     "pydantic==2.11.0",
     "pyyaml>=6.0.2",
+    "uvicorn>=0.34.2",
 ]
+

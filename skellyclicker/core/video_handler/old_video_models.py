@@ -1,11 +1,9 @@
 from typing import Tuple
 
-import cv2
 import math
-import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
-from skellyclicker import VideoPathString
+from skellyclicker.models.skellyclicker_types import VideoPathString
 
 
 class VideoScalingParameters(BaseModel):
@@ -29,7 +27,6 @@ class VideoMetadata(BaseModel):
     height: int
     frame_count: int
 
-
 class ZoomState(BaseModel):
     """State of the zoom for a video."""
 
@@ -41,25 +38,6 @@ class ZoomState(BaseModel):
         self.scale = 1.0
         self.center_x = 0
         self.center_y = 0
-
-
-class VideoPlaybackState(BaseModel):
-    """Current state of video playback."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    metadata: VideoMetadata
-    cap: cv2.VideoCapture
-    current_frame: np.ndarray | None = None
-    processed_frame: np.ndarray | None = None
-    scaling_params: VideoScalingParameters | None = (
-        None  # rescale info to put it within the grid
-    )
-    zoom_state: ZoomState = ZoomState()  # how much the user has zoomed in on the video
-
-    @property
-    def name(self) -> str:
-        return self.metadata.name
 
 
 class ClickData(BaseModel):

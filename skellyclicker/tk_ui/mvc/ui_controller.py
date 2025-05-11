@@ -9,9 +9,9 @@ from pydantic import ValidationError
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import (
     DeeplabcutTrainingConfig,
 )
-from skellyclicker.ui.mvc.ui_model import SkellyClickerUIModel
+from skellyclicker.tk_ui.mvc.ui_model import SkellyClickerUIModel
 from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
-from skellyclicker.ui.mvc.ui_view import SkellyClickerUIView
+from skellyclicker.tk_ui.mvc.ui_view import SkellyClickerUIView
 from skellyclicker.core.video_handler.video_viewer import VideoViewer
 
 DEEPLABCUT_CONFIG_FILE_NAME = "config.yaml"

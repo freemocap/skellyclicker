@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from skellyclicker import VideoPathString
+from skellyclicker.models.skellyclicker_types import VideoPathString
 from skellyclicker.core.click_data_handler.click_handler import ClickHandler
 from skellyclicker.core.click_data_handler.data_handler import (
     DataHandler,
@@ -16,7 +16,7 @@ from skellyclicker.core.video_handler.image_annotator import (
     ImageAnnotator,
     ImageAnnotatorConfig,
 )
-from skellyclicker.core.video_handler.video_models import (
+from skellyclicker.core.video_handler.old_video_models import (
     VideoPlaybackState,
     GridParameters,
     VideoMetadata,

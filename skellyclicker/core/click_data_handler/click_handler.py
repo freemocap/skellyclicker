@@ -3,7 +3,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from skellyclicker.core.video_handler.video_models import GridParameters, VideoPlaybackState
+from skellyclicker.core.video_handler.old_video_models import GridParameters, VideoPlaybackState
 
 
 class ClickData(BaseModel):

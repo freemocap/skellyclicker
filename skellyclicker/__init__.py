@@ -1,21 +1,15 @@
 
 __url__ = "https://github.com/freemocap/skellyclicker"
+__author__ = """Skelly FreeMoCap    """
+__email__ = "info@freemocap.org"
+__version__ = "v0.1.0"
+__description__ = f"For clicking on stuff ({__url__})"
 
-import logging
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+__package_name__ = "skellyclicker"
+__repo_url__ = f"https://github.com/freemocap/{__package_name__}/"
+__repo_issues_url__ = f"{__repo_url__}issues"
 
-PointNameString = str
-VideoNameString = str
-VideoPathString = str
-ClickDataCSVPathString = str
+from skellyclicker.system.logging_configuration.configure_logging import configure_logging
+from skellyclicker.system.logging_configuration.logger_builder import LogLevels
 
-MAX_WINDOW_SIZE = (1920, 1080)
-ZOOM_STEP = 1.1
-ZOOM_MIN = 1.0
-ZOOM_MAX = 10.0
-POSITION_EPSILON = 1e-6  # Small threshold for position changes
+configure_logging(LogLevels.DEBUG)

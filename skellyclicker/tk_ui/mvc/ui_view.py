@@ -9,7 +9,7 @@ from pathlib import Path
 from PIL import Image, ImageTk
 
 import skellyclicker
-from skellyclicker.ui.assets.logo_paths import SKELLYCLICKER_LOGO_PNG, SKELLYCLICKER_LOGO_ICO
+from skellyclicker.assets.logo_paths import SKELLYCLICKER_LOGO_PNG, SKELLYCLICKER_LOGO_ICO
 
 logger = logging.getLogger(__name__)
 
