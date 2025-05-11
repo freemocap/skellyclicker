@@ -1,13 +1,13 @@
+import logging
 import mimetypes
 from pathlib import Path
 from typing import Annotated
 
 import cv2
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, field_validator
+from pydantic import BaseModel, Field, BeforeValidator, field_validator
 
 from skellyclicker.models.skellyclicker_types import ImageNumpyArray, FrameNumberInt, VideoNameString
 
-import logging
 logger = logging.getLogger(__name__)
 
 CV2_COMPATIBLE_VIDEO_FILE_EXTENSIONS = ['.mp4', '.avi', '.mov', '.wmv']
@@ -111,7 +111,6 @@ class VideoHandler(BaseModel):
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
         ret, frame = self.cap.read()
         if ret:
-            self.current_frame = frame
             return frame
         else:
             logger.error(f"Failed to read frame {frame_number} from video {self.path}")
@@ -175,7 +174,7 @@ class VideoGroupHandler(BaseModel):
             raise ValueError("All videos must have the same number of frames.")
         return value
 
-    def get_multi_frame(self, frame_number: FrameNumberInt) -> dict[VideoNameString, ImageNumpyArray]:
+    def get_images_by_frame_number(self, frame_number: FrameNumberInt) -> dict[VideoNameString, ImageNumpyArray]:
         """Get the specified frame from all videos."""
         frames = {}
         for name, video in self.videos.items():

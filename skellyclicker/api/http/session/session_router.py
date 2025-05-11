@@ -15,6 +15,7 @@ DEFAULT_RECORDING_PATH = str(Path.home() / "freemocap_data" / "recording_session
 class LoadRecordingRequest(BaseModel):
     recording_path: str = Field(default=DEFAULT_RECORDING_PATH, description="Path to the recording directory, which should contain a folder called `synchronized_videos` with the video files.")
 
+
 @session_router.post("/load_recording", response_model=SkellyClickerAppState)
 async def load_recording_endpoint(request: LoadRecordingRequest = Body(..., description="Request body containing the path to the recording directory",
                                                                        examples=[LoadRecordingRequest()])

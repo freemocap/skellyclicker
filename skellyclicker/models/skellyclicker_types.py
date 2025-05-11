@@ -7,5 +7,7 @@ VideoNameString = str
 VideoPathString = str
 ClickDataCSVPathString = str
 
+JPEGImageString = str
+
 FrameNumberInt = int
 ImageNumpyArray = NDArray[Shape["* width, * height, * color_channels"], np.uint8]
