@@ -36,7 +36,7 @@ class LoggerBuilder:
         if self.queue:
             root.addHandler(self._build_websocket_handler())
 
-        if True:#not os.getenv("SKELLYCAM_RUNNING_IN_ELECTRON"):
+        if True:
             # only add console handler if not running in electron, otherwise logs will go through the websocket handler
             root.addHandler(self._build_console_handler())
         else:

@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter
 
-HELLO_FROM_SKELLYCLICKER_BACKEND_MESSAGE = {"message": "Hello from the SkellyClicker Backend 💀🤖✨"}
+HELLO_FROM_SKELLYCLICKER_BACKEND_MESSAGE = {"message": "Hello from the SkellyClicker Backend 💀👆✨"}
 
 logger = logging.getLogger(__name__)
 health_router = APIRouter()

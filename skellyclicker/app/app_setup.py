@@ -26,7 +26,7 @@ def customize_swagger_ui(app: FastAPI):
         if app.openapi_schema:
             return app.openapi_schema
         openapi_schema = get_openapi(
-            title="Welcome to the SkellyClicker API 💀🤖✨",
+            title="Welcome to the SkellyClicker API 💀👆✨",
             version=skellyclicker.__version__,
             description=f"The FastAPI/Uvicorn/Swagger Backend UI for SkellyClicker: {skellyclicker.__description__}",
             routes=app.routes,
