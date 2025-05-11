@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import cv2
 
-from skellyclicker.__main__ import DEMO_VIDEO_PATH
+from skellyclicker.core.video_handler.video_viewer import DEMO_VIDEO_PATH
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,7 +26,6 @@ def run(path_to_recording: Path,
         scorer_name: str = "Scorer"
         ):
     path_to_videos_for_training = path_to_recording / 'synchronized_videos'  # Will need to adjust for ferret lab path
-    recording_name = path_to_recording.stem
 
     labels_dataframe = pd.read_csv(path_to_image_labels_csv)
     per_video_dataframe = dict(

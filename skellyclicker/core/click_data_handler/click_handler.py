@@ -3,15 +3,33 @@ from typing import List
 
 from pydantic import BaseModel
 
-from .video_models import ClickData, VideoPlaybackState, GridParameters
+from skellyclicker.core.video_handler.video_models import GridParameters, VideoPlaybackState
 
+
+class ClickData(BaseModel):
+    """Data associated with a mouse click."""
+
+    window_x: int
+    window_y: int
+    video_x: int
+    video_y: int
+    frame_number: int
+    video_index: int
+
+    @property
+    def x(self) -> int:
+        return int(self.video_x)
+
+    @property
+    def y(self) -> int:
+        return int(self.video_y)
 
 class ClickHandler(BaseModel):
     """Handles mouse click processing and data recording."""
 
     output_path: str
-    videos: List[VideoPlaybackState]
-    grid_parameters: GridParameters
+    videos: list[VideoPlaybackState]
+    grid_helper: GridParameters
     clicks: dict[str, list[ClickData]] = {}
     csv_ready: bool = False
 
@@ -31,10 +49,10 @@ class ClickHandler(BaseModel):
     def process_click(self, x: int, y: int, frame_number: int) -> ClickData | None:
         """Process a mouse click and return click data if valid."""
         # Calculate which grid cell was clicked
-        cell_x = x // self.grid_parameters.cell_width
-        cell_y = y // self.grid_parameters.cell_height
+        cell_x = x // self.grid_helper.cell_width
+        cell_y = y // self.grid_helper.cell_height
 
-        video_idx = cell_y * self.grid_parameters.columns + cell_x
+        video_idx = cell_y * self.grid_helper.columns + cell_x
         if video_idx >= len(self.videos):
             return None
 
@@ -43,8 +61,8 @@ class ClickHandler(BaseModel):
         zoom_state = video.zoom_state
 
         # Get position within cell
-        relative_cell_x = x % self.grid_parameters.cell_width
-        relative_cell_y = y % self.grid_parameters.cell_height
+        relative_cell_x = x % self.grid_helper.cell_width
+        relative_cell_y = y % self.grid_helper.cell_height
 
         # Check if click is within the actual video area
         if (scaling.x_offset <= relative_cell_x < scaling.x_offset + scaling.scaled_width and

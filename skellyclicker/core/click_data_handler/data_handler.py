@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from skellyclicker.helpers.video_models import VideoPlaybackState, ClickData
+from skellyclicker import VideoNameString, PointNameString
+from skellyclicker.core.video_handler.video_models import ClickData, VideoPlaybackState, VideoMetadata, \
+    VideoScalingParameters
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +19,15 @@ class DataHandlerConfig(BaseModel):
     tracked_point_names: list[str]
 
     @classmethod
-    def from_config_file(cls, videos: list[VideoPlaybackState], config_path: str):
+    def from_config_file(cls, videos: dict[VideoNameString, VideoPlaybackState], config_path: str):
 
         with open(file=Path(config_path)) as file:
             config = json.load(file)
         tracked_point_names = config["tracked_point_names"]
-        logger.debug(f"Found tracked point names {tracked_point_names} in file: {config_path}")
+        logger.debug(f"Found tracked point names in file: {tracked_point_names}")
         return cls(
-            num_frames=videos[0].metadata.frame_count,
-            video_names=sorted([video.name for video in videos]),
+            num_frames=next(iter(videos.values())).metadata.frame_count,
+            video_names=sorted([video.name for video in videos.values()]),
             tracked_point_names=tracked_point_names,
         )
 
@@ -33,23 +35,25 @@ class DataHandlerConfig(BaseModel):
     def from_dataframe(cls, dataframe: pd.DataFrame):
         tracked_point_names = set()
         for name in dataframe.columns:
-            name = name.strip("_x").strip("_y")
+            name = name.removesuffix("_x").removesuffix("_y")
             tracked_point_names.add(name)
         tracked_point_names = list(tracked_point_names)
         logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
-        video_names = sorted(dataframe.index.get_level_values("video").unique().tolist())
         return cls(
             num_frames=dataframe.index.get_level_values("frame").max(),
-            video_names=video_names,
+            video_names=sorted(dataframe.index.get_level_values("video").unique().tolist()),
             tracked_point_names=tracked_point_names,
         )
+
+
+
 
 
 class DataHandler(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     config: DataHandlerConfig
     dataframe: pd.DataFrame
-    active_point: str
+    active_point: PointNameString
 
     @classmethod
     def from_config(cls, config: DataHandlerConfig):
@@ -105,15 +109,16 @@ class DataHandler(BaseModel):
         self.active_point = self.config.tracked_point_names[new_position]
         logger.debug(f"Active point set to {self.active_point}")
 
-    def update_dataframe(self, click_data: ClickData):
-        video_name = self.config.video_names[
-            click_data.video_index
-        ]  # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
+    def update_dataframe(self, click_data: ClickData, point_name: str | None = None):
+        video_name = self.config.video_names[click_data.video_index]
+        # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
+        if point_name is None:
+            point_name = self.active_point
         self.dataframe.loc[
-            (video_name, click_data.frame_number), f"{self.active_point}_x"
+            (video_name, click_data.frame_number), f"{point_name}_x"
         ] = click_data.x
         self.dataframe.loc[
-            (video_name, click_data.frame_number), f"{self.active_point}_y"
+            (video_name, click_data.frame_number), f"{point_name}_y"
         ] = click_data.y
 
     def clear_current_point(self, video_index: int, frame_number: int):
@@ -125,22 +130,22 @@ class DataHandler(BaseModel):
             np.nan
         )
         logger.debug(
-            f"Cleared point {self.active_point} for all videos, frame {frame_number}"
+            f"Cleared point {self.active_point} for video {video_name}, frame {frame_number}"
         )
 
     def get_data_by_video_frame(
         self, video_index: int, frame_number: int
     ) -> dict[str, ClickData]:
         video_name = self.config.video_names[video_index]
-        video_frame_row = self.dataframe.loc[(video_name, frame_number)] 
+        video_frame_row = self.dataframe.loc[(video_name, frame_number)]
 
+        # TODO: There is some error in the DLC machine labels that sometimes returns duplicate data, this pulls the first occurence for each row
         if len(video_frame_row.shape) > 1:
             video_frame_row = video_frame_row.iloc[0]
         click_data = {}
         for point_name in self.config.tracked_point_names:
             x = video_frame_row[f"{point_name}_x"]
             y = video_frame_row[f"{point_name}_y"]
-        
             if not np.isnan(x) and not np.isnan(y):
                 click_data[point_name] = ClickData(
                     video_index=video_index,
@@ -164,15 +169,14 @@ class DataHandler(BaseModel):
 
 if __name__ == "__main__":
     import cv2
-    from skellyclicker.helpers.video_models import VideoMetadata, VideoScalingParameters
 
     video_paths = Path(
         Path.home()
         / "freemocap_data/recording_sessions/freemocap_test_data/synchronized_videos"
     ).glob("*.mp4")
-    config_file_path = Path("../../tracked_points.json")
+    config_file_path = Path("../../../tracked_points.json")
 
-    videos = []
+    _videos = []
     image_counts = set()
 
     for video_path in video_paths:
@@ -182,7 +186,7 @@ if __name__ == "__main__":
 
         metadata = VideoMetadata(
             path=str(video_path),
-            name=video_path.stem,
+            name=video_path.name,
             width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
             height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
             frame_count=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
@@ -196,15 +200,17 @@ if __name__ == "__main__":
             y_offset=0,
             scaled_width=metadata.width,
             scaled_height=metadata.height,
+            original_width=metadata.width,
+            original_height=metadata.height,
         )
 
-        videos.append(
+        _videos.append(
             VideoPlaybackState(
-                metadata=metadata, cap=cap, scaling_params=scaling_params
+                metadata=metadata, cap=cap, grid_scale=scaling_params
             )
         )
     handler_config = DataHandlerConfig.from_config_file(
-        videos=videos, config_path=config_file_path
+        videos=_videos, config_path=config_file_path
     )
     handler = DataHandler.from_config(handler_config)
 
