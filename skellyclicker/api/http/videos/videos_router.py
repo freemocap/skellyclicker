@@ -53,7 +53,7 @@ class FramesResponse(BaseModel):
         base64_image = base64.b64encode(jpeg_image).decode('utf-8')
         return base64_image
 
-@videos_router.get("/frames/{frame_number}", response_model=FramesResponse)
+@videos_router.get("/get_frames", response_model=FramesResponse)
 def get_frames_by_frame_number(
         frame_number: Annotated[int, Field(ge=0,
                                            default=0,
@@ -61,7 +61,7 @@ def get_frames_by_frame_number(
     """
     Retrieve frames from all videos at the specified frame number.
     """
-    logger.info(f"Retrieving frames for frame number: {frame_number}")
+    logger.trace(f"Retrieving frames for frame number: {frame_number}")
     video_group_handler:VideoGroupHandler = get_skellyclicker_app_state().video_group_handler
     if not video_group_handler:
         error_msg = "No video group handler available. Please load a recording first."
@@ -74,7 +74,6 @@ def get_frames_by_frame_number(
             error_msg = f"No images found for frame number: {frame_number}"
             logger.error(error_msg)
             raise HTTPException(status_code=404, detail=error_msg)
-        logger.info(f"Retrieved {len(images)} images for frame number: {frame_number}")
         return FramesResponse.from_numpy_images(images=images, frame_number=frame_number)
     except Exception as e:
         error_msg = f"Error retrieving frames: {type(e).__name__} - {str(e)}"

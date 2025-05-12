@@ -2,7 +2,7 @@ import React from 'react';
 import {PaperbaseContent} from "@/layout/paperbase_theme/PaperbaseContent";
 import {Provider} from "react-redux";
 import {AppStateStore} from "@/store/AppStateStore";
-import {WebSocketContextProvider} from "@/context/websocket-context/WebSocketContext";
+import {WebSocketContextProvider} from "@/hooks/websocket-context/WebSocketContext";
 
 
 function App() {
@@ -11,9 +11,9 @@ function App() {
 
     return (
         <Provider store={AppStateStore}>
-            {/*<WebSocketContextProvider url={wsUrl}>*/}
+            <WebSocketContextProvider url={wsUrl}>
                 <PaperbaseContent/>
-            {/*</WebSocketContextProvider>*/}
+            </WebSocketContextProvider>
         </Provider>
     );
 }

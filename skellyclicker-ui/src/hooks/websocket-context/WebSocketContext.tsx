@@ -1,13 +1,13 @@
 import React, {createContext, ReactNode, useContext} from "react";
-import {useWebSocket} from "@/context/websocket-context/useWebSocket";
+import {useWebSocket, FrameData} from "@/hooks/websocket-context/useWebSocket";
 
 interface WebSocketContextProps {
     isConnected: boolean;
     connect: () => void;
     disconnect: () => void;
-    latestImageBitmaps: Record<string, ImageBitmap>;
+    requestFrame: (frameNumber: number) => void;
+    latestFrameData: FrameData | null;
 }
-
 
 interface WebSocketProviderProps {
     url: string;
@@ -17,10 +17,10 @@ interface WebSocketProviderProps {
 const WebSocketContext = createContext<WebSocketContextProps | undefined>(undefined);
 
 export const WebSocketContextProvider: React.FC<WebSocketProviderProps> = ({url, children}) => {
-    const {isConnected, connect, disconnect, latestImageBitmaps} = useWebSocket(url);
+    const {isConnected, connect, disconnect, requestFrame, latestFrameData} = useWebSocket(url);
 
     return (
-        <WebSocketContext.Provider value={{isConnected, connect, disconnect,latestImageBitmaps}}>
+        <WebSocketContext.Provider value={{isConnected, connect, disconnect, requestFrame, latestFrameData}}>
             {children}
         </WebSocketContext.Provider>
     )

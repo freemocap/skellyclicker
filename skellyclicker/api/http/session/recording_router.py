@@ -8,7 +8,7 @@ from pydantic import BaseModel, DirectoryPath, Field
 from skellyclicker.app.app_state_singleton import SkellyClickerAppState, get_skellyclicker_app_state
 
 logger = logging.getLogger(__name__)
-recording_router = APIRouter()
+session_router = APIRouter()
 
 DEFAULT_RECORDING_PATH = str(Path.home() / "freemocap_data" / "recording_sessions" / "freemocap_test_data")
 
@@ -29,7 +29,7 @@ class LoadRecordingResponse(BaseModel):
             frame_count=app_state.video_group_handler.frame_count if app_state.video_group_handler else 0,
         )
 
-@recording_router.post("/load_recording", response_model=LoadRecordingResponse)
+@session_router.post("/load_recording", response_model=LoadRecordingResponse)
 async def load_recording_endpoint(request: LoadRecordingRequest = Body(..., description="Request body containing the path to the recording directory",
                                                                        examples=[LoadRecordingRequest()])
                                   ) -> LoadRecordingResponse:
@@ -49,3 +49,5 @@ async def load_recording_endpoint(request: LoadRecordingRequest = Body(..., desc
         error_msg = f"Failed to load recording: {type(e).__name__} - {str(e)}"
         logger.exception(error_msg)
         raise HTTPException(status_code=500, detail=error_msg)
+
+

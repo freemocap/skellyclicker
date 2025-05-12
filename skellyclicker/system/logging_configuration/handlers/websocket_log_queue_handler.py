@@ -53,7 +53,7 @@ class WebSocketQueueHandler(logging.Handler):
             log_record_dict['exc_info'] = str(log_record_dict['exc_info']) if log_record_dict['exc_info'] else None
             if not isinstance(log_record_dict['msg'], str):
                 log_record_dict['msg'] = str(log_record_dict['msg'])
-            self.queue.put(LogRecordModel(**log_record_dict).model_dump())
+            self.queue.put(LogRecordModel(**log_record_dict))
 
 
 MAX_WEBSOCKET_LOG_QUEUE_SIZE = 1000

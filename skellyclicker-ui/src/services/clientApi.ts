@@ -3,8 +3,7 @@ import {z} from 'zod';
 
 // Schema for frame image response
 export const FramesResponseSchema = z.object({
-    frame_number: z.number(),
-    frames: z.record(z.string(), z.string()), // camera_id -> base64 image data
+    frames:  z.record(z.string(), z.string()) // [frame_number/video_name/base64_image]
 });
 export type FramesResponse = z.infer<typeof FramesResponseSchema>;
 
@@ -22,9 +21,9 @@ export const clientApi = createApi({
     baseQuery: fetchBaseQuery({baseUrl: 'http://localhost:8089'}),
     tagTypes: ['Frames'],
     endpoints: (builder) => ({
-        getFrames: builder.query<FramesResponse, number>({
-            query: (frameNumber) => `/videos/frames/${frameNumber}`,
-            providesTags: ['Frames'],
+        getFrames: builder.query<FramesResponse, { frameNumber: number }>({
+            query: ({ frameNumber }) => `/videos/get_frames?frame_number=${frameNumber}`,
+            providesTags: (result, error, { frameNumber }) => [{ type: 'Frames', id: frameNumber }],
             transformResponse: (response: unknown) => {
                 try {
                     return FramesResponseSchema.parse(response);
@@ -34,6 +33,7 @@ export const clientApi = createApi({
                 }
             },
         }),
+
 
         // Load recording - this should be a mutation since it changes server state
         loadRecording: builder.mutation<LoadRecordingResponse, string>({

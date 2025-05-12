@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Grid, Paper, Typography, useTheme } from '@mui/material';
-import { useAppSelector } from '@/store/AppStateStore';
-import { useGetFramesQuery } from '@/services/clientApi';
+import {useWebSocketFrameNavigation} from "@/hooks/useWebsocketFrameNavigation";
 
 interface ImageInfo {
   videoName: string;
@@ -10,27 +9,23 @@ interface ImageInfo {
 
 const VideosViewer: React.FC = () => {
   const theme = useTheme();
-  const { currentFrame } = useAppSelector(state => state.playbackControl);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
 
-  // Fetch frame images using RTK Query
+  // Use our WebSocket-based frame navigation hook
   const {
-    data: frameData,
+    currentFrame,
+    frames,
     isLoading,
-    isError,
     error
-  } = useGetFramesQuery(currentFrame, {
-    // Skip query if frame is negative
-    skip: currentFrame < 0,
-  });
+  } = useWebSocketFrameNavigation();
 
   // Process images from the frame data
   const processedImages: Record<string, ImageInfo> = React.useMemo(() => {
-    if (!frameData?.frames) return {};
+    if (!frames) return {};
 
     const result: Record<string, ImageInfo> = {};
-    Object.entries(frameData.frames).forEach(([videoName, imageData]) => {
+    Object.entries(frames).forEach(([videoName, imageData]) => {
       result[videoName] = {
         videoName,
         imageData,
@@ -38,7 +33,7 @@ const VideosViewer: React.FC = () => {
     });
 
     return result;
-  }, [frameData]);
+  }, [frames]);
 
   // Update container dimensions on resize
   useEffect(() => {
@@ -85,7 +80,7 @@ const VideosViewer: React.FC = () => {
     );
   }
 
-  if (isError) {
+  if (error) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%' }}>
         <Typography color="error">

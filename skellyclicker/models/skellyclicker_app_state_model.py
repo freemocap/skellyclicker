@@ -8,8 +8,17 @@ from skellyclicker.models.video_models import VideoGroupHandler
 
 class SkellyClickerAppState(BaseModel):
     recording_path: str | None = None
+    current_frame_number: int = -1
     video_group_handler: VideoGroupHandler| None = None
 
+    def set_current_frame_number(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise ValueError("current_frame_number must be an integer")
+        if value < 0:
+            raise ValueError("current_frame_number must be non-negative")
+        if self.video_group_handler and value >= self.video_group_handler.total_frame_count:
+            raise ValueError("current_frame_number exceeds total frame count")
+        self.current_frame_number = value
 
     @property
     def recording_name(self) -> str | None:

@@ -1,49 +1,45 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useGetFramesQuery } from '@/services/clientApi';
-import { useAppSelector } from '@/store/AppStateStore';
+import { useAppSelector, useAppDispatch } from '@/store/AppStateStore';
+import { setCurrentFrame, nextFrame, previousFrame } from '@/store/slices/playbackControlSlice';
 
 export function useFrameNavigation() {
-    const [currentFrame, setCurrentFrame] = useState(0);
-    const totalFrameCount = useAppSelector(state => state.playbackControl.totalFrames);
+    const dispatch = useAppDispatch();
+    const { currentFrame, totalFrames, isPlaying } = useAppSelector(state => state.playbackControl);
 
+    // Fetch the current frame data
     const {
         data: framesData,
-        isLoading: isLoadingFrames,
-        isFetching: isFetchingFrames,
-        error: framesError,
-        refetch: refetchFrames
-    } = useGetFramesQuery(currentFrame, {
-        skip: totalFrameCount === 0
+        isLoading,
+        isFetching,
+        error
+    } = useGetFramesQuery({ frameNumber: currentFrame }, {
+        skip: totalFrames === 0
     });
 
+    // Navigation functions
+    const goToFrame = useCallback((frame: number) => {
+        dispatch(setCurrentFrame(frame));
+    }, [dispatch]);
+
     const goToNextFrame = useCallback(() => {
-        if (currentFrame < totalFrameCount - 1) {
-            setCurrentFrame(prev => prev + 1);
-        }
-    }, [currentFrame, totalFrameCount]);
+        dispatch(nextFrame());
+    }, [dispatch]);
 
     const goToPreviousFrame = useCallback(() => {
-        if (currentFrame > 0) {
-            setCurrentFrame(prev => prev - 1);
-        }
-    }, [currentFrame]);
-
-    const goToFrame = useCallback((frameNumber: number) => {
-        if (frameNumber >= 0 && frameNumber < totalFrameCount) {
-            setCurrentFrame(frameNumber);
-        }
-    }, [totalFrameCount]);
+        dispatch(previousFrame());
+    }, [dispatch]);
 
     return {
         currentFrame,
-        totalFrameCount,
+        totalFrames,
+        isPlaying,
         frames: framesData?.frames || {},
-        isLoadingFrames,
-        isFetchingFrames,
-        framesError,
-        refetchFrames,
+        isLoading,
+        isFetching,
+        error,
+        goToFrame,
         goToNextFrame,
         goToPreviousFrame,
-        goToFrame
     };
 }

@@ -36,11 +36,8 @@ class LoggerBuilder:
         if self.queue:
             root.addHandler(self._build_websocket_handler())
 
-        if True:
-            # only add console handler if not running in electron, otherwise logs will go through the websocket handler
-            root.addHandler(self._build_console_handler())
-        else:
-            print("Running in electron, not adding console handler to python root logger")
+        # only add console handler if not running in electron, otherwise logs will go through the websocket handler
+        root.addHandler(self._build_console_handler())
 
     def _build_console_handler(self):
         handler = ColoredConsoleHandler()

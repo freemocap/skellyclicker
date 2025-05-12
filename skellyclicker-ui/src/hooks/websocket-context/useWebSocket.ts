@@ -5,11 +5,20 @@ import {useAppDispatch} from "@/store/AppStateStore";
 
 const MAX_RECONNECT_ATTEMPTS = 30;
 
+// Define schema for frame data messages
+export const FrameDataSchema = z.object({
+    type: z.literal('frame_data'),
+    frame_number: z.number(),
+    frames: z.record(z.string(), z.string()), // [video_name, base64_image]
+});
+
+export type FrameData = z.infer<typeof FrameDataSchema>;
 
 export const useWebSocket = (wsUrl: string) => {
     const [isConnected, setIsConnected] = useState(false);
     const [websocket, setWebSocket] = useState<WebSocket | null>(null);
     const [connectAttempt, setConnectAttempt] = useState(0);
+    const [latestFrameData, setLatestFrameData] = useState<FrameData | null>(null);
     const dispatch = useAppDispatch();
 
     const handleIncomingMessage = useCallback((event: MessageEvent) => {
@@ -29,6 +38,16 @@ export const useWebSocket = (wsUrl: string) => {
         try {
             const parsedData = JSON.parse(data);
 
+            // Try to parse as frame data
+            try {
+                const frameData = FrameDataSchema.parse(parsedData);
+                setLatestFrameData(frameData);
+                return;
+            } catch (e) {
+                if (!(e instanceof z.ZodError)) throw e;
+            }
+
+            // Try to parse as log record
             try {
                 const logRecord = LogRecordSchema.parse(parsedData);
                 dispatch(addLog({
@@ -56,7 +75,6 @@ export const useWebSocket = (wsUrl: string) => {
             } catch (e) {
                 if (!(e instanceof z.ZodError)) throw e;
             }
-
 
             console.error('Message did not match any known schema. Message keys:', Object.keys(parsedData));
         } catch (e) {
@@ -97,14 +115,23 @@ export const useWebSocket = (wsUrl: string) => {
             console.error('Websocket error:', error);
         };
         setWebSocket(ws);
-    }, [wsUrl, websocket, connectAttempt]);
+    }, [wsUrl, websocket, connectAttempt, handleIncomingMessage]);
 
     const disconnect = useCallback(() => {
         if (websocket) {
             websocket.close();
             setWebSocket(null);
         }
+    }, [websocket]);
 
+    // Function to request a specific frame
+    const requestFrame = useCallback((frameNumber: number) => {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify({
+                type: 'frame_request',
+                frame_number: frameNumber
+            }));
+        }
     }, [websocket]);
 
     useEffect(() => {
@@ -116,12 +143,13 @@ export const useWebSocket = (wsUrl: string) => {
         return () => {
             clearTimeout(timeout);
         };
-
     }, [connect, connectAttempt, wsUrl]);
 
     return {
         isConnected,
         connect,
         disconnect,
+        requestFrame,
+        latestFrameData,
     };
 };
