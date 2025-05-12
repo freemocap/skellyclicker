@@ -1,7 +1,8 @@
 from skellyclicker.api.http.app.health import health_router
 from skellyclicker.api.http.app.state import state_router
-from skellyclicker.api.http.session.session_router import session_router
+from skellyclicker.api.http.load.recording_router import recording_router
 from skellyclicker.api.http.videos.videos_router import videos_router
+from skellyclicker.api.websocket.websocket_connect import websocket_router
 
 SKELLYCLICKER_ROUTERS = {
     "/app": {
@@ -12,6 +13,9 @@ SKELLYCLICKER_ROUTERS = {
         "videos": videos_router,
     },
     "/session": {
-        "session": session_router,
-    }
+        "session": recording_router,
+    },
+    "/websocket": {
+        "connect": websocket_router,
+    },
 }

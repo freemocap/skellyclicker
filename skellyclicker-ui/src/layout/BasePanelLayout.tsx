@@ -1,8 +1,8 @@
 // skellyclicker-ui/src/layout/BasePanelLayout.tsx
 import React from "react"
 import {Panel, PanelGroup, PanelResizeHandle} from "react-resizable-panels";
-import {LeftSidePanelContent} from "@/components/ui-components/LeftSidePanelContent";
-import BottomPanelContent from "@/components/ui-components/BottomPanelContent";
+import {LeftSidePanelContent} from "@/components/layout-components/LeftSidePanelContent";
+import BottomPanelContent from "@/components/layout-components/BottomPanelContent";
 import {useTheme} from "@mui/material/styles";
 import {Box} from "@mui/material";
 

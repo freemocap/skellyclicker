@@ -9,21 +9,14 @@ from starlette.websockets import WebSocket, WebSocketState, WebSocketDisconnect
 
 from skellyclicker.app.app_state_singleton import get_skellyclicker_app_state, \
     SkellyClickerAppState
+from skellyclicker.system.logging_configuration.handlers.websocket_log_queue_handler import get_websocket_log_queue
 
 logger = logging.getLogger(__name__)
 
-
-class WebsocketPayload(BaseModel):
-    payload: str | dict | list | BaseModel
-    session_id: uuid.UUID
-
-
 class SkellyClickerWebsocketServer:
-    def __init__(self, websocket: WebSocket, session_id: str):
+    def __init__(self, websocket: WebSocket):
         self.websocket = websocket
-        self.session_id = session_id
-        self._skellyclicker_app_state: SkellyClickerAppState = get_skellyclicker_app_state()
-        self.frontend_image_relay_task: Optional[asyncio.Task] = None
+        self.websocket_queue = get_websocket_log_queue()
 
     async def __aenter__(self):
         logger.debug("Entering SkellyClicker  WebsocketServer context manager...")
@@ -52,18 +45,12 @@ class SkellyClickerWebsocketServer:
 
         try:
             while True:
-                if self._skellyclicker_app_state.websocket_queue.qsize() > 0:
+                if self.websocket_queue.qsize() > 0:
                     try:
-                        message = self._skellyclicker_app_state.websocket_queue.get()
+                        message = self.websocket_queue.get()
                         logger.info(f"Got message from queue: {message}")
-                        if not isinstance(message, WebsocketPayload):
-                            raise ValueError(f"Message is not of type WebsocketPayload: {message}")
-                        if message.session_id != self.session_id:
-                            raise ValueError(f"Session ID does not match: {message.session_id} != {self.session_id}")
-                        await self.websocket.send_json(message.model_dump())
+                        await self.websocket.send_json(message)
 
-                        # await self._handle_ipc_queue_message(
-                        #     message=self._skellyclicker_app_state.websocket_queue.get())
                     except multiprocessing.queues.Empty:
                         continue
                 else:

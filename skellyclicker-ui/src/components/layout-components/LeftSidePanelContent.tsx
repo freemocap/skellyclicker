@@ -2,9 +2,8 @@
 import * as React from 'react';
 import Box from "@mui/material/Box";
 import {List, ListItem, useTheme} from "@mui/material";
-import {AvailableCamerasPanel} from "@/components/available-cameras-panel/AvailableCamerasPanel";
 import {RecordingInfoPanel} from "@/components/recording-info-panel/RecordingInfoPanel";
-import ThemeToggle from "@/components/ui-components/ThemeToggle";
+import ThemeToggle from "@/components/layout-components/ThemeToggle";
 
 // Extract reusable scrollbar styles
 const scrollbarStyles = {
@@ -68,6 +67,8 @@ export const LeftSidePanelContent = () => {
             <List disablePadding>
                 <ListItem sx={{...item, ...itemCategory, fontSize: 22, color: theme.palette.common.white}}>
                     SkellyClicker💀👆
+                    <ThemeToggle />
+
                 </ListItem>
             </List>
 
@@ -77,9 +78,8 @@ export const LeftSidePanelContent = () => {
                 overflowX: 'hidden',
                 ...scrollbarStyles
             }}>
-                <ThemeToggle />
-                <AvailableCamerasPanel/>
                 <RecordingInfoPanel/>
+                {/*<WebsocketConnectionStatus/>*/}
             </Box>
         </Box>
     );

@@ -139,6 +139,22 @@ class VideoGroupHandler(BaseModel):
     """Handles multiple video files and their metadata."""
     videos: dict[VideoNameString, VideoHandler] = Field(default_factory=dict)
 
+    @property
+    def video_paths(self) -> list[str]:
+        """Get the paths of all videos in the group."""
+        return [video.path for video in self.videos.values()]
+
+    @property
+    def frame_count(self) -> int:
+        """Get the total frame count of all videos in the group."""
+        if not self.videos:
+            return 0
+        frame_count = set([video.frame_count for video in self.videos.values()])
+        if len(frame_count) > 1:
+            logger.error("All videos must have the same number of frames.")
+            raise ValueError("All videos must have the same number of frames.")
+        return frame_count.pop()
+
     @classmethod
     def from_recording_path(cls, recording_path: str):
         """Create a VideoGroupHandler from a recording path

@@ -9,6 +9,7 @@ from uvicorn import Server
 
 from skellyclicker.api.server.server_constants import HOSTNAME, PORT
 from skellyclicker.app.create_app import create_app
+from skellyclicker.utilities.kill_process_on_port import kill_process_on_port
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class UvicornServerManager:
         )
 
         logger.info(f"Starting uvicorn server on {self.hostname}:{self.port}")
+        kill_process_on_port(port=self.port)
         self.server = uvicorn.Server(config)
 
         def server_thread():

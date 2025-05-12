@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     outer_global_kill_flag = multiprocessing.Value("b", False)
     try:
-        create_skellyclicker_app_state(global_kill_flag=outer_global_kill_flag)
+        create_skellyclicker_app_state()
         run_skellyclicker_server(outer_global_kill_flag)
         outer_global_kill_flag.value = True
     except Exception as e:

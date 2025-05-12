@@ -5,17 +5,20 @@ import {LogTerminal} from "@/components/LogTerminal";
 import FramerateViewerPanel from "@/components/framerate-viewer/FrameRateViewer";
 import {Panel, PanelGroup, PanelResizeHandle} from "react-resizable-panels";
 import {useTheme} from "@mui/material/styles";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 
 export default function BottomPanelContent() {
     const theme = useTheme();
 
     return (
-        <Box sx={{ width: '100%', height: '100%' }}>
+        <Box sx={{width: '100%', height: '100%'}}>
             <PanelGroup direction="horizontal">
                 {/* Framerate Viewer Panel */}
                 <Panel defaultSize={50} minSize={20}>
-                    <Box sx={{ height: '100%', overflow: 'auto' }}>
-                        <FramerateViewerPanel />
+                    <Box sx={{height: '100%', overflow: 'auto'}}>
+                        {/*<ErrorBoundary>*/}
+                        {/*    /!*<FramerateViewerPanel/>*!/*/}
+                        {/*</ErrorBoundary>*/}
                     </Box>
                 </Panel>
 
@@ -30,8 +33,8 @@ export default function BottomPanelContent() {
 
                 {/* Logs Terminal Panel */}
                 <Panel defaultSize={50} minSize={20}>
-                    <Box sx={{ height: '100%', overflow: 'auto' }}>
-                        <LogTerminal />
+                    <Box sx={{height: '100%', overflow: 'auto'}}>
+                        <LogTerminal/>
                     </Box>
                 </Panel>
             </PanelGroup>

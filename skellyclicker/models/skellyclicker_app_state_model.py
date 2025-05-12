@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel
 import multiprocessing
 
@@ -5,11 +7,24 @@ from skellyclicker.models.video_models import VideoGroupHandler
 
 
 class SkellyClickerAppState(BaseModel):
+    recording_path: str | None = None
     video_group_handler: VideoGroupHandler| None = None
 
-    @classmethod
-    def create(cls, global_kill_flag: multiprocessing.Value):
-        return cls()
+
+    @property
+    def recording_name(self) -> str | None:
+        """Get the name of the recording without the file extension."""
+        if self.recording_path:
+            return Path(self.recording_path).name
+        return None
+
+
+    @property
+    def total_frame_count(self) -> int | None:
+        """Get the total frame count of the recording."""
+        if self.video_group_handler:
+            return self.video_group_handler.total_frame_count
+        return None
 
     def close(self):
         """Release any resources held by the app state."""
@@ -20,3 +35,4 @@ class SkellyClickerAppState(BaseModel):
     def set_recording_path(self, recording_path: str) -> None:
         """Set the recording path and load the video group handler."""
         self.video_group_handler = VideoGroupHandler.from_recording_path(recording_path)
+        self.recording_path = recording_path
