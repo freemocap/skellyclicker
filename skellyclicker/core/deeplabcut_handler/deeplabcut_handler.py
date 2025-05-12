@@ -200,7 +200,7 @@ class DeeplabcutHandler(BaseModel):
         else:
             print("Skipping video annotation")
 
-        deeplabcut.plot_trajectories(config=self.project_config_path, videos=video_paths, filtered=filter_videos)
+        deeplabcut.plot_trajectories(config=self.project_config_path, videos=video_paths, filtered=filter_videos, destfolder=str(output_folder))
 
         csv_path = output_folder / f"skellyclicker_machine_labels_iteration_{config['iteration']}.csv"
 
