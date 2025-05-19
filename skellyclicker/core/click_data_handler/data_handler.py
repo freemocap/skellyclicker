@@ -114,6 +114,11 @@ class DataHandler(BaseModel):
         # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
         if point_name is None:
             point_name = self.active_point
+        if click_data.x < 0 or click_data.y < 0:
+            logger.warning(
+                f"Negative click data {click_data} entered for video {video_name}, frame {click_data.frame_number}"
+            )
+            return
         self.dataframe.loc[
             (video_name, click_data.frame_number), f"{point_name}_x"
         ] = click_data.x
