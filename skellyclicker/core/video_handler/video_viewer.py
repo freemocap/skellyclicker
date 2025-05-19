@@ -88,6 +88,8 @@ class VideoViewer(BaseModel):
             self._jump_n_frames(-1)
         elif key == ord("d"):
             self._jump_n_frames(1)
+        elif key == ord("f"):
+            self._jump_to_next_labeled_frame()
         elif key == ord("w"):
             self.video_handler.move_active_point_by_index(index_change=-1)
         elif key == ord("s"):
@@ -151,6 +153,23 @@ class VideoViewer(BaseModel):
         self.frame_number += num_frames
         self.frame_number = max(0, self.frame_number)
         self.frame_number = min(self.frame_count, self.frame_number)
+
+    def _jump_to_next_labeled_frame(self):
+        self.is_playing = False
+        labeled_frames = self.video_handler.data_handler.get_nonempty_frames()
+        print(f"Labeled frames: {labeled_frames}")
+        if labeled_frames and len(labeled_frames) > 0:
+            next_frame = min(
+                [
+                    frame_number
+                    for frame_number in labeled_frames
+                    if frame_number > self.frame_number
+                ],
+                default=labeled_frames[0],
+            )
+            self.frame_number = next_frame
+        else:
+            logger.warning("Jump to next labeled frame pressed, but no labeled frames found in the current video.")
 
     def _mouse_callback(self, event, x, y, flags, param):
         # Calculate which grid cell contains the mouse

@@ -35,6 +35,7 @@ FULL_HELP_TEXT = (
     "Press 'c' to toggle auto next point.\n"
     "Press 'm' to toggle machine labels visibility.\n"
     "Press 'v' to copy machine labels to labelled data.\n"
+    "Press 'f' to jump to next labeled frame.\n"
     "Press 'n' to toggle point name visibility.\n"
     "Press 'h' to toggle help text.\n"
     "Press 'Esc' to quit.\n"
