@@ -165,9 +165,7 @@ class DataHandler(BaseModel):
     def get_nonempty_frames(self) -> list[int]:
         mask = self.dataframe.iloc[:, 2:].notna().any(axis=1)
         nonempty_dataframe = self.dataframe[mask]
-        print(nonempty_dataframe)
         nonempty_frames = nonempty_dataframe.index.get_level_values("frame").unique()
-        print(nonempty_frames)
         return sorted(nonempty_frames.tolist())
 
     def save_csv(self, output_path: str | Path):
