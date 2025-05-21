@@ -192,6 +192,8 @@ class SkellyClickerUIController:
         else:
             messagebox.showinfo("Data Not Saved", "Data not saved.")
 
+        self.update_progress()
+
         self.video_viewer = None
 
     def train_model(self) -> None:
@@ -435,6 +437,17 @@ class SkellyClickerUIController:
             )
             return
         print(f"Training batch size set to: {self.ui_model.training_batch_size}")
+
+    def update_progress(self) -> None:
+        if self.video_viewer:
+            total_frames = self.video_viewer.video_handler.frame_count
+            labeled_frames = self.video_viewer.video_handler.data_handler.get_nonempty_frames()
+            self.ui_model.frame_count = total_frames
+            self.ui_model.labeled_frames = labeled_frames
+
+        self.ui_view.labeling_progress.update(
+            self.ui_model.frame_count, self.ui_model.labeled_frames
+        )
 
     def clear_session(self) -> None:
         response = messagebox.askyesno(

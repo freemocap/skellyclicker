@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 
 import skellyclicker
 from skellyclicker.ui.assets.logo_paths import SKELLYCLICKER_LOGO_PNG, SKELLYCLICKER_LOGO_ICO
+from skellyclicker.ui.tk_components.labeling_progress import LabelingProgress
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,10 @@ class SkellyClickerUIView:
     show_help_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     show_help_checkbox: tk.Checkbutton = None
 
+    # Progress section
+    progress_frame: tk.Frame = None
+    total_rows_var: tk.IntVar = field(default_factory=lambda: tk.IntVar(value=0))
+    labeling_progress: LabelingProgress = None
 
 
     @classmethod
@@ -141,7 +146,7 @@ class SkellyClickerUIView:
 
         # instance._create_playback_section()
         # instance._create_separator()
-
+        instance._create_progress_frame()
         instance._create_separator()
         #
         # instance._create_show_help_frame()
@@ -406,6 +411,15 @@ class SkellyClickerUIView:
             variable=self.show_help_boolean_var,
         )
         self.show_help_checkbox.pack(fill=tk.X)
+
+    def _create_progress_frame(self):
+        """Create the progress section."""
+        self.progress_frame = tk.Frame(self.main_frame)
+        self.progress_frame.pack(fill=tk.X, pady=5)
+
+        # Create a LabelingProgress instance
+        self.labeling_progress = LabelingProgress(total_rows=self.total_rows_var.get(), labeled_rows=[], master=self.progress_frame)
+        self.labeling_progress.pack(fill=tk.X, padx=5, pady=5)
 
     def set_app_icon(self):
         """
