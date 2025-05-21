@@ -126,6 +126,10 @@ class VideoViewer(BaseModel):
             self.video_handler.image_annotator.config.show_names = (
                 not self.video_handler.image_annotator.config.show_names
             )
+            if self.video_handler.machine_labels_annotator is not None:
+                self.video_handler.machine_labels_annotator.config.show_names = (
+                    self.video_handler.image_annotator.config.show_names
+                )
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
