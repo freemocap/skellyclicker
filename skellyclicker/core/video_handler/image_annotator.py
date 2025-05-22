@@ -31,6 +31,7 @@ FULL_HELP_TEXT = (
     "Use 'w' and 's' to change the active point.\n"
     "Use 'e' to zoom in and 'q' to zoom out.\n"
     "Use 'r' to reset the zoom.\n"
+    "Use 'j', 'i', 'k', 'l' to pan.\n"
     "Press 'u' to clear the data for active point\n"
     "for the current frame.\n"
     "Press 'c' to toggle auto next point.\n"
