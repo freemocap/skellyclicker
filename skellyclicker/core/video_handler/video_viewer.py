@@ -76,7 +76,7 @@ class VideoViewer(BaseModel):
     def frame_count(self):
         return self.video_handler.frame_count
 
-    def _handle_keypress(self, key: int):
+    def _handle_keypress(self, key: int) -> bool:
         if key == 27:  # ESC
             return False
         elif key == 32:  # spacebar
@@ -130,6 +130,14 @@ class VideoViewer(BaseModel):
                 self.video_handler.machine_labels_annotator.config.show_names = (
                     self.video_handler.image_annotator.config.show_names
                 )
+        elif key == ord('i'):
+            self.keyboard_pan((0, -1))  # Pan up
+        elif key == ord('k'):
+            self.keyboard_pan((0, 1))  # Pan down
+        elif key == ord('j'):
+            self.keyboard_pan((-1, 0))  # Pan left
+        elif key == ord('l'):
+            self.keyboard_pan((1, 0))  # Pan right
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
@@ -142,6 +150,20 @@ class VideoViewer(BaseModel):
                 cell_x=self.active_cell[0],
                 cell_y=self.active_cell[1],
             )
+
+    def keyboard_pan(self, direction: tuple[int, int]):
+        if self.active_cell is None:
+            return
+        cell_x, cell_y = self.active_cell
+        video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
+        if video_idx >= len(self.video_handler.videos.values()):
+            return
+        video = list(self.video_handler.videos.values())[video_idx]
+
+        pan_amount = 10
+        video.zoom_state.center_x += direction[0] * pan_amount
+        video.zoom_state.center_y += direction[1] * pan_amount
+
 
     def clear_current_point(self):
         video_index = None
