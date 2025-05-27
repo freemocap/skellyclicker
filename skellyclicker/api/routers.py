@@ -1,0 +1,3 @@
+SKELLYCLICKER_ROUTERS = {
+
+}
