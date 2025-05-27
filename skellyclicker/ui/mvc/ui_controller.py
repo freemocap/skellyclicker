@@ -153,8 +153,6 @@ class SkellyClickerUIController:
                 print("Stopping previous video viewer")
                 self.video_viewer.stop()
                 print("Previous video viewer stopped")
-                # while self.video_viewer:
-                # time.sleep(0.1)
 
             if self.ui_model.csv_saved_path:
                 self.video_viewer = VideoViewer.from_videos(
@@ -170,6 +168,7 @@ class SkellyClickerUIController:
             self.ui_model.tracked_point_names = (
                 self.video_viewer.video_handler.data_handler.config.tracked_point_names
             )
+            self.ui_model.frame_count = self.video_viewer.video_handler.frame_count
             self.video_viewer.on_complete = self.video_viewer_on_complete
             self.video_viewer.launch_video_thread()
 
@@ -188,6 +187,7 @@ class SkellyClickerUIController:
         if save_data and save_path:
             self.ui_model.csv_saved_path = save_path
             self.ui_view.click_save_path_var.set(save_path)
+            self.update_progress()
             messagebox.showinfo("Data Saved", f"Data saved to: {save_path}")
         else:
             messagebox.showinfo("Data Not Saved", "Data not saved.")
@@ -380,6 +380,12 @@ class SkellyClickerUIController:
             self.ui_view.deeplabcut_batch_size_var.set(
                 self.ui_model.training_batch_size
             )
+        if self.ui_model.frame_count and self.ui_model.labeled_frames:
+            self.ui_view.labeling_progress.update(
+                self.ui_model.frame_count, self.ui_model.labeled_frames
+            )
+        else:
+            self.ui_view.labeling_progress.update(0, [])
 
     def on_autosave_toggle(self) -> None:
         self.ui_model.auto_save = self.ui_view.autosave_boolean_var.get()
@@ -435,6 +441,17 @@ class SkellyClickerUIController:
             )
             return
         print(f"Training batch size set to: {self.ui_model.training_batch_size}")
+
+    def update_progress(self) -> None:
+        if self.video_viewer:
+            total_frames = self.video_viewer.video_handler.frame_count
+            labeled_frames = self.video_viewer.video_handler.data_handler.get_nonempty_frames()
+            self.ui_model.frame_count = total_frames
+            self.ui_model.labeled_frames = labeled_frames
+
+        self.ui_view.labeling_progress.update(
+            self.ui_model.frame_count, self.ui_model.labeled_frames
+        )
 
     def clear_session(self) -> None:
         response = messagebox.askyesno(

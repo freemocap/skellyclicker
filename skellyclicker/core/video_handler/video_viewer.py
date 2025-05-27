@@ -76,7 +76,7 @@ class VideoViewer(BaseModel):
     def frame_count(self):
         return self.video_handler.frame_count
 
-    def _handle_keypress(self, key: int):
+    def _handle_keypress(self, key: int) -> bool:
         if key == 27:  # ESC
             return False
         elif key == 32:  # spacebar
@@ -88,6 +88,10 @@ class VideoViewer(BaseModel):
             self._jump_n_frames(-1)
         elif key == ord("d"):
             self._jump_n_frames(1)
+        elif key == ord("f"):
+            self._jump_to_labeled_frame(reverse=True)
+        elif key == ord("g"):
+            self._jump_to_labeled_frame(reverse=False)
         elif key == ord("w"):
             self.video_handler.move_active_point_by_index(index_change=-1)
         elif key == ord("s"):
@@ -115,11 +119,25 @@ class VideoViewer(BaseModel):
             self.video_handler.show_machine_labels = (
                 not self.video_handler.show_machine_labels
             )
-            print(f"Machine labels visibility: {self.video_handler.show_machine_labels}")
+            print(
+                f"Machine labels visibility: {self.video_handler.show_machine_labels}"
+            )
         elif key == ord("n"):
             self.video_handler.image_annotator.config.show_names = (
                 not self.video_handler.image_annotator.config.show_names
             )
+            if self.video_handler.machine_labels_annotator is not None:
+                self.video_handler.machine_labels_annotator.config.show_names = (
+                    self.video_handler.image_annotator.config.show_names
+                )
+        elif key == ord('i'):
+            self.keyboard_pan((0, -1))  # Pan up
+        elif key == ord('k'):
+            self.keyboard_pan((0, 1))  # Pan down
+        elif key == ord('j'):
+            self.keyboard_pan((-1, 0))  # Pan left
+        elif key == ord('l'):
+            self.keyboard_pan((1, 0))  # Pan right
         return True
 
     def keyboard_zoom(self, zoom_in: bool = True):
@@ -132,6 +150,20 @@ class VideoViewer(BaseModel):
                 cell_x=self.active_cell[0],
                 cell_y=self.active_cell[1],
             )
+
+    def keyboard_pan(self, direction: tuple[int, int]):
+        if self.active_cell is None:
+            return
+        cell_x, cell_y = self.active_cell
+        video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
+        if video_idx >= len(self.video_handler.videos.values()):
+            return
+        video = list(self.video_handler.videos.values())[video_idx]
+
+        pan_amount = 10
+        video.zoom_state.center_x += direction[0] * pan_amount
+        video.zoom_state.center_y += direction[1] * pan_amount
+
 
     def clear_current_point(self):
         video_index = None
@@ -151,6 +183,31 @@ class VideoViewer(BaseModel):
         self.frame_number += num_frames
         self.frame_number = max(0, self.frame_number)
         self.frame_number = min(self.frame_count, self.frame_number)
+
+    def _jump_to_labeled_frame(self, reverse: bool = False):
+        self.is_playing = False
+        labeled_frames = self.video_handler.data_handler.get_nonempty_frames()
+        if not labeled_frames or len(labeled_frames) == 0:
+            logger.warning(
+                "Jump to next labeled frame pressed, but no labeled frames found in the current video."
+            )
+            return
+        compare_function = (
+            (lambda x: x < self.frame_number)
+            if reverse
+            else (lambda x: x > self.frame_number)
+        )
+        eligible_frames = [
+            frame_number
+            for frame_number in labeled_frames
+            if compare_function(frame_number)
+        ]
+        next_frame = (
+            max(eligible_frames, default=labeled_frames[-1])
+            if reverse
+            else min(eligible_frames, default=labeled_frames[0])
+        )
+        self.frame_number = next_frame
 
     def _mouse_callback(self, event, x, y, flags, param):
         # Calculate which grid cell contains the mouse

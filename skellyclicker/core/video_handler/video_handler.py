@@ -316,15 +316,16 @@ class VideoHandler(BaseModel):
                     # center_x = relative_x
                     # center_y = relative_y
 
-                    cv2.drawMarker(
-                        zoomed,
-                        (center_x, center_y),
-                        (0, 0, 255),
-                        markerType=cv2.MARKER_CROSS,
-                        markerSize=10,
-                        thickness=2,
-                        line_type=cv2.LINE_AA,
-                    )
+                    # Draw marker at zoom center for debugging
+                    # cv2.drawMarker(
+                    #     zoomed,
+                    #     (center_x, center_y),
+                    #     (0, 0, 255),
+                    #     markerType=cv2.MARKER_CROSS,
+                    #     markerSize=10,
+                    #     thickness=2,
+                    #     line_type=cv2.LINE_AA,
+                    # )
 
                     # Calculate extraction region centered on this point
                     x1 = max(0, center_x - video.scaling_params.scaled_width // 2)
@@ -341,16 +342,17 @@ class VideoHandler(BaseModel):
                         y1 = zoomed_height - video.scaling_params.scaled_height
                         adjusted = True
 
-                    if adjusted:
-                        cv2.drawMarker(
-                            zoomed,
-                            (x1+20, y1+20),
-                            (255, 255, 0),
-                            markerType=cv2.MARKER_CROSS,
-                            markerSize=10,
-                            thickness=2,
-                            line_type=cv2.LINE_AA,
-                        )
+                    # Draw marker at adjusted position for debugging
+                    # if adjusted:
+                    #     cv2.drawMarker(
+                    #         zoomed,
+                    #         (x1+20, y1+20),
+                    #         (255, 255, 0),
+                    #         markerType=cv2.MARKER_CROSS,
+                    #         markerSize=10,
+                    #         thickness=2,
+                    #         line_type=cv2.LINE_AA,
+                    #     )
 
                     # Extract visible region
                     scaled_image = zoomed[y1:y2, x1:x2]

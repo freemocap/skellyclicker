@@ -16,9 +16,11 @@ class SkellyClickerUIModel(BaseModel):
     timer_id: int | None = None  # To track the timer for cancellation
     frames_per_second: int = 30  # Default FPS for video playback
     frame_count: int = 0  # Total number of frames in the video
+    labeled_frames: List[int] = []  # Frames that have been labeled in at least 1 video
     annotate_videos: bool = False  # To create annotated videos with DLC while analyzing
     tracked_point_names: List[str] | None = None
     training_epochs: int = 200
     training_save_epochs: int = 20
     training_batch_size: int = 1
     filter_predictions: bool = False
+    

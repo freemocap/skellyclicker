@@ -114,6 +114,11 @@ class DataHandler(BaseModel):
         # TODO - NO LIST INDEXING!! We've been burned by this so many times - dicts with video names as keys or something like that would be better
         if point_name is None:
             point_name = self.active_point
+        if click_data.x < 0 or click_data.y < 0:
+            logger.warning(
+                f"Negative click data {click_data} entered for video {video_name}, frame {click_data.frame_number}"
+            )
+            return
         self.dataframe.loc[
             (video_name, click_data.frame_number), f"{point_name}_x"
         ] = click_data.x
@@ -156,6 +161,12 @@ class DataHandler(BaseModel):
                     window_y=int(y),
                 )
         return click_data
+
+    def get_nonempty_frames(self) -> list[int]:
+        mask = self.dataframe.iloc[:, 2:].notna().any(axis=1)
+        nonempty_dataframe = self.dataframe[mask]
+        nonempty_frames = nonempty_dataframe.index.get_level_values("frame").unique()
+        return sorted(nonempty_frames.tolist())
 
     def save_csv(self, output_path: str | Path):
         self.dataframe.to_csv(output_path)

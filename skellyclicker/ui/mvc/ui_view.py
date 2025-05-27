@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 
 import skellyclicker
 from skellyclicker.ui.assets.logo_paths import SKELLYCLICKER_LOGO_PNG, SKELLYCLICKER_LOGO_ICO
+from skellyclicker.ui.tk_components.labeling_progress import LabelingProgress
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,11 @@ class SkellyClickerUIView:
     show_help_boolean_var: tk.BooleanVar = field(default_factory=tk.BooleanVar)
     show_help_checkbox: tk.Checkbutton = None
 
+    # Progress section
+    progress_frame: tk.Frame = None
+    progress_label: tk.Label = None
+    total_rows_var: tk.IntVar = field(default_factory=lambda: tk.IntVar(value=0))
+    labeling_progress: LabelingProgress = None
 
 
     @classmethod
@@ -141,7 +147,7 @@ class SkellyClickerUIView:
 
         # instance._create_playback_section()
         # instance._create_separator()
-
+        instance._create_progress_frame()
         instance._create_separator()
         #
         # instance._create_show_help_frame()
@@ -272,7 +278,7 @@ class SkellyClickerUIView:
         self.open_videos_button.pack(side=tk.LEFT, padx=5)
         self.open_videos_button.config(state=tk.DISABLED)
 
-        self.videos_directory_label = tk.Label(self.load_videos_frame, textvariable=self.videos_directory_path_var, wraplength=200)
+        self.videos_directory_label = tk.Label(self.load_videos_frame, textvariable=self.videos_directory_path_var, wraplength=400)
         self.videos_directory_label.pack(side=tk.LEFT, padx=5)
 
     def _create_playback_section(self):
@@ -380,7 +386,7 @@ class SkellyClickerUIView:
         self.click_save_path_label = tk.Label(
             path_frame,
             textvariable=self.click_save_path_var,
-            wraplength=200,  # Wrap text to fit sidebar
+            wraplength=400,  # Wrap text to fit sidebar
         )
         self.click_save_path_label.pack(fill=tk.X, padx=5, pady=2)
 
@@ -391,7 +397,7 @@ class SkellyClickerUIView:
         self.machine_labels_path_label = tk.Label(
             path_frame,
             textvariable=self.machine_labels_path_var,
-            wraplength=200,  # Wrap text to fit sidebar
+            wraplength=400,  # Wrap text to fit sidebar
         )
         self.machine_labels_path_label.pack(fill=tk.X, padx=5, pady=2)
 
@@ -406,6 +412,18 @@ class SkellyClickerUIView:
             variable=self.show_help_boolean_var,
         )
         self.show_help_checkbox.pack(fill=tk.X)
+
+    def _create_progress_frame(self):
+        """Create the progress section."""
+        self.progress_frame = tk.Frame(self.main_frame)
+        self.progress_frame.pack(fill=tk.X, pady=5)
+
+        self.progress_label = tk.Label(self.progress_frame, text="Labeling Progress:")
+        self.progress_label.pack(anchor='w', padx=5)
+
+        # Create a LabelingProgress instance
+        self.labeling_progress = LabelingProgress(total_rows=self.total_rows_var.get(), labeled_rows=[], master=self.progress_frame)
+        self.labeling_progress.pack(fill=tk.X, padx=5, pady=5)
 
     def set_app_icon(self):
         """
