@@ -1,4 +1,5 @@
-
+__version__ = "0.1.0"
+__description__ = "A tool for annotating video data with skeleton markers to train ML models."
 __url__ = "https://github.com/freemocap/skellyclicker"
 
 import logging

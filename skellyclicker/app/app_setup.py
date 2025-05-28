@@ -15,10 +15,9 @@ def register_routes(app: FastAPI):
     async def read_root():
         return RedirectResponse("/docs")
 
-    for prefix, routers in SKELLYCLICKER_ROUTERS.items():
-        for name, router in routers.items():
-            logger.api(f"Registering route: `{prefix}/{name}`")
-            app.include_router(router, prefix=prefix)
+    for name, router in SKELLYCLICKER_ROUTERS.items():
+        logger.api(f"Registering route: `{name}`")
+        app.include_router(router)
 
 
 def customize_swagger_ui(app: FastAPI):

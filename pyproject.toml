@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "colorbrewer>=0.3",
     "deeplabcut==3.0.0rc7",
-    "fastapi==0.115.12",
+    "fastapi[standard]==0.115.12",
     "numpy==1.26.2",
     "opencv-contrib-python>=4.8.1.78",
     "pandas==2.1.4",
