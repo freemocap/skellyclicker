@@ -8,7 +8,8 @@ import uvicorn
 from uvicorn import Server
 
 from skellyclicker.api.server.server_constants import HOSTNAME, PORT
-from skellyclicker.app.create_app import create_app
+from skellyclicker.app.app_lifespan.create_app import create_fastapi_app
+from skellyclicker.app.skellyclicker_app import create_skellyclicker_app
 from skellyclicker.utilities.kill_process_on_port import kill_process_on_port
 
 
@@ -22,6 +23,7 @@ class UvicornServerManager:
                  port: int = PORT,
                  log_level: str = "info"):
         self._global_kill_flag = global_kill_flag
+        create_skellyclicker_app()
         self.hostname: str = hostname
         self.port: int = port
         self.server_thread: Optional[threading.Thread] = None
@@ -35,7 +37,7 @@ class UvicornServerManager:
     def start_server(self):
 
         config = uvicorn.Config(
-            create_app,
+            create_fastapi_app,
             host=self.hostname,
             port=self.port,
             log_level=0,  # self.log_level,

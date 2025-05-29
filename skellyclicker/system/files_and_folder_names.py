@@ -3,6 +3,10 @@ from pathlib import Path
 import time 
 
 
+DEEPLABCUT_CONFIG_FILE_NAME = "config.yaml"
+FREEMOCAP_SAMPLE_DATA_PATH = Path.home()/"freemocap_data"/"recording_sessions"/"freemocap_sample_data"/"synchronized_videos"
+
+
 def get_skellyclicker_base_data_folder_path() -> str:
     path = Path().home()  / "skellyclicker-data"
     path.mkdir(parents=True, exist_ok=True)
