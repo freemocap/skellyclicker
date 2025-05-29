@@ -35,6 +35,15 @@ class SkellyclickerApp(BaseModel):
         """
         return self.app_state
 
+    def get_dlc_iteration(self) -> int:
+        """
+        Returns the current DeepLabCut iteration.
+        """
+        if self.deeplabcut_handler is None:
+            logger.warning("No DeepLabCut handler initialized, returning iteration 0")
+            return 0
+        return self.deeplabcut_handler.iteration
+
     def load_deeplabcut_project(self, project_path: str) -> None:
         if not Path(project_path).exists():
             logger.error(f"Project path does not exist: {project_path}")
@@ -306,21 +315,21 @@ class SkellyclickerApp(BaseModel):
         self.app_state.filter_predictions = not self.app_state.filter_predictions
         logger.info(f"Filter predictions set to: {self.app_state.filter_predictions}")
 
-    def change_training_epochs(self, training_epochs: int) -> None:
+    def set_training_epochs(self, training_epochs: int) -> None:
         if training_epochs < 1:
             logger.warning("Training epochs must be at least 1")
             return
         self.app_state.training_epochs = training_epochs
         logger.info(f"Training epochs set to: {self.app_state.training_epochs}")
 
-    def change_training_save_epochs(self, save_epochs: int) -> None:
+    def set_training_save_epochs(self, save_epochs: int) -> None:
         if save_epochs < 1:
             logger.warning("Save epochs must be at least 1")
             return
         self.app_state.training_save_epochs = save_epochs
         logger.info(f"Training save epochs set to: {self.app_state.training_save_epochs}")
 
-    def change_training_batch_size(self, batch_size: int) -> None:
+    def set_training_batch_size(self, batch_size: int) -> None:
         if batch_size < 1:
             logger.warning("Batch size must be at least 1")
             return

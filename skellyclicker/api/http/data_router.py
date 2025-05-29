@@ -1,6 +1,4 @@
 import logging
-import os
-import signal
 
 from fastapi import APIRouter
 
