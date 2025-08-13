@@ -130,6 +130,10 @@ class VideoViewer(BaseModel):
                 self.video_handler.machine_labels_annotator.config.show_names = (
                     self.video_handler.image_annotator.config.show_names
                 )
+        elif key == ord(","):
+            self.video_handler.image_annotator.config.show_clicks = (
+                not self.video_handler.image_annotator.config.show_clicks
+            )
         elif key == ord('i'):
             self.keyboard_pan((0, -1))  # Pan up
         elif key == ord('k'):
