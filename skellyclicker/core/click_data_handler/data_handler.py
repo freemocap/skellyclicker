@@ -33,10 +33,13 @@ class DataHandlerConfig(BaseModel):
 
     @classmethod
     def from_dataframe(cls, dataframe: pd.DataFrame):
-        tracked_point_names = set()
+        tracked_point_names = []
+        seen = set()
         for name in dataframe.columns:
             name = name.removesuffix("_x").removesuffix("_y")
-            tracked_point_names.add(name)
+            if name not in seen:
+                seen.add(name)
+                tracked_point_names.append(name)
         tracked_point_names = list(tracked_point_names)
         logger.debug(f"Found tracked point names in dataframe: {tracked_point_names}")
         return cls(
@@ -92,6 +95,10 @@ class DataHandler(BaseModel):
         dataframe = pd.DataFrame(np.nan, index=video_frame_index, columns=column_names)
 
         return dataframe
+    
+    @property
+    def tracked_points(self) -> list[str]:
+        return self.config.tracked_point_names
 
     def set_active_point_by_name(self, point_name: str):
         if point_name not in self.config.tracked_point_names:
@@ -142,6 +149,30 @@ class DataHandler(BaseModel):
         self, video_index: int, frame_number: int
     ) -> dict[str, ClickData]:
         video_name = self.config.video_names[video_index]
+        video_frame_row = self.dataframe.loc[(video_name, frame_number)]
+
+        # TODO: There is some error in the DLC machine labels that sometimes returns duplicate data, this pulls the first occurence for each row
+        if len(video_frame_row.shape) > 1:
+            video_frame_row = video_frame_row.iloc[0]
+        click_data = {}
+        for point_name in self.config.tracked_point_names:
+            x = video_frame_row[f"{point_name}_x"]
+            y = video_frame_row[f"{point_name}_y"]
+            if not np.isnan(x) and not np.isnan(y):
+                click_data[point_name] = ClickData(
+                    video_index=video_index,
+                    frame_number=frame_number,
+                    video_x=int(x),
+                    video_y=int(y),
+                    window_x=int(x),
+                    window_y=int(y),
+                )
+        return click_data
+    
+    def get_data_by_video_name_and_frame(
+        self, video_name: str, frame_number: int
+    ) -> dict[str, ClickData]:
+        video_index = self.config.video_names.index(video_name)
         video_frame_row = self.dataframe.loc[(video_name, frame_number)]
 
         # TODO: There is some error in the DLC machine labels that sometimes returns duplicate data, this pulls the first occurence for each row
