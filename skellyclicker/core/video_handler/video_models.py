@@ -56,6 +56,8 @@ class VideoPlaybackState(BaseModel):
         None  # rescale info to put it within the grid
     )
     zoom_state: ZoomState = ZoomState()  # how much the user has zoomed in on the video
+    contrast: int = 1
+    brightness: int = 0
 
     @property
     def name(self) -> str:
