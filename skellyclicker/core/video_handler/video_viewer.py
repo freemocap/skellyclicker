@@ -134,6 +134,14 @@ class VideoViewer(BaseModel):
             self.video_handler.image_annotator.config.show_clicks = (
                 not self.video_handler.image_annotator.config.show_clicks
             )
+        elif key == ord("1"):
+            self._change_brightness(increase=False)
+        elif key == ord("2"):
+            self._change_brightness(increase=True)
+        elif key == ord("3"):
+            self._change_contrast(increase=False)
+        elif key == ord("4"):
+            self._change_contrast(increase=True)
         elif key == ord('i'):
             self.keyboard_pan((0, -1))  # Pan up
         elif key == ord('k'):
@@ -167,6 +175,40 @@ class VideoViewer(BaseModel):
         pan_amount = 10
         video.zoom_state.center_x += direction[0] * pan_amount
         video.zoom_state.center_y += direction[1] * pan_amount
+
+    def _change_contrast(self, increase: bool = True):
+        if self.active_cell is None:
+            return
+        cell_x, cell_y = self.active_cell
+        video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
+        if video_idx >= len(self.video_handler.videos.values()):
+            return
+        video = list(self.video_handler.videos.values())[video_idx]
+
+        if video.contrast == 1:
+            change = 1 if increase else -0.1
+            video.contrast = max(0, video.contrast + change)
+        elif video.contrast > 1 and video.contrast < 1.5:
+            change = 1 if increase else 1 - video.contrast
+        elif video.contrast < 1:
+            change = 0.1 if increase else -0.1
+            video.contrast = max(0, video.contrast + change)
+        else:
+            change = 1 if increase else -1
+            video.contrast = min(video.contrast + change, 10)
+
+
+    def _change_brightness(self, increase: bool = True):
+        if self.active_cell is None:
+            return
+        cell_x, cell_y = self.active_cell
+        video_idx = cell_y * self.video_handler.grid_parameters.columns + cell_x
+        if video_idx >= len(self.video_handler.videos.values()):
+            return
+        video = list(self.video_handler.videos.values())[video_idx]
+
+        change = 10 if increase else -10
+        video.brightness = min(max(-120, video.brightness + change), 120)
 
 
     def clear_current_point(self):

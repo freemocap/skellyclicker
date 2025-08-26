@@ -271,6 +271,7 @@ class VideoHandler(BaseModel):
             success, image = video.cap.read()
 
             if success:
+                image = cv2.convertScaleAbs(image, alpha=video.contrast, beta=video.brightness)
                 if annotate_images:
                     image = self.image_annotator.annotate_single_image(
                         image,

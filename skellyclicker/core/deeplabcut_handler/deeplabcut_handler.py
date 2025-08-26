@@ -146,11 +146,15 @@ class DeeplabcutHandler(BaseModel):
         deeplabcut.create_training_dataset(self.project_config_path)
 
         logger.info("Training model...")
+        logger.info(f"With config: epochs={training_config.epochs}, save epochs={training_config.save_epochs}, batch_size={training_config.batch_size}")
         deeplabcut.train_network(
             self.project_config_path,
             epochs=training_config.epochs,
             save_epochs=training_config.save_epochs,
             batch_size=training_config.batch_size,
+            pytorch_cfg_updates={
+                "runner.optimizer.params.lr": 0.0001
+            }
         )
 
     def analyze_videos(
