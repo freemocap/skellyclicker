@@ -16,6 +16,7 @@ from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_p
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import (
     DeeplabcutTrainingConfig,
 )
+from skellyclicker.core.deeplabcut_handler.analyze_videos_dlc import analyze_videos
 
 
 logger = logging.getLogger(__name__)
@@ -167,7 +168,7 @@ class DeeplabcutHandler(BaseModel):
         config = auxiliaryfunctions.read_config(self.project_config_path)
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
-        deeplabcut.analyze_videos(
+        analyze_videos(
             config=str(self.project_config_path),
             videos=video_paths,
             videotype=".mp4",
