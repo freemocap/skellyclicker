@@ -44,7 +44,7 @@ from deeplabcut.refine_training_dataset.stitch import stitch_tracklets
 from deeplabcut.utils import auxiliaryfunctions
 
 
-def analyze_videos(
+def analyze_videos_dlc(
     config: str,
     videos: list[str],
     videotype: str = "",

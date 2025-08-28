@@ -267,7 +267,9 @@ class SkellyClickerUIController:
                 filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
             )
             if video_paths is not None and len(video_paths) > 0:
-                output_folder = Path(video_paths[0]).parent / f"model_outputs_iteration_{self.deeplabcut_handler.iteration}"
+                config = auxiliaryfunctions.read_config(self.deeplabcut_handler.project_config_path)
+                project_name = config.get("Task", "")
+                output_folder = Path(video_paths[0]).parent / f"{project_name}_model_outputs_iteration_{self.deeplabcut_handler.iteration}"
 
         if video_paths is None or len(video_paths) == 0:
             messagebox.showinfo("No Videos", "No videos selected for analysis")
