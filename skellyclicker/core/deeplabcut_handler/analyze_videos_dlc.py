@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 from multiprocessing import Pool
+import torch.multiprocessing as mp
 
 import albumentations as A
 import pickle
@@ -290,6 +291,7 @@ def analyze_videos(
             save_as_csv=True,
         )
     """
+    mp.set_start_method("spawn")
     _update_device(gputouse, torch_kwargs)
 
     if batchsize is not None:
