@@ -16,6 +16,7 @@ from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_p
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import (
     DeeplabcutTrainingConfig,
 )
+from skellyclicker.core.deeplabcut_handler.analyze_videos_dlc import analyze_videos_dlc
 
 
 logger = logging.getLogger(__name__)
@@ -160,18 +161,14 @@ class DeeplabcutHandler(BaseModel):
     def analyze_videos(
         self,
         video_paths: list[str],
+        output_folder: str | Path,
         annotate_videos: bool = False,
         filter_videos: bool = True,
     ) -> str:
         config = auxiliaryfunctions.read_config(self.project_config_path)
-        output_folder = (
-            Path(config["project_path"])
-            / "model_outputs"
-            / f"model_outputs_iteration_{config['iteration']}"
-        )
-        output_folder.mkdir(parents=True, exist_ok=True)
+        Path(output_folder).mkdir(parents=True, exist_ok=True)
 
-        deeplabcut.analyze_videos(
+        analyze_videos_dlc(
             config=str(self.project_config_path),
             videos=video_paths,
             videotype=".mp4",
@@ -206,7 +203,7 @@ class DeeplabcutHandler(BaseModel):
 
         deeplabcut.plot_trajectories(config=self.project_config_path, videos=video_paths, filtered=filter_videos, destfolder=str(output_folder))
 
-        csv_path = output_folder / f"skellyclicker_machine_labels_iteration_{config['iteration']}.csv"
+        csv_path = Path(output_folder) / f"skellyclicker_machine_labels_iteration_{config['iteration']}.csv"
 
         video_folders = set(Path(video_path).parent for video_path in video_paths)
         if len(video_folders) > 1:

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, simpledialog, messagebox, NORMAL, DISABLED
 
+from deeplabcut.utils import auxiliaryfunctions
 from pydantic import ValidationError
 
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.deelabcut_project_config import (
@@ -234,7 +235,6 @@ class SkellyClickerUIController:
         if not self.ui_model.project_path:
             messagebox.showinfo("No Project", "Please load or create a project first")
             return
-        print("Analyzing videos...")
         if self.deeplabcut_handler is None:
             messagebox.showinfo(
                 "No DeepLabCut Handler", "DeepLabCut handler not initialized"
@@ -250,14 +250,26 @@ class SkellyClickerUIController:
         if analyze_training_videos_dialog is None:
             return
         elif analyze_training_videos_dialog is True:
+            print("Analyzing videos...")
             video_paths = self.ui_model.video_files
             copy_to_machine_labels = True
+            config = auxiliaryfunctions.read_config(self.deeplabcut_handler.project_config_path)
+            output_folder = (
+                Path(config["project_path"])
+                / "model_outputs"
+                / f"model_outputs_iteration_{config['iteration']}"
+            )
         else:
+            print("Analyzing videos...")
             copy_to_machine_labels = False
             video_paths = filedialog.askopenfilenames(
                 title="Select Videos",
                 filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
             )
+            if video_paths is not None and len(video_paths) > 0:
+                config = auxiliaryfunctions.read_config(self.deeplabcut_handler.project_config_path)
+                project_name = config.get("Task", "")
+                output_folder = Path(video_paths[0]).parent / f"{project_name}_model_outputs_iteration_{self.deeplabcut_handler.iteration}"
 
         if video_paths is None or len(video_paths) == 0:
             messagebox.showinfo("No Videos", "No videos selected for analysis")
@@ -269,6 +281,7 @@ class SkellyClickerUIController:
             video_paths=video_paths,
             annotate_videos=self.ui_model.annotate_videos,
             filter_videos=self.ui_model.filter_predictions,
+            output_folder=output_folder,
         )
 
         if copy_to_machine_labels:
