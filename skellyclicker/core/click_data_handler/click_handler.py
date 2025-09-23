@@ -4,25 +4,7 @@ from typing import List
 from pydantic import BaseModel
 
 from skellyclicker.core.video_handler.video_models import GridParameters, VideoPlaybackState
-
-
-class ClickData(BaseModel):
-    """Data associated with a mouse click."""
-
-    window_x: int
-    window_y: int
-    video_x: int
-    video_y: int
-    frame_number: int
-    video_index: int
-
-    @property
-    def x(self) -> int:
-        return int(self.video_x)
-
-    @property
-    def y(self) -> int:
-        return int(self.video_y)
+from skellyclicker.core.video_handler.video_models import ClickData
 
 class ClickHandler(BaseModel):
     """Handles mouse click processing and data recording."""

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from skellyclicker.core.click_data_handler.click_handler import ClickData
+from skellyclicker.core.video_handler.video_models import ClickData
 
 
 def draw_doubled_text(image: np.ndarray,

@@ -1,12 +1,15 @@
 import logging
+import cv2
 import deeplabcut
-
 from deeplabcut import DEBUG
 from deeplabcut.utils import auxiliaryfunctions
+from multiprocessing import Pool
 from pathlib import Path
 import pandas as pd
 from pydantic import BaseModel
 
+from skellyclicker.core.click_data_handler.data_handler import DataHandler
+from skellyclicker.core.video_handler.image_annotator import ImageAnnotator, ImageAnnotatorConfig
 from skellyclicker.core.deeplabcut_handler.create_deeplabcut.create_deeplabcut_config import (
     create_new_deeplabcut_project,
 )
@@ -147,14 +150,14 @@ class DeeplabcutHandler(BaseModel):
         deeplabcut.create_training_dataset(self.project_config_path)
 
         logger.info("Training model...")
-        logger.info(f"With config: epochs={training_config.epochs}, save epochs={training_config.save_epochs}, batch_size={training_config.batch_size}")
+        logger.info(f"With config: epochs={training_config.epochs}, save epochs={training_config.save_epochs}, batch_size={training_config.batch_size}, learning_rate={training_config.learning_rate}")
         deeplabcut.train_network(
             self.project_config_path,
             epochs=training_config.epochs,
             save_epochs=training_config.save_epochs,
             batch_size=training_config.batch_size,
             pytorch_cfg_updates={
-                "runner.optimizer.params.lr": 0.0001
+                "runner.optimizer.params.lr": training_config.learning_rate
             }
         )
 
@@ -186,21 +189,6 @@ class DeeplabcutHandler(BaseModel):
                 destfolder=str(output_folder),
             )
 
-
-        if annotate_videos:
-            print(
-                f"Annotating videos {video_paths}, saving to {output_folder}"
-            )
-            deeplabcut.create_labeled_video(
-                config=self.project_config_path,
-                videos=video_paths,
-                videotype=".mp4",
-                destfolder=str(output_folder),
-                filtered=filter_videos,
-            )
-        else:
-            print("Skipping video annotation")
-
         deeplabcut.plot_trajectories(config=self.project_config_path, videos=video_paths, filtered=filter_videos, destfolder=str(output_folder))
 
         csv_path = Path(output_folder) / f"skellyclicker_machine_labels_iteration_{config['iteration']}.csv"
@@ -214,6 +202,15 @@ class DeeplabcutHandler(BaseModel):
             output_path=str(csv_path),
             filtered=filter_videos,
         )
+
+        if annotate_videos:
+            self.annotate_videos(
+                output_path=str(output_folder),
+                csv_path=str(csv_path),
+                video_paths=[Path(video) for video in video_paths]
+            )
+        else:
+            print("Skipping video annotation")
 
         return str(csv_path)
 
@@ -267,3 +264,55 @@ class DeeplabcutHandler(BaseModel):
 
         df.to_csv(output_path)
         print(f"Saved skellyclicker compatible CSV to {output_path}")
+
+    def annotate_videos(self, output_path: str | Path, video_paths: list[Path], csv_path: str | Path):
+        print(
+            f"Annotating videos {video_paths}, saving to {output_path}"
+        )
+        args = [
+            (output_path, csv_path, video) for video in video_paths
+        ]
+        with Pool(processes=len(video_paths)) as pool:
+            pool.starmap(self.annotate_single_video, args)
+
+    def annotate_single_video(self, output_path: str | Path, csv_path: str | Path, video: Path):
+        data_handler = DataHandler.from_csv(csv_path)
+        annotator_config = ImageAnnotatorConfig(
+                marker_thickness=3,
+                show_names=False,
+                tracked_points=sorted(data_handler.tracked_points),
+                show_clicks=False,
+                show_help=False
+            )
+        image_annotator = ImageAnnotator(config=annotator_config)
+
+
+        video_name = video.stem
+        cap = cv2.VideoCapture(str(video))
+
+        framerate = cap.get(cv2.CAP_PROP_FPS)
+        framesize = (
+                int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            )
+        fourcc = cv2.VideoWriter.fourcc(*"mp4v")  # need to deal with higher frame rates
+        print(f"writing video to {str(Path(output_path) / video.name)}")
+
+        video_writer_object = cv2.VideoWriter(
+                str(Path(output_path) / video.name), fourcc, round(framerate, 2), framesize
+            )
+
+        frame_number = -1
+        while True:
+            ret, frame = cap.read()
+            frame_number += 1
+            if not ret:
+                print(f"failed to read frame {frame_number}")
+                break
+
+            click_data = data_handler.get_data_by_video_name_and_frame(video_name=video_name, frame_number=frame_number)
+
+            annotated_frame = image_annotator.annotate_single_image(image=frame, click_data=click_data)
+            video_writer_object.write(annotated_frame)
+        video_writer_object.release()
+        cap.release()
