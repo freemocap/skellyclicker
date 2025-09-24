@@ -1,7 +1,7 @@
 {
   "tracked_point_names": [
-    "toy_face",
     "toy_top",
-    "toy_tail"
+    "toy_tail_base",
+    "toy_nose"
     ]
 }
