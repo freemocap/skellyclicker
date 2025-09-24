@@ -1,6 +1,4 @@
 import cv2
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
 from skellyclicker.core.click_data_handler.data_handler import DataHandler

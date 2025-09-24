@@ -48,6 +48,7 @@ class DeeplabcutTrainingConfig(BaseModel):
     epochs: int = 200  # this is the new equivalent of 'maxiters' for PyTorch (200 is their default)
     save_epochs: int = 20  # this is the new equivalent of 'save_iters' for PyTorch
     batch_size: int = 1  # this seems to be similar to batch/multi processing (higher number = faster if your gpu can handle it?)
+    learning_rate: float = 0.0001  # DLC default, changing this could help with sessions that won't train
     
     @classmethod
     def from_config(cls, config: dict, epochs: int = 200, save_epochs: int = 20):
