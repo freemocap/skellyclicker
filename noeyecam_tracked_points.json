@@ -1,15 +1,12 @@
 {
   "tracked_point_names": [
     "nose",
-    "left_cam_tip",
-    "right_cam_tip",
-    "base",
     "left_eye",
     "right_eye",
     "left_ear",
     "right_ear",
     "spine_t1",
-    "sacrum",
+    "tail_base",
     "tail_tip"
     ]
 }

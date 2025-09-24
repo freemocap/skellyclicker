@@ -1,12 +1,15 @@
 {
   "tracked_point_names": [
-    "lid_top",
-    "lid_bottom",
-    "pupil_outer",
-    "pupil_inner",
-    "pupil_top",
-    "pupil_bottom",
-    "tear_duct",
-    "outer_eye"
+    "nose",
+    "left_cam_tip",
+    "right_cam_tip",
+    "base",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "spine_t1",
+    "tail_base",
+    "tail_tip"
     ]
 }

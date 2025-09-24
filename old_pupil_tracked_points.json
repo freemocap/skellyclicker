@@ -1,0 +1,12 @@
+{
+  "tracked_point_names": [
+    "lid_top",
+    "lid_bottom",
+    "pupil_outer",
+    "pupil_inner",
+    "pupil_top",
+    "pupil_bottom",
+    "tear_duct",
+    "outer_eye"
+    ]
+}

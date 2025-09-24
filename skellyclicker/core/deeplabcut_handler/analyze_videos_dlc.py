@@ -291,7 +291,11 @@ def analyze_videos_dlc(
             save_as_csv=True,
         )
     """
-    mp.set_start_method("spawn")
+    try:
+        mp.set_start_method("spawn")
+    except RuntimeError:
+        pass
+
     _update_device(gputouse, torch_kwargs)
 
     if batchsize is not None:
