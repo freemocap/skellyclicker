@@ -48,6 +48,9 @@ class VideoViewer(BaseModel):
         if sys.platform == "darwin":  # OpenCV GUI can only open in main thread on Mac
             self.video_thread = None
             self.run()
+        elif sys.platform == "linux":
+            self.video_thread = None
+            self.run()
         else:
             self.video_thread = threading.Thread(target=self.run)
             self.video_thread.daemon = True
