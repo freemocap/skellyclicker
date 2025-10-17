@@ -148,8 +148,8 @@ class DeeplabcutHandler(BaseModel):
             path_to_image_labels_csv=labels_csv_path,
         )
 
-        logger.info("Creating training dataset...")
-        deeplabcut.create_training_dataset(self.project_config_path, net_type='resnet_50')
+        logger.info(f"Creating training dataset with net type: {training_config.model_type}...")
+        deeplabcut.create_training_dataset(self.project_config_path, net_type=training_config.model_type)
         # deeplabcut.create_training_model_comparison(self.project_config_path, net_types=["resnet_50", "rtmpose_x"])
 
 
