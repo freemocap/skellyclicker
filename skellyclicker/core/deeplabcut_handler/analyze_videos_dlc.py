@@ -433,11 +433,16 @@ def analyze_videos_dlc(
         for video in videos
     ]
     if multiprocess:
-        with Pool(processes=len(videos)) as pool:
-            pool.starmap(
-                analyze_single_video_dlc,
-                args
-            )
+        try:
+            with Pool(processes=len(videos)) as pool:
+                pool.starmap(
+                    analyze_single_video_dlc,
+                    args
+                )
+        except TypeError:
+            print("Analyzing with multiprocessing failed, defaulting to sequential processing")
+            for arg in args:
+                analyze_single_video_dlc(*arg)
     else:
         for arg in args:
             analyze_single_video_dlc(*arg)
