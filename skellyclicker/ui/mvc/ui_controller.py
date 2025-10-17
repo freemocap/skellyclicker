@@ -221,6 +221,7 @@ class SkellyClickerUIController:
             epochs=self.ui_model.training_epochs,
             save_epochs=self.ui_model.training_save_epochs,
             batch_size=self.ui_model.training_batch_size,
+            hflip_augmentation=self.ui_model.hflip_augmentation,
         )
         self.deeplabcut_handler.train_model(
             labels_csv_path=self.ui_model.csv_saved_path,
