@@ -157,8 +157,15 @@ class DeeplabcutHandler(BaseModel):
         learning_rate = training_config.learning_rate
         if batch_size > 1:
             learning_rate *= math.floor(math.sqrt(batch_size))
+            training_config.learning_rate = learning_rate
             print(f"Adjusted default learning rate to scale with square root of batch size")
             print("See https://stackoverflow.com/questions/64105986/in-2020-what-is-the-optimal-way-to-train-a-model-in-pytorch-on-more-than-one-gpu")
+
+        pytorch_cfg_updates = {
+            "runner.optimizer.params.lr": training_config.learning_rate
+        }
+        if training_config.hflip_augmentation:
+            pytorch_cfg_updates["data.train.hflip"] = True
         logger.info("Training model...")
         logger.info(f"With config: epochs={training_config.epochs}, save epochs={training_config.save_epochs}, batch_size={training_config.batch_size}, learning_rate={training_config.learning_rate}")
         start_time = perf_counter_ns()
@@ -167,10 +174,7 @@ class DeeplabcutHandler(BaseModel):
             epochs=training_config.epochs,
             save_epochs=training_config.save_epochs,
             batch_size=training_config.batch_size,
-            pytorch_cfg_updates={
-                "data.train.hflip": True,
-                "runner.optimizer.params.lr": training_config.learning_rate
-            }
+            pytorch_cfg_updates=pytorch_cfg_updates
         )
         end_time = perf_counter_ns()
         print(f"Model training took {(end_time-start_time)/1e9} seconds over {training_config.epochs} epochs ({(end_time-start_time)/(1e9*training_config.epochs)} s per epoch)")
@@ -185,7 +189,6 @@ class DeeplabcutHandler(BaseModel):
         config = auxiliaryfunctions.read_config(self.project_config_path)
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
-        # TODO: set batch size here
         analyze_videos_dlc(
             config=str(self.project_config_path),
             videos=video_paths,

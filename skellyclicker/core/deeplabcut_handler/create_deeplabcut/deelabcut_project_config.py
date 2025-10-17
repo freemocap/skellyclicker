@@ -32,7 +32,7 @@ class SkellyClickerDataConfig(BaseModel):
         auxiliaryfunctions.edit_config(
             config_path,
             {
-                "skellyclicker_folder_of_videos": str(self.videos),
+                "skellyclicker_video_paths": str(self.video_paths),
                 "skellyclicker_labels_csv_path": str(self.click_data_csv_path),
             },
         )
@@ -43,6 +43,9 @@ class DeeplabcutTrainingConfig(BaseModel):
 
     # Network settings
     model_type: str = "resnet_50"
+
+    # Augmentation settings
+    hflip_augmentation: bool = False
 
     # Training settings
     epochs: int = 200  # this is the new equivalent of 'maxiters' for PyTorch (200 is their default)
