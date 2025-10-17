@@ -1,4 +1,5 @@
 import logging
+import math
 import cv2
 import deeplabcut
 from deeplabcut import DEBUG
@@ -7,6 +8,7 @@ from multiprocessing import Pool
 from pathlib import Path
 import pandas as pd
 from pydantic import BaseModel
+from time import perf_counter_ns
 
 from skellyclicker.core.click_data_handler.data_handler import DataHandler
 from skellyclicker.core.video_handler.image_annotator import ImageAnnotator, ImageAnnotatorConfig
@@ -147,19 +149,31 @@ class DeeplabcutHandler(BaseModel):
         )
 
         logger.info("Creating training dataset...")
-        deeplabcut.create_training_dataset(self.project_config_path)
+        deeplabcut.create_training_dataset(self.project_config_path, net_type='resnet_50')
+        # deeplabcut.create_training_model_comparison(self.project_config_path, net_types=["resnet_50", "rtmpose_x"])
 
+
+        batch_size = training_config.batch_size
+        learning_rate = training_config.learning_rate
+        if batch_size > 1:
+            learning_rate *= math.floor(math.sqrt(batch_size))
+            print(f"Adjusted default learning rate to scale with square root of batch size")
+            print("See https://stackoverflow.com/questions/64105986/in-2020-what-is-the-optimal-way-to-train-a-model-in-pytorch-on-more-than-one-gpu")
         logger.info("Training model...")
         logger.info(f"With config: epochs={training_config.epochs}, save epochs={training_config.save_epochs}, batch_size={training_config.batch_size}, learning_rate={training_config.learning_rate}")
+        start_time = perf_counter_ns()
         deeplabcut.train_network(
             self.project_config_path,
             epochs=training_config.epochs,
             save_epochs=training_config.save_epochs,
             batch_size=training_config.batch_size,
             pytorch_cfg_updates={
+                "data.train.hflip": True,
                 "runner.optimizer.params.lr": training_config.learning_rate
             }
         )
+        end_time = perf_counter_ns()
+        print(f"Model training took {(end_time-start_time)/1e9} seconds over {training_config.epochs} epochs ({(end_time-start_time)/(1e9*training_config.epochs)} s per epoch)")
 
     def analyze_videos(
         self,
@@ -171,12 +185,15 @@ class DeeplabcutHandler(BaseModel):
         config = auxiliaryfunctions.read_config(self.project_config_path)
         Path(output_folder).mkdir(parents=True, exist_ok=True)
 
+        # TODO: set batch size here
         analyze_videos_dlc(
             config=str(self.project_config_path),
             videos=video_paths,
             videotype=".mp4",
             save_as_csv=True,
-            destfolder = str(output_folder)
+            destfolder = str(output_folder),
+            batch_size=8,  # 16 is too high for 5 mocap videos
+            multiprocess=False
         )
 
         if filter_videos:
