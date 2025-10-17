@@ -54,18 +54,14 @@ def analyze_videos_dlc(
     save_as_csv: bool = False,
     in_random_order: bool = True,
     destfolder: str | None = None,
-    batchsize: int | None = None,
     cropping: list[int] | None = None,
-    TFGPUinference: bool = True,
     dynamic: tuple[bool, float, int] = (False, 0.5, 10),
     modelprefix: str = "",
     robust_nframes: bool = False,
-    allow_growth: bool = False,
     use_shelve: bool = False,
     auto_track: bool = True,
     n_tracks: int | None = None,
     animal_names: list[str] | None = None,
-    calibrate: bool = False,
     identity_only: bool = False,
     snapshot_index: int | str | None = None,
     detector_snapshot_index: int | str | None = None,
@@ -75,6 +71,7 @@ def analyze_videos_dlc(
     transform: A.Compose | None = None,
     overwrite: bool = False,
     save_as_df: bool = False,
+    multiprocess: bool = True,
     **torch_kwargs,
 ):
     """Makes prediction based on a trained network.
@@ -130,10 +127,6 @@ def analyze_videos_dlc(
         Specifies the destination folder for analysis data. If ``None``, the path of
         the video is used. Note that for subsequent analysis this folder also needs to
         be passed.
-
-    batchsize: int or None, optional, default=None
-        Currently not supported by the PyTorch engine.
-        Change batch size for inference; if given overwrites value in ``pose_cfg.yaml``.
 
     cropping: list or None, optional, default=None
         Currently not supported by the PyTorch engine.
@@ -298,16 +291,6 @@ def analyze_videos_dlc(
 
     _update_device(gputouse, torch_kwargs)
 
-    if batchsize is not None:
-        if "batch_size" in torch_kwargs:
-            print(
-                f"You called analyze_videos with parameters ``batchsize={batchsize}"
-                f"`` and batch_size={torch_kwargs['batch_size']}. Only one is "
-                f"needed/used. Using batch size {torch_kwargs['batch_size']}"
-            )
-        else:
-            torch_kwargs["batch_size"] = batchsize
-
     # Create the output folder
     _validate_destfolder(destfolder)
 
@@ -449,11 +432,15 @@ def analyze_videos_dlc(
         )
         for video in videos
     ]
-    with Pool(processes=len(videos)) as pool:
-        pool.starmap(
-            analyze_single_video_dlc,
-            args
-        )
+    if multiprocess:
+        with Pool(processes=len(videos)) as pool:
+            pool.starmap(
+                analyze_single_video_dlc,
+                args
+            )
+    else:
+        for arg in args:
+            analyze_single_video_dlc(*arg)
 
     print(
         "The videos are analyzed. Now your research can truly start!\n"
