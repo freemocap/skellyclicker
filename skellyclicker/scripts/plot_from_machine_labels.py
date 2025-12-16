@@ -5,8 +5,8 @@ from skellyclicker.core.click_data_handler.data_handler import DataHandler
 from skellyclicker.core.video_handler.image_annotator import ImageAnnotator, ImageAnnotatorConfig
 
 if __name__=='__main__':
-    labels_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-01_ferret_757_EyeCameras_P33_EO5/clips/1m_20s-2m_20s/eye_data/dlc_output/model_outputs_iteration_11/skellyclicker_machine_labels_iteration_11.csv")
-    video_folder = Path('/home/scholl-lab/ferret_recordings/session_2025-07-01_ferret_757_EyeCameras_P33_EO5/clips/1m_20s-2m_20s/eye_data/eye_videos')
+    labels_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-11_ferret_757_EyeCamera_P43_E15__1/clips/0m_37s-1m_37s/eye_data/dlc_output/eye_model_v2_model_outputs_iteration_0/skellyclicker_machine_labels_iteration_0.csv")
+    video_folder = Path('/home/scholl-lab/ferret_recordings/session_2025-07-11_ferret_757_EyeCamera_P43_E15__1/clips/0m_37s-1m_37s/eye_data/eye_videos')
     # video_paths = [video_folder / "eye0.mp4", video_folder / "eye1.mp4"]
     # video_paths = [video_folder / "eye0_clipped_4451_11621.mp4", video_folder / "eye1_clipped_4469_11638.mp4"]
     # video_paths = [video_folder / "25006505.mp4", video_folder / "25000609.mp4", video_folder / "24908832.mp4", video_folder / "24908831.mp4", video_folder / "24676894.mp4"]
@@ -22,7 +22,7 @@ if __name__=='__main__':
     output_path.mkdir(exist_ok=True)
 
 
-    data_handler = DataHandler.from_csv(labels_path) 
+    data_handler = DataHandler.from_csv(labels_path)
 
     annotator_config = ImageAnnotatorConfig(
         marker_thickness=3,

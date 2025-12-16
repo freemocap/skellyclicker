@@ -28,7 +28,8 @@ class SkellyClickerUIController:
 
     def load_deeplabcut_project(self) -> None:
         project_path = filedialog.askdirectory(
-            title="Select DeepLabCut Project Directory"
+            title="Select DeepLabCut Project Directory",
+            initialdir="/home/scholl-lab/deeplabcut_data"
         )
         if project_path:
             self.ui_model.project_path = project_path
@@ -45,7 +46,8 @@ class SkellyClickerUIController:
 
     def create_deeplabcut_project(self) -> None:
         project_path = filedialog.askdirectory(
-            title="Select Directory for New DeepLabCut Project"
+            title="Select Directory for New DeepLabCut Project",
+            initialdir="/home/scholl-lab/deeplabcut_data"
         )
         if project_path:
             project_name = simpledialog.askstring(
@@ -80,6 +82,7 @@ class SkellyClickerUIController:
         video_files = filedialog.askopenfilenames(
             title="Select Videos",
             filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
+            initialdir="/home/scholl-lab/ferret_recordings"
         )
         if video_files:
             self.ui_model.video_files = list(video_files)
@@ -90,6 +93,7 @@ class SkellyClickerUIController:
         csv_file = filedialog.askopenfilename(
             title="Select Labels CSV File",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir="/home/scholl-lab/ferret_recordings"
         )
         if (
             csv_file
@@ -100,6 +104,7 @@ class SkellyClickerUIController:
             self.ui_model.csv_saved_path = csv_file
             self.ui_view.click_save_path_var.set(csv_file)
             print(f"Labels CSV loaded from: {csv_file}")
+            # TODO: set ui_model tracked point names from csv files
         else:
             print("Invalid CSV file selected or file does not exist")
 
@@ -107,6 +112,7 @@ class SkellyClickerUIController:
         machine_labels_file = filedialog.askopenfilename(
             title="Select Machine Labels CSV File",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir="/home/scholl-lab/ferret_recordings"
         )
         if (
             machine_labels_file
@@ -171,6 +177,7 @@ class SkellyClickerUIController:
             )
             self.ui_model.frame_count = self.video_viewer.video_handler.frame_count
             self.video_viewer.on_complete = self.video_viewer_on_complete
+            print("launching videos")
             self.video_viewer.launch_video_thread()
 
     def video_viewer_on_complete(self) -> None:
@@ -221,6 +228,7 @@ class SkellyClickerUIController:
             epochs=self.ui_model.training_epochs,
             save_epochs=self.ui_model.training_save_epochs,
             batch_size=self.ui_model.training_batch_size,
+            hflip_augmentation=self.ui_model.hflip_augmentation,
         )
         self.deeplabcut_handler.train_model(
             labels_csv_path=self.ui_model.csv_saved_path,
@@ -265,6 +273,7 @@ class SkellyClickerUIController:
             video_paths = filedialog.askopenfilenames(
                 title="Select Videos",
                 filetypes=[("Video files", "*.mp4 *.avi *.mov"), ("All files", "*.*")],
+                initialdir="/home/scholl-lab/ferret_recordings"
             )
             if video_paths is not None and len(video_paths) > 0:
                 config = auxiliaryfunctions.read_config(self.deeplabcut_handler.project_config_path)
@@ -331,6 +340,7 @@ class SkellyClickerUIController:
         json_file = filedialog.askopenfilename(
             title="Select Session File",
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialdir="/home/scholl-lab/deeplabcut_data"
         )
         if json_file is None or json_file == "":
             return

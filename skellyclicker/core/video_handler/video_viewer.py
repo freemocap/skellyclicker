@@ -370,6 +370,7 @@ class VideoViewer(BaseModel):
                         self.frame_number + self.step_size
                     ) % self.frame_count
         finally:
+            print("closing videos")
             cv2.destroyAllWindows()
             cv2.waitKey(1)
             if self.on_complete:
