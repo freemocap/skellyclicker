@@ -1,15 +1,16 @@
 {
   "tracked_point_names": [
-    "nose",
-    "left_cam_tip",
-    "right_cam_tip",
-    "base",
-    "left_eye",
-    "right_eye",
-    "left_ear",
-    "right_ear",
-    "spine_t1",
-    "tail_base",
-    "tail_tip"
+    "p1",
+    "p2",
+    "p3",
+    "p4",
+    "p5",
+    "p6",
+    "p7",
+    "p8",
+    "tear_duct",
+    "outer_eye",
+    "cr_top",
+    "cr_bottom"
     ]
 }
