@@ -1,0 +1,55 @@
+name: head
+tracker_name: head
+
+order:
+  - body
+
+aspects:
+  body:
+    tracked_points:
+      type: list
+      names:
+        - nose
+        - left_cam_tip
+        - right_cam_tip
+        - base
+        - left_eye
+        - right_eye
+        - left_ear
+        - right_ear
+        - spine_t1
+        - tail_base
+        - tail_tip
+    
+    segment_connections:
+      right_eye_seg:
+        proximal: nose
+        distal: right_eye
+      left_eye_seg:
+        proximal: nose
+        distal: left_eye
+      right_ear_seg:
+        proximal: right_eye
+        distal: right_ear
+      left_ear_seg:
+        proximal: left_eye
+        distal: left_ear
+      left_cam_seg:
+        proximal: base
+        distal: left_cam_tip
+      right_cam_seg:
+        proximal: base
+        distal: right_cam_tip
+
+    joint_hierarchy:
+      nose:
+        - right_eye
+        - left_eye
+        - base
+      right_eye:
+        - right_ear
+      left_eye:
+        - left_ear
+      base:
+        - left_cam_tip
+        - right_cam_tip

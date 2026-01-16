@@ -1,0 +1,28 @@
+name: toy
+tracker_name: toy
+
+order:
+  - body
+
+aspects:
+  body:
+    tracked_points:
+      type: list
+      names:
+        - toy_face
+        - toy_top
+        - toy_tail
+    
+    segment_connections:
+      front_seg:
+        proximal: toy_top
+        distal: toy_face
+      back_seg:
+        proximal: toy_top
+        distal: toy_tail
+
+
+    joint_hierarchy:
+      toy_top:
+        - toy_face
+        - toy_tail
