@@ -28,6 +28,18 @@ def build_dlc_formatted_header(labels_dataframe: pd.DataFrame, scorer_name: str)
 
     return header_df, joint_names
 
+def get_session_name(path_to_videos_for_training: str) -> str:
+    path_parts = Path(path_to_videos_for_training).parts
+    for part in path_parts:
+        if part.startswith('session'):
+            return part
+        
+    for part in path_parts:
+        if part.startswith('Session'):
+            return part
+        
+    raise ValueError(f"Session name not found in path: {path_to_videos_for_training} - must include string 'session'")
+
 
 def fill_in_labelled_data_folder(path_to_videos_for_training: str,
                                  path_to_dlc_project_folder: str,
@@ -43,13 +55,11 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: str,
     labeled_frames_per_video = {}
     for video_name, video_df in per_video_dataframe.items():
         video_name_wo_extension = str(video_name).split('.')[0]
-        dlc_video_folder_path = Path(path_to_dlc_project_folder) / 'labeled-data' / video_name_wo_extension
+        session_name = get_session_name(path_to_videos_for_training)
+        combined_name = f"{session_name}_{video_name_wo_extension}"
+        dlc_video_folder_path = Path(path_to_dlc_project_folder) / 'labeled-data' / combined_name
         dlc_video_folder_path.mkdir(parents=True, exist_ok=True)
 
-        # TODO: be able to look in different locations to handle multiple video folders
-        # Or is it better to run this function for each video set (each with own CSV?)
-
-        # TODO: change this to be able to take in a list of videos
         video_path = Path(path_to_videos_for_training) / f"{video_name}"
         if not video_path.exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")
@@ -79,7 +89,7 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: str,
                                 img=frame)
 
                 # Create the path format for the index
-                image_path = f"labeled-data/{video_name_wo_extension}/{image_name}"
+                image_path = f"labeled-data/{combined_name}/{image_name}"
 
                 # Build a row for this frame
                 frame_data = {}
@@ -115,10 +125,11 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: str,
 
 
 if __name__ == '__main__':
-    _path_to_dlc_project_folder = Path(r"C:\Users\Aaron\Documents\your-project-name-Aaron-2025-04-01")
-    _path_to_image_labels_csv = Path(r"C:\Users\Aaron\Downloads\output.csv")
+    path_to_videos_for_training = ""
+    path_to_dlc_project_folder = ""
+    path_to_image_labels_csv = ""
 
     fill_in_labelled_data_folder(
-        path_to_recording=r"C:\Users\Aaron\FreeMocap_Data\recording_sessions\freemocap_test_data",
-        path_to_dlc_project_folder=_path_to_dlc_project_folder,
-        path_to_image_labels_csv=_path_to_image_labels_csv)
+        path_to_videos_for_training=path_to_videos_for_training,
+        path_to_dlc_project_folder=path_to_dlc_project_folder,
+        path_to_image_labels_csv=path_to_image_labels_csv)
