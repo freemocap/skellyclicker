@@ -32,7 +32,7 @@ def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_
     handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(deeplabcut_config))
     video_paths = [str(path) for path in video_folder.glob("*.mp4")]
     print(f"VIDEO PATHS in {video_folder}: \n{video_paths}")
-    handler.analyze_videos(video_paths=video_paths, output_folder=analyze_videos_output, annotate_videos=True)
+    handler.analyze_videos(video_paths=video_paths, output_folder=analyze_videos_output, annotate_videos=True, filter_videos=True)
 
     annotated_video_paths = list(analyze_videos_output.glob("*.mp4"))
     copy_files(files = annotated_video_paths, destination=annotated_videos_folder)
@@ -70,13 +70,16 @@ def run_all_models(recording_path: Path, include_eye: bool, flip_eye_0: bool = F
     print("toy model processed")
 
 if __name__=="__main__":
-    # set this as needed to flip eye videos correctly
-    flip_eye_0 = True  # set True for October Videos
-    flip_eye_1 = False  # Set True for July Videos
-
     # use /full_recording or /clips/{clip_name}
-    recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-10-12_ferret_402_E03/full_recording")
+    recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-09_ferret_753_EyeCameras_P41_E13/full_recording")
     include_eye = True
+
+    if "757" in recording_path:
+        flip_eye_0 = False
+        flip_eye_1 = True
+    else:
+        flip_eye_0 = True
+        flip_eye_1 = False
 
     run_all_models(recording_path, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
 
