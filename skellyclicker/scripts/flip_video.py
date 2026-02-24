@@ -45,7 +45,7 @@ def flip_eye1_video(eye_data_folder: Path) -> Path:
     flipped_eye1 = flip_video(video=eye1_video_path, flip_method=FlipMethod.HORIZONTAL)
 
     shutil.copy2(eye0_video_path, flipped_videos_path)
-    shutil.move(flipped_eye1, flipped_videos_path)
+    flipped_eye1.rename(flipped_videos_path / flipped_eye1.name)
 
     return flipped_videos_path
 
@@ -58,7 +58,7 @@ def flip_eye0_video(eye_data_folder: Path) -> Path:
     flipped_eye0 = flip_video(video=eye0_video_path, flip_method=FlipMethod.VERTICAL)
 
     shutil.copy2(eye1_video_path, flipped_videos_path)
-    shutil.move(flipped_eye0, flipped_videos_path)
+    flipped_eye0.rename(flipped_videos_path / flipped_eye0.name)
 
     return flipped_videos_path
 
