@@ -19,6 +19,16 @@ def copy_files(files: list[Path], destination: Path):
     for file_path in files:
         shutil.copy2(src = file_path, dst=destination)
 
+def clean_dlc_output_folder(dlc_output_folder: Path):
+    if not dlc_output_folder.exists() or not dlc_output_folder.is_dir():
+        return
+    print("Existing dlc data found, removing it to ensure latest model is used")
+    patterns = ["*snapshot*.csv", "*snapshot*.h5", "*snapshot*.pickle"]
+    for pattern in patterns:
+        for file in dlc_output_folder.glob(pattern):
+            print(f"Removing existinng file {file}")
+            file.unlink()
+
 def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_folder: Path | None = None, suffix: str = ""):
     if output_folder is None:
         output_folder = video_folder.parent
@@ -28,6 +38,7 @@ def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_
     dlc_output_folder.mkdir(exist_ok=True, parents=True)
     annotated_videos_folder.mkdir(exist_ok=True, parents=True)
     analyze_videos_output = dlc_output_folder / f"{deeplabcut_folder.stem}{suffix}"
+    clean_dlc_output_folder(analyze_videos_output)
     deeplabcut_config = deeplabcut_folder / "config.yaml"
     handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(deeplabcut_config))
     video_paths = [str(path) for path in video_folder.glob("*.mp4")]
@@ -71,7 +82,7 @@ def run_all_models(recording_path: Path, include_eye: bool, flip_eye_0: bool = F
 
 if __name__=="__main__":
     # use /full_recording or /clips/{clip_name}
-    recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-11_ferret_757_EyeCamera_P43_E15__1/clips/0m_37s-1m_37s")
+    recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-09_ferret_753_EyeCameras_P41_E13/full_recording")
     include_eye = True
 
     if "757" in str(recording_path):

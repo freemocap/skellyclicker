@@ -196,7 +196,8 @@ class DeeplabcutHandler(BaseModel):
             save_as_csv=True,
             destfolder = str(output_folder),
             batch_size=8,  # 16 is too high for 5 mocap videos
-            multiprocess=False
+            multiprocess=True,
+            overwrite=True
         )
 
         if filter_videos:
