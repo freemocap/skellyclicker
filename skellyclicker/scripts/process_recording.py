@@ -1,4 +1,5 @@
 import shutil
+import sys
 from pathlib import Path
 
 from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
@@ -85,19 +86,32 @@ if __name__=="__main__":
     recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-09_ferret_753_EyeCameras_P41_E13/full_recording")
     include_eye = True
 
-    if "757" in str(recording_path):
+    if len(sys.argv) >= 2:
+        recording_folder = Path(sys.argv[1])
+        include_eye = True
+    else:
+        recording_folder = recording_path
+        print(f"Using default directory: {recording_folder}")
+
+    if not recording_folder.exists():
+        print(f"Error: Directory does not exist: {recording_folder}")
+        print("\nUsage: python process_recording.py [recording_folder] {--skip-eye | -e}")
+        sys.exit(1)
+
+    flags = [a for a in sys.argv[1:] if a.startswith("-")]
+
+    # Process boolean flags
+    for flag in flags:
+        if flag in ("--skip-eye", "-e"):
+            include_eye = False
+        else:
+            print(f"Warning: unknown flag {flag}")
+
+    if "757" in str(recording_folder):
         flip_eye_0 = False
         flip_eye_1 = True
     else:
         flip_eye_0 = True
         flip_eye_1 = False
 
-    run_all_models(recording_path, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
-
-    # recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-10-12_ferret_402_E03/full_recording")
-
-    # run_all_models(recording_path, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
-
-    # recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-07_ferret_753_EyeCameras_P39_E11/full_recording")
-
-    # run_all_models(recording_path, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
+    run_all_models(recording_folder, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
