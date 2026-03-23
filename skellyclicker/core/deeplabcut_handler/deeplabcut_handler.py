@@ -259,16 +259,13 @@ class DeeplabcutHandler(BaseModel):
             column_names = ["frame"]
             for bodypart in bodyparts:
                 column_names.extend(
-                    [f"{bodypart}_x", f"{bodypart}_y", f"{bodypart}_likelihood"]
+                    [f"{bodypart}_x", f"{bodypart}_y", f"{bodypart}_confidence"]
                 )
 
             df.columns = column_names
 
             # remove first two rows
             df = df.iloc[2:, :]
-            # TODO: consider filtering for confidence
-
-            df = df.drop(columns=[f"{bodypart}_likelihood" for bodypart in bodyparts])
 
             df["video"] = video_name
 

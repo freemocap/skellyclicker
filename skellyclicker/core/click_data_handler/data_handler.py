@@ -36,7 +36,7 @@ class DataHandlerConfig(BaseModel):
         tracked_point_names = []
         seen = set()
         for name in dataframe.columns:
-            name = name.removesuffix("_x").removesuffix("_y")
+            name = name.removesuffix("_x").removesuffix("_y").removesuffix("_likelihood").removesuffix("_confidence")
             if name not in seen:
                 seen.add(name)
                 tracked_point_names.append(name)
