@@ -1,3 +1,5 @@
+from datetime import datetime
+import json
 import logging
 import math
 import cv2
@@ -295,6 +297,25 @@ class DeeplabcutHandler(BaseModel):
         ]
         with Pool(processes=len(video_paths)) as pool:
             pool.starmap(self.annotate_single_video, args)
+
+        config = auxiliaryfunctions.read_config(self.project_config_path)
+        metadata = {
+            "model_name": self.project_name,
+            "scorer": config.get("scorer"),
+            "iteration": self.iteration,
+            "project_creation_date": config.get("date"),
+            "processing_datetime": datetime.now().isoformat(),
+            "project_config_path": str(self.project_config_path),
+            "tracked_point_names": self.tracked_point_names,
+            "connections": [c.model_dump() for c in self.connections] if self.connections else [],
+            "video_paths": [str(v) for v in video_paths],
+            "csv_path": str(csv_path),
+            "output_path": str(output_path),
+        }
+        metadata_path = Path(output_path) / f"skellyclicker_metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+        print(f"Saved annotation metadata to {metadata_path}")
 
     def annotate_single_video(self, output_path: str | Path, csv_path: str | Path, video: Path):
         data_handler = DataHandler.from_csv(csv_path)
