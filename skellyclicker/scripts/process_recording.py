@@ -49,7 +49,7 @@ def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_
     annotated_video_paths = list(analyze_videos_output.glob("*.mp4"))
     copy_files(files = annotated_video_paths, destination=annotated_videos_folder)
 
-def run_all_models(recording_path: Path, include_eye: bool, flip_eye_0: bool = False, flip_eye_1: bool = False):
+def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True, flip_eye_0: bool = False, flip_eye_1: bool = False):
     mocap_video_path = recording_path / "mocap_data" / "synchronized_corrected_videos"
     if not mocap_video_path.exists():
         mocap_video_path = recording_path / "mocap_data" / "synchronized_videos"
@@ -74,28 +74,34 @@ def run_all_models(recording_path: Path, include_eye: bool, flip_eye_0: bool = F
         print("eye videos processed")
     else:
         best_mocap_model_folder = "/home/scholl-lab/deeplabcut_data/head_body_noeyecam_v0"
-    # print("Processing mocap videos...")
-    process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_mocap_model_folder)
-    print("mocap videos processed")
-    print("Processing mocap videos with toy model...")
-    process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_toy_model_folder)
-    print("toy model processed")
+    if include_body:
+        print("Processing mocap videos...")
+        process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_mocap_model_folder)
+        print("mocap videos processed") 
+    if include_toy:
+        print("Processing mocap videos with toy model...")
+        process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_toy_model_folder)
+        print("toy model processed")
 
 if __name__=="__main__":
     # use /full_recording or /clips/{clip_name}
     recording_path = Path("/home/scholl-lab/ferret_recordings/session_2025-07-09_ferret_753_EyeCameras_P41_E13/full_recording")
     include_eye = True
+    include_body = True
+    include_toy = True
 
     if len(sys.argv) >= 2:
         recording_folder = Path(sys.argv[1])
         include_eye = True
+        include_body = True
+        include_toy = True
     else:
         recording_folder = recording_path
         print(f"Using default directory: {recording_folder}")
 
     if not recording_folder.exists():
         print(f"Error: Directory does not exist: {recording_folder}")
-        print("\nUsage: python process_recording.py [recording_folder] {--skip-eye | -e}")
+        print("\nUsage: python process_recording.py [recording_folder] {--skip-eye | -e} {--skip-body | -b} {--skip-toy | -t}")
         sys.exit(1)
 
     flags = [a for a in sys.argv[1:] if a.startswith("-")]
@@ -104,6 +110,10 @@ if __name__=="__main__":
     for flag in flags:
         if flag in ("--skip-eye", "-e"):
             include_eye = False
+        elif flag in ("--skip-body", "-b"):
+            include_body = False
+        elif flag in ("--skip-toy", "-t"):
+            include_toy = False
         else:
             print(f"Warning: unknown flag {flag}")
 
@@ -114,4 +124,4 @@ if __name__=="__main__":
         flip_eye_0 = True
         flip_eye_1 = False
 
-    run_all_models(recording_folder, include_eye, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
+    run_all_models(recording_folder, include_eye, include_body, include_toy, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
