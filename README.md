@@ -2,6 +2,8 @@
 
 For labelling and training data through DeepLabCut.
 
+[![DOI](https://zenodo.org/badge/955944295.svg)](https://doi.org/10.5281/zenodo.19389888)
+
 ## Installation
 
 1. Clone the repository
