@@ -49,7 +49,7 @@ def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_
     annotated_video_paths = list(analyze_videos_output.glob("*.mp4"))
     copy_files(files = annotated_video_paths, destination=annotated_videos_folder)
 
-def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True, flip_eye_0: bool = False, flip_eye_1: bool = False):
+def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True):
     mocap_video_path = recording_path / "mocap_data" / "synchronized_corrected_videos"
     if not mocap_video_path.exists():
         mocap_video_path = recording_path / "mocap_data" / "synchronized_videos"
@@ -108,12 +108,5 @@ if __name__=="__main__":
             include_toy = False
         else:
             print(f"Warning: unknown flag {flag}")
-
-    if "757" in str(recording_folder):
-        flip_eye_0 = False
-        flip_eye_1 = True
-    else:
-        flip_eye_0 = True
-        flip_eye_1 = False
 
     run_all_models(recording_folder, include_eye, include_body, include_toy, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
