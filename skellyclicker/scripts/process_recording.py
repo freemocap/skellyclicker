@@ -63,14 +63,6 @@ def run_all_models(recording_path: Path, include_eye: bool, include_body: bool =
 
         print("Processing eye videos...")
         process_recording(video_folder=eye_video_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path)
-        if flip_eye_0:
-            flip_eye0_video(eye_data_folder=eye_data_path)
-        if flip_eye_1:
-            flip_eye1_video(eye_data_folder=eye_data_path)
-        if flip_eye_0 or flip_eye_1:
-            print("standard eye video processed, processing flipped eye videos")
-            flipped_eye_videos_path = eye_video_path / "flipped_eye_videos"
-            process_recording(video_folder=flipped_eye_videos_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path, suffix="_flipped")
         print("eye videos processed")
     else:
         best_mocap_model_folder = "/home/scholl-lab/deeplabcut_data/head_body_noeyecam_v0"
