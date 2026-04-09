@@ -7,8 +7,6 @@ from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutH
 import matplotlib as plt
 import logging
 
-from skellyclicker.scripts.flip_video import flip_eye1_video, flip_eye0_video
-
 
 plt.set_loglevel('WARNING')
 logging.getLogger('PIL').setLevel(logging.WARNING)
@@ -109,4 +107,4 @@ if __name__=="__main__":
         else:
             print(f"Warning: unknown flag {flag}")
 
-    run_all_models(recording_folder, include_eye, include_body, include_toy, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
+    run_all_models(recording_folder, include_eye, include_body, include_toy)
