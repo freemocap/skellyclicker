@@ -1,4 +1,5 @@
 import logging
+import shutil
 from pathlib import Path
 
 import cv2
@@ -58,7 +59,9 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: str,
         session_name = get_session_name(path_to_videos_for_training)
         combined_name = f"{session_name}_{video_name_wo_extension}"
         dlc_video_folder_path = Path(path_to_dlc_project_folder) / 'labeled-data' / combined_name
-        dlc_video_folder_path.mkdir(parents=True, exist_ok=True)
+        if dlc_video_folder_path.exists():
+            shutil.rmtree(dlc_video_folder_path)
+        dlc_video_folder_path.mkdir(parents=True)
 
         video_path = Path(path_to_videos_for_training) / f"{video_name}"
         if not video_path.exists():
@@ -66,43 +69,38 @@ def fill_in_labelled_data_folder(path_to_videos_for_training: str,
 
         cap = cv2.VideoCapture(str(video_path))
         labeled_frames = []
-        frame_idx = 0
 
         # Initialize a DataFrame with the MultiIndex structure
         df = header_df.copy()
 
         logger.info(f'Looking for labeled frames for {video_path}')
-        while cap.isOpened():
+
+        labeled_rows = video_df[~video_df.iloc[:, 2:].isna().all(axis=1)]
+        for _, row in labeled_rows.iterrows():
+            frame_number = int(row["frame"])
+
+            # Seek to the exact frame — must match skellyclicker's cap.set()/cap.read() behavior
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             ret, frame = cap.read()
-            if not ret or frame_idx >= len(video_df):
-                break
+            if not ret:
+                logger.warning(f"Could not read frame {frame_number} from {video_path}, skipping")
+                continue
 
-            row = video_df.iloc[frame_idx, 2:]  # Keep this line to check for non-NaN values
+            labeled_frames.append(frame_number)
 
-            if not row.isna().all():  # if a frame is labeled (any of the x/y values are filled in/not NaNs)
-                labeled_frames.append(video_df.iloc[frame_idx]["frame"])
+            image_name = f'img{frame_number:05d}.png'
+            image_save_path = dlc_video_folder_path / image_name
+            # Always overwrite: stale images from prior iterations must not persist
+            cv2.imwrite(filename=str(image_save_path), img=frame)
 
-                image_name = f'img{frame_idx:03d}.png'
-                image_save_path = dlc_video_folder_path / image_name
-                if not image_save_path.exists():
-                    cv2.imwrite(filename=str(image_save_path),
-                                img=frame)
+            image_path = f"labeled-data/{combined_name}/{image_name}"
 
-                # Create the path format for the index
-                image_path = f"labeled-data/{combined_name}/{image_name}"
+            frame_data = {}
+            for joint in joint_names:
+                frame_data[(scorer_name, joint, 'x')] = row[f"{joint}_x"]
+                frame_data[(scorer_name, joint, 'y')] = row[f"{joint}_y"]
 
-                # Build a row for this frame
-                frame_data = {}
-                for joint in joint_names:
-                    x_val = video_df[video_df['frame'] == frame_idx][f"{joint}_x"].values[0]
-                    y_val = video_df[video_df['frame'] == frame_idx][f"{joint}_y"].values[0]
-                    frame_data[(scorer_name, joint, 'x')] = x_val
-                    frame_data[(scorer_name, joint, 'y')] = y_val
-
-                # Add this frame to the DataFrame
-                df.loc[image_path] = frame_data
-
-            frame_idx += 1
+            df.loc[image_path] = frame_data
 
         cap.release()
 
