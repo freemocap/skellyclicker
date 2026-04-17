@@ -7,8 +7,6 @@ from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutH
 import matplotlib as plt
 import logging
 
-from skellyclicker.scripts.flip_video import flip_eye1_video, flip_eye0_video
-
 
 plt.set_loglevel('WARNING')
 logging.getLogger('PIL').setLevel(logging.WARNING)
@@ -49,7 +47,7 @@ def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_
     annotated_video_paths = list(analyze_videos_output.glob("*.mp4"))
     copy_files(files = annotated_video_paths, destination=annotated_videos_folder)
 
-def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True, flip_eye_0: bool = False, flip_eye_1: bool = False):
+def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True):
     mocap_video_path = recording_path / "mocap_data" / "synchronized_corrected_videos"
     if not mocap_video_path.exists():
         mocap_video_path = recording_path / "mocap_data" / "synchronized_videos"
@@ -63,14 +61,6 @@ def run_all_models(recording_path: Path, include_eye: bool, include_body: bool =
 
         print("Processing eye videos...")
         process_recording(video_folder=eye_video_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path)
-        if flip_eye_0:
-            flip_eye0_video(eye_data_folder=eye_data_path)
-        if flip_eye_1:
-            flip_eye1_video(eye_data_folder=eye_data_path)
-        if flip_eye_0 or flip_eye_1:
-            print("standard eye video processed, processing flipped eye videos")
-            flipped_eye_videos_path = eye_video_path / "flipped_eye_videos"
-            process_recording(video_folder=flipped_eye_videos_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path, suffix="_flipped")
         print("eye videos processed")
     else:
         best_mocap_model_folder = "/home/scholl-lab/deeplabcut_data/head_body_noeyecam_v0"
@@ -117,11 +107,4 @@ if __name__=="__main__":
         else:
             print(f"Warning: unknown flag {flag}")
 
-    if "757" in str(recording_folder):
-        flip_eye_0 = False
-        flip_eye_1 = True
-    else:
-        flip_eye_0 = True
-        flip_eye_1 = False
-
-    run_all_models(recording_folder, include_eye, include_body, include_toy, flip_eye_0=flip_eye_0, flip_eye_1=flip_eye_1)
+    run_all_models(recording_folder, include_eye, include_body, include_toy)
