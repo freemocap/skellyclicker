@@ -1,51 +1,14 @@
-import shutil
 import sys
 from pathlib import Path
-
-from skellyclicker.core.deeplabcut_handler.deeplabcut_handler import DeeplabcutHandler
 
 import matplotlib as plt
 import logging
 
+from skellyclicker.scripts.process_folder import process_folder
+
 
 plt.set_loglevel('WARNING')
 logging.getLogger('PIL').setLevel(logging.WARNING)
-
-def copy_files(files: list[Path], destination: Path):
-    if len(files) == 0:
-        raise ValueError(f"attemped to copy files to {str(destination)} but no files provided")
-    print(f"Copying files {[file.name for file in files]} to {str(destination)}")
-    for file_path in files:
-        shutil.copy2(src = file_path, dst=destination)
-
-def clean_dlc_output_folder(dlc_output_folder: Path):
-    if not dlc_output_folder.exists() or not dlc_output_folder.is_dir():
-        return
-    print("Existing dlc data found, removing it to ensure latest model is used")
-    patterns = ["*snapshot*.csv", "*snapshot*.h5", "*snapshot*.pickle"]
-    for pattern in patterns:
-        for file in dlc_output_folder.glob(pattern):
-            print(f"Removing existinng file {file}")
-            file.unlink()
-
-def process_recording(video_folder: Path, deeplabcut_folder: Path | str, output_folder: Path | None = None, suffix: str = ""):
-    if output_folder is None:
-        output_folder = video_folder.parent
-    deeplabcut_folder = Path(deeplabcut_folder)
-    dlc_output_folder = output_folder / "dlc_output"
-    annotated_videos_folder = output_folder / "annotated_videos" / f"annotated_videos_{deeplabcut_folder.stem}{suffix}"
-    dlc_output_folder.mkdir(exist_ok=True, parents=True)
-    annotated_videos_folder.mkdir(exist_ok=True, parents=True)
-    analyze_videos_output = dlc_output_folder / f"{deeplabcut_folder.stem}{suffix}"
-    clean_dlc_output_folder(analyze_videos_output)
-    deeplabcut_config = deeplabcut_folder / "config.yaml"
-    handler = DeeplabcutHandler.load_deeplabcut_project(project_config_path=str(deeplabcut_config))
-    video_paths = [str(path) for path in video_folder.glob("*.mp4")]
-    print(f"VIDEO PATHS in {video_folder}: \n{video_paths}")
-    handler.analyze_videos(video_paths=video_paths, output_folder=analyze_videos_output, annotate_videos=True, filter_videos=True)
-
-    annotated_video_paths = list(analyze_videos_output.glob("*.mp4"))
-    copy_files(files = annotated_video_paths, destination=annotated_videos_folder)
 
 def run_all_models(recording_path: Path, include_eye: bool, include_body: bool = True, include_toy: bool = True):
     mocap_video_path = recording_path / "mocap_data" / "synchronized_corrected_videos"
@@ -60,17 +23,17 @@ def run_all_models(recording_path: Path, include_eye: bool, include_body: bool =
         best_mocap_model_folder = "/home/scholl-lab/deeplabcut_data/head_body_eyecam_retrain_test_v2"
 
         print("Processing eye videos...")
-        process_recording(video_folder=eye_video_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path)
+        process_folder(video_folder=eye_video_path, deeplabcut_folder=best_eye_model_folder, output_folder=eye_data_path)
         print("eye videos processed")
     else:
         best_mocap_model_folder = "/home/scholl-lab/deeplabcut_data/head_body_noeyecam_v0"
     if include_body:
         print("Processing mocap videos...")
-        process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_mocap_model_folder)
+        process_folder(video_folder=mocap_video_path, deeplabcut_folder=best_mocap_model_folder)
         print("mocap videos processed") 
     if include_toy:
         print("Processing mocap videos with toy model...")
-        process_recording(video_folder=mocap_video_path, deeplabcut_folder=best_toy_model_folder)
+        process_folder(video_folder=mocap_video_path, deeplabcut_folder=best_toy_model_folder)
         print("toy model processed")
 
 if __name__=="__main__":
