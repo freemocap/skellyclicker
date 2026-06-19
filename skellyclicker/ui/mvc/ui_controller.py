@@ -178,7 +178,8 @@ class SkellyClickerUIController:
             self.ui_model.frame_count = self.video_viewer.video_handler.frame_count
             self.video_viewer.on_complete = self.video_viewer_on_complete
             print("launching videos")
-            self.video_viewer.launch_video_thread()
+            # Pass Tk root so OpenCV pumps on macOS and completion callbacks stay thread-safe.
+            self.video_viewer.launch_video_thread(tk_root=self.ui_view.root)
 
     def video_viewer_on_complete(self) -> None:
         if self.video_viewer is None:

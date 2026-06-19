@@ -2,7 +2,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import cv2
 import numpy as np
@@ -43,18 +43,55 @@ class VideoViewer(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     should_continue: bool = True
     on_complete: Callable | None = None
+    _cv_window_ready: bool = False
 
-    def launch_video_thread(self):
-        if sys.platform == "darwin":  # OpenCV GUI can only open in main thread on Mac
+    def launch_video_thread(self, tk_root: Any | None = None) -> None:
+        """Start the OpenCV viewer without blocking the Tkinter main loop."""
+        # macOS OpenCV highgui must run on the main thread; pump frames via Tk after().
+        if sys.platform == "darwin" and tk_root is not None:
             self.video_thread = None
-            self.run()
-        elif sys.platform == "linux":
-            self.video_thread = None
-            self.run()
+            self._init_cv_window()
+            self._schedule_pump(tk_root)
+            return
+
+        # Linux/Windows: OpenCV runs in a background thread so Tk stays responsive.
+        self.video_thread = threading.Thread(
+            target=self._run_in_background,
+            args=(tk_root,),
+            daemon=True,
+        )
+        self.video_thread.start()
+
+    def _run_in_background(self, tk_root: Any | None) -> None:
+        try:
+            self.run(notify_complete=False)
+        finally:
+            self._notify_complete(tk_root)
+
+    def _schedule_pump(self, tk_root: Any) -> None:
+        if not self.should_continue:
+            self._cleanup_cv_window()
+            self._notify_complete(tk_root)
+            return
+
+        if not self._pump_frame():
+            self.should_continue = False
+            self._cleanup_cv_window()
+            self._notify_complete(tk_root)
+            return
+
+        tk_root.after(1, lambda: self._schedule_pump(tk_root))
+
+    def _notify_complete(self, tk_root: Any | None) -> None:
+        if self.on_complete is None:
+            self.video_handler.close(save_data=None)
+            return
+
+        # Tk dialogs must run on the main thread.
+        if tk_root is not None:
+            tk_root.after(0, self.on_complete)
         else:
-            self.video_thread = threading.Thread(target=self.run)
-            self.video_thread.daemon = True
-            self.video_thread.start()
+            self.on_complete()
 
     @classmethod
     def from_videos(
@@ -345,8 +382,10 @@ class VideoViewer(BaseModel):
             # Keep zoom scale within reasonable limits
             video.zoom_state.scale = np.clip(video.zoom_state.scale, 1.0, 10.0)
 
-    def run(self):
-        """Run the video grid viewer."""
+    def _init_cv_window(self) -> None:
+        if self._cv_window_ready:
+            return
+
         cv2.namedWindow(self.video_folder, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.video_folder, *self.max_window_size)
         cv2.setMouseCallback(
@@ -355,28 +394,41 @@ class VideoViewer(BaseModel):
                 event, x, y, flags, param
             ),
         )
+        self._cv_window_ready = True
 
+    def _pump_frame(self) -> bool:
+        """Process one viewer frame. Returns False when the viewer should close."""
+        key = cv2.waitKey(1) & 0xFF
+        if not self._handle_keypress(key):
+            return False
+
+        grid_image = self.video_handler.create_grid_image(
+            self.frame_number, annotate_images=True
+        )
+        cv2.imshow(str(self.video_folder), grid_image)
+        if self.is_playing:
+            self.frame_number = (
+                self.frame_number + self.step_size
+            ) % self.frame_count
+        return True
+
+    def _cleanup_cv_window(self) -> None:
+        print("closing videos")
+        cv2.destroyAllWindows()
+        cv2.waitKey(1)
+        self._cv_window_ready = False
+
+    def run(self, notify_complete: bool = True) -> None:
+        """Run the video grid viewer (blocking loop for CLI use)."""
+        self._init_cv_window()
         try:
             while self.should_continue:
-                key = cv2.waitKey(1) & 0xFF
-                if not self._handle_keypress(key):
+                if not self._pump_frame():
                     break
-                grid_image = self.video_handler.create_grid_image(
-                    self.frame_number, annotate_images=True
-                )
-                cv2.imshow(str(self.video_folder), grid_image)
-                if self.is_playing:
-                    self.frame_number = (
-                        self.frame_number + self.step_size
-                    ) % self.frame_count
         finally:
-            print("closing videos")
-            cv2.destroyAllWindows()
-            cv2.waitKey(1)
-            if self.on_complete:
-                self.on_complete()
-            else:
-                self.video_handler.close(save_data=None)
+            self._cleanup_cv_window()
+            if notify_complete:
+                self._notify_complete(tk_root=None)
 
     def stop(self):
         self.should_continue = False
