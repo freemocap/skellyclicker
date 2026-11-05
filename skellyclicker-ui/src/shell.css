@@ -24,3 +24,31 @@ html, body, #root {height:100%; margin:0;}
 
 .skellyclicker-bottom {grid-column:1 / -1; min-width:0; overflow:hidden;} 
 
+.skellyclicker-main .skellyclicker-tabs {display:flex;align-items:end;padding:8px 12px 0;gap:6px;background:var(--gray-900);}
+.skellyclicker-tabs [role=tab] {position:relative;min-width:110px;padding:10px 22px;border:1px solid var(--gray-600);border-bottom:0;border-radius:7px 7px 0 0;background:var(--gray-800);color:var(--gray-100);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+.skellyclicker-tabs [role=tab][aria-selected=true]::after {content:"";position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:2px;background:var(--color-primary, #8b8ce8);}
+.skellyclicker-tabs [role=tab]:focus-visible {outline:2px solid var(--color-primary, #8b8ce8);outline-offset:2px;}
+.project-browser-stack {display:flex;flex-direction:column;gap:12px;min-height:0;}
+.project-dialog {padding:0;width:min(680px,calc(100vw - 48px));max-height:calc(100vh - 64px);overflow:auto;border:1px solid var(--gray-600);border-radius:8px;background:var(--gray-800);color:var(--gray-100);box-shadow:0 18px 70px #0009;font:inherit;}
+.project-dialog::backdrop {background:#0009;}
+.project-dialog header {display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--gray-600);}
+.project-dialog h2 {font-size:16px;margin:0;}
+.project-dialog header button {background:transparent;border:0;color:inherit;font-size:24px;cursor:pointer;}
+.project-dialog-fields {padding:8px 20px 20px;}
+.project-dialog-fields p {font-size:13px;color:var(--gray-300);line-height:1.5;}
+.project-dialog label {display:flex;flex-direction:column;gap:6px;font-size:13px;margin-top:14px;}
+.project-dialog input,.project-dialog select {padding:9px 10px;border:1px solid var(--gray-600);border-radius:4px;background:var(--gray-900);color:inherit;width:100%;box-sizing:border-box;font:inherit;}
+.project-dialog-pair {display:grid;grid-template-columns:1fr 160px;gap:16px;}
+.project-dialog footer {display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;border-top:1px solid var(--gray-600);}
+.project-dialog footer button {padding:8px 18px;border:1px solid var(--gray-500);border-radius:5px;background:var(--gray-700);color:inherit;cursor:pointer;}
+.project-dialog footer .project-dialog-submit {background:var(--color-bg-primary, #42466b);}
+.project-dialog [role=alert] {color:var(--color-error,#ffaaa8);overflow-wrap:anywhere;}
+.project-dialog button:focus-visible,.project-dialog input:focus-visible,.project-dialog select:focus-visible {outline:2px solid var(--color-primary,#8b8ce8);outline-offset:2px;}
+.skellyclicker-sidebar {padding:8px;}
+.skellyclicker-sidebar > header {gap:8px;margin-bottom:12px;padding:4px 6px;}
+.skellyclicker-sidebar > header img {width:28px;height:28px;}
+.skellyclicker-sidebar > header h1 {font-size:15px;font-weight:600;}
+.skellyclicker-sidebar > header {justify-content:space-between;align-items:center;gap:8px;}
+.skellyclicker-brand {display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.skellyclicker-sidebar .skellyclicker-brand img {width:24px;height:24px;}
+.skellyclicker-sidebar .skellyclicker-brand h1 {font-size:13px;}

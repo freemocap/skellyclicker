@@ -1,0 +1,17 @@
+import {chromium,expect} from '@playwright/test';
+import {writeFile} from 'node:fs/promises';
+const browser=await chromium.connectOverCDP('http://127.0.0.1:9224');
+const page=browser.contexts()[0].pages().find(p=>!p.url().startsWith('devtools:'));
+await expect(page.getByRole('tab',{name:'Project',exact:true})).toHaveAttribute('aria-selected','true');
+await expect(page.getByText('Recording Playback Timing Issue',{exact:true})).toHaveCount(0);
+await expect(page.getByRole('button',{name:'Collapse logs',exact:true})).toHaveCount(0);
+await expect(page.locator('.sdk-log-heading')).toHaveCount(0);
+await expect(page.getByText('benchy-sfn26',{exact:true}).first()).toBeVisible({timeout:15000});
+await expect(page.getByRole('button',{name:'Connected',exact:true})).toBeVisible();
+const monitor=await page.locator('.sdk-server-monitor').boundingBox(),brand=await page.locator('.skellyclicker-brand').boundingBox();
+if(monitor.x+monitor.width>brand.x)throw new Error('Connection monitor overlaps branding');
+const result={url:page.url(),monitor,brand,body:await page.locator('body').innerText(),backendUrl:await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('backend_url'))};
+await page.screenshot({path:'../.test-artifacts/native-project-picker.png'});
+await writeFile('../.test-artifacts/native-project-picker.json',JSON.stringify(result,null,2));
+console.log(JSON.stringify({native:true,monitor,brand,backendUrl:result.backendUrl,removedPopup:true,picker:true,projectTab:true}));
+await browser.close();

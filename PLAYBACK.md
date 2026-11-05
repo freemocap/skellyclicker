@@ -70,3 +70,17 @@ checks startup replay and live warnings through the public SDK client. Native
 inspection scripts are `tests/native-project-review.mjs` and
 `tests/native-live-logs.mjs` in the UI package. Their screenshots/reports belong in
 ignored `.test-artifacts/`, and are not production data.
+
+The Project sidebar now composes SDK `RecordingBrowser` for remembered projects
+and current recordings, preserving Core's search, sorting, compact rows and
+expandable details. Open/New project fields are secondary app-owned dialogs.
+The upper-left SDK `ServerConnectionStatus` follows actual TransportService
+`state-change` events; its reconnect/disconnect actions only control that socket,
+not the desktop-owned backend. HTTP reachability is shown separately.
+SkellyClicker explicitly disables the informational playback timing popup and the
+redundant log wrapper header; resource errors and log terminal controls remain.
+The active workspace is a semantic Project tab. Isolated interaction validation:
+`skellyclicker-ui/tests/project-browser-controls.mjs`; passive native evidence:
+`skellyclicker-ui/tests/native-project-picker.mjs`. The isolated test stubs only
+native endpoint discovery and uses the real backend/socket; it does not operate
+the user's native window.

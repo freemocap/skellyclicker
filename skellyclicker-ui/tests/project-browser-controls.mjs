@@ -1,0 +1,30 @@
+import {chromium,expect} from '@playwright/test';
+const browser=await chromium.launch({headless:true,channel:'msedge'});
+try {
+ const page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.addInitScript(()=>{globalThis.isTauri=true;window.__TAURI_INTERNALS__={invoke:async command=>{if(command==='backend_url')return 'http://127.0.0.1:56718';throw new Error(command);}};localStorage.setItem('skellyclicker.projectPath','C:/Users/jonma/freemocap_data/skellyclicker_projects/benchy-sfn26/benchy-sfn26_project.json');});
+ await page.goto('http://127.0.0.1:5176');
+ await expect(page.getByRole('button',{name:'Connected',exact:true})).toBeVisible({timeout:15000});
+ await expect(page.getByText('benchy-sfn26',{exact:true}).first()).toBeVisible({timeout:30000});
+ await expect(page.getByRole('tab',{name:'Project',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByText('Recording Playback Timing Issue',{exact:true})).toHaveCount(0);
+ await expect(page.locator('.sdk-log-heading')).toHaveCount(0);
+ await page.getByRole('button',{name:'Show details for benchy-20261104-232220-208509',exact:true}).click();
+ await expect(page.getByText('Awaiting fresh replay',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Open project',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Open project',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.getByRole('button',{name:'New project',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'New project',exact:true})).toBeVisible();
+ await expect(page.getByLabel('Object ID',{exact:true})).toHaveValue('benchy');
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.getByRole('button',{name:'Connected',exact:true}).click();
+ await expect(page.getByText('http://127.0.0.1:56718',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Disconnect',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Not connected',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Connect',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Connected',exact:true})).toBeVisible();
+ if(errors.length)throw new Error(errors.join('\n'));
+ console.log(JSON.stringify({separateBrowser:true,realBackend:true,projectDialogs:true,recordingDetails:true,actualDisconnectReconnect:true,removedTimingPopup:true,errors}));
+}finally{await browser.close();}

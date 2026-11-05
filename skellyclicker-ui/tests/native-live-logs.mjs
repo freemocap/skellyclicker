@@ -4,10 +4,10 @@ const browser=await chromium.connectOverCDP('http://127.0.0.1:9224');
 const page=browser.contexts()[0].pages().find(p=>!p.url().startsWith('devtools:'));
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 await expect(page.getByRole('region',{name:'Backend logs',exact:true})).toBeVisible({timeout:15000});
-await expect(page.getByRole('heading',{name:'benchy-sfn26',exact:true})).toBeVisible({timeout:30000});
+await expect(page.getByText('benchy-sfn26',{exact:true}).first()).toBeVisible({timeout:30000});
 await expect(page.locator('.log-entry').filter({hasText:'Opened project benchy-sfn26'})).toBeVisible({timeout:15000});
 await expect(page.getByRole('separator',{name:'Resize log panel'})).toBeVisible();
-await expect(page.getByRole('button',{name:'Collapse logs',exact:true})).toBeVisible();
+await expect(page.getByRole('button',{name:'Collapse logs',exact:true})).toHaveCount(0);
 const backendUrl=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('backend_url'));
 const result={url:page.url(),backendUrl,errors,body:await page.locator('body').innerText(),logBounds:await page.locator('.sdk-bottom-log-panel').boundingBox(),viewport:await page.evaluate(()=>({width:innerWidth,height:innerHeight}))};
 await page.screenshot({path:'../.test-artifacts/native-live-logs.png'});
@@ -15,3 +15,4 @@ await writeFile('../.test-artifacts/native-live-logs.json',JSON.stringify(result
 console.log(JSON.stringify(result,null,2));
 if(errors.length)throw new Error(errors.join('\n'));
 await browser.close();
+
