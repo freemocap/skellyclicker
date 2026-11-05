@@ -55,6 +55,7 @@ class Project(Model):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     recording_manifests: list[str]
     target_manifests: list[str]
+    sample_result: str | None = None
 
 class CreateProject(Model):
     project_path: str
@@ -152,5 +153,5 @@ def open_project(path: Path) -> dict:
     return {"root": str(root), "manifest_path": str(manifest), "project": project.model_dump(mode="json"),
         "recordings": [r.model_dump(mode="json") for r in recordings],
         "targets": [t.model_dump(mode="json") for t in targets], "issues": issues,
-        "sample_state": "not_prepared", "playback": None}
+        "sample_state": "prepared" if project.sample_result else "not_prepared", "playback": None}
 

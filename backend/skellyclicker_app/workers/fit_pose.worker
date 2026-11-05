@@ -1,0 +1,83 @@
+"""Standalone FoundationPose adapter; fresh inputs only, explicit demonstration mask preset."""
+print('Starting standalone fit_pose worker', flush=True)
+import json,os,sys,time,hashlib,importlib.metadata
+from pathlib import Path
+request=json.loads(Path(sys.argv[1]).read_text());out=Path(request['output'])
+handle=os.add_dll_directory(request['runtime']['pose_dlls'])
+os.environ['PATH']=request['runtime']['pose_dlls']+os.pathsep+os.environ['PATH']
+import numpy as np,cv2,trimesh,moderngl,onnxruntime as ort
+ort.preload_dlls(directory=request['runtime']['pose_dlls']);ort.set_default_logger_severity(3)
+from spatialhub import FoundationPose
+from spatialhub.utils.mesh import scale_mesh,center_mesh
+cal=json.loads((out/'calibration.json').read_text());samples=json.loads((out/'samples.json').read_text())
+K=np.array(cal['left']);Kr=np.array(cal['right']);extr=np.linalg.inv(cal['T_left_from_right_m'])
+mesh=trimesh.load_mesh(request['stl']);mesh=mesh.simplify_quadric_decimation(face_count=10000)
+_,offset=center_mesh(scale_mesh(mesh.copy(),model_unit=request['stl_units']))
+original_to_center=np.eye(4);original_to_center[:3,3]=offset
+(out/'geometry.json').write_text(json.dumps({'source_units':request['stl_units'],'source_sha256':request['target_sha256'],'T_centered_from_original_m':original_to_center.tolist(),'meaning':'Convert original STL vertices to metres, then apply this centering matrix; original-STL poses already include it.','simplified_faces':len(mesh.faces)},indent=2))
+context=moderngl.create_standalone_context(require=430)
+engine=FoundationPose(intrinsics=K,model=mesh,model_unit=request['stl_units'],glctx=context,providers=['CUDAExecutionProvider'])
+
+def emit(**value): print('SKELLY_PROGRESS '+json.dumps(value,allow_nan=False),flush=True)
+def mask_for(image,depth):
+    # Explicit per-run recording fixture preset, never the arbitrary-STL model definition.
+    hsv=cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
+    broad=cv2.inRange(hsv,(17,170,110),(39,255,255));seed=cv2.inRange(hsv,(17,160,130),(39,255,255))
+    _,labels,stats,_=cv2.connectedComponentsWithStats(broad);best=0;score=0
+    for index,(x,y,w,h,area) in enumerate(stats[1:],1):
+        if not(150<area<24000 and 10<w<250 and 10<h<250 and .2<w/h<5 and x>1 and y>1 and x+w<image.shape[1]-1 and y+h<image.shape[0]-1):continue
+        cut=(slice(y,y+h),slice(x,x+w));pixels=labels[cut]==index
+        z=depth[cut][pixels];z=z[(z>.17)&(z<1.8)]
+        if len(z)<.3*area or not 100<area*np.median(z)**2<1100:continue
+        n=np.count_nonzero(seed[cut][pixels]);rank=n*n/area
+        if n>.28*area and rank>score:best=index;score=rank
+    return labels==best if best else np.zeros(broad.shape,bool)
+def yellow(image):return cv2.inRange(cv2.cvtColor(image,cv2.COLOR_BGR2HSV),(17,170,110),(39,255,255))>0
+def render(matrix,intrinsics,shape):
+    h,w=shape;return engine.renderer.render(intrinsics,h,w,matrix[None].astype('f4'),(w,h))[1].squeeze()
+def iou(a,b):return float(np.count_nonzero(a&b)/max(1,np.count_nonzero(a|b)))
+pose=None;last_global=-100;fail=0;last_mask=None;last_z=None;rows=[]
+try:
+ for index,sample in enumerate(samples):
+    if (out/'cancel').exists():raise InterruptedError('Preparation cancelled')
+    frame=sample['source_frame'];tag=f'{frame:06d}';folder=out/'frames'
+    left=cv2.imread(str(folder/f'{tag}-left.png'));right=cv2.imread(str(folder/f'{tag}-right.png'))
+    raw=np.load(folder/f'{tag}-depth.npy',allow_pickle=False);depth=np.where(np.isfinite(raw)&(raw>0),raw,0)
+    mask=mask_for(left,depth);cv2.imwrite(str(folder/f'{tag}-mask.png'),mask.astype('uint8')*255)
+    row={**sample,'status':'no_mask','accepted':False,'reason':'No usable mask from explicit recording color preset','method':None}
+    rendered=[np.zeros_like(depth),np.zeros_like(depth)]
+    if mask.any():
+        yy,xx=np.where(mask&(depth>0));point=np.array([np.median(xx),np.median(yy)]);z0=float(np.median(depth[yy,xx]))
+        rgb=cv2.cvtColor(left,cv2.COLOR_BGR2RGB)
+        if pose is None or(fail>=2 and frame-last_global>=6):
+            engine.reset_tracking();pose=engine.register(rgb=rgb,depth=depth,mask=mask,iteration=2).pose[0];method='register';last_global=frame
+        else:
+            initial=pose.copy()
+            if last_mask is not None and np.linalg.norm(point-last_mask)<160:
+                initial[:2,3]+=(point-last_mask)*initial[2,3]/np.array([K[0,0],K[1,1]])
+                initial[2,3]+=np.clip(z0-last_z,-.04,.04)
+            engine.current_pose=initial;pose=engine.track(rgb=rgb,depth=depth,iteration=3).pose[0];method='track'
+        row.update(method=method,status='rejected',reason='Invalid pose')
+        if np.isfinite(pose).all() and pose[2,3]>0:
+            row['candidate_centered_pose_m']=pose.tolist();row['T_left_from_stl_m']=(pose@original_to_center).tolist();row['T_right_from_stl_m']=(extr@pose@original_to_center).tolist()
+            rendered=[render(pose,K,depth.shape),render(extr@pose,Kr,depth.shape)];ml=rendered[0]>0;mr=rendered[1]>0
+            common=mask&ml&(depth>0);n=int(common.sum());coverage=n/max(1,int(mask.sum()))
+            error=float(np.median(abs(depth[common]-rendered[0][common]))*1000) if n else None
+            _,labels,_,_=cv2.connectedComponentsWithStats(yellow(right).astype('uint8'));counts=np.bincount(labels[mr]) if mr.any() else np.array([0]);counts[0]=0
+            right_mask=labels==counts.argmax() if counts.max()>0 else np.zeros_like(mr)
+            il,ir=iou(ml,mask),iou(mr,right_mask);yl=float(yellow(left)[ml].mean()) if ml.any() else 0;yr=float(yellow(right)[mr].mean()) if mr.any() else 0
+            accepted=il>=.78 and ir>=.72 and min(yl,yr)>=.8 and n>=100 and coverage>=.5 and error is not None and error<5
+            row.update(accepted=bool(accepted),status='accepted' if accepted else 'rejected',reason='Passed configured pilot gates' if accepted else 'Stereo or depth gate',left_iou=il,right_iou=ir,median_abs_depth_mm=error,depth_coverage=coverage,common_depth_px=n,left_mask_fraction=yl,right_mask_fraction=yr)
+        else:pose=None
+        fail=0 if row['accepted'] else fail+1;last_mask,last_z=point,z0
+    else:pose=None;last_mask=None;fail=0;engine.reset_tracking()
+    for view,image,z in [('left',left,rendered[0]),('right',right,rendered[1])]:
+        preview=image.copy();contours,_=cv2.findContours((z>0).astype('uint8'),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(preview,contours,-1,(80,255,80) if row['accepted'] else (40,150,255),2)
+        cv2.putText(preview,f'Source {frame} | {row["status"]} | FP candidate, not approved',(20,35),cv2.FONT_HERSHEY_SIMPLEX,.7,(255,255,255),2)
+        cv2.imwrite(str(folder/f'{tag}-{view}-candidate.png'),preview)
+    rows.append(row)
+    (out/'candidates.json').write_text(json.dumps(rows,allow_nan=False))
+    emit(stage='fit',completed=index+1,total=len(samples),source_frame=frame,status=row['status'],accepted=sum(r['accepted'] for r in rows))
+ (out/'pose-software.json').write_text(json.dumps({'python':sys.version,'spatialhub':importlib.metadata.version('spatialhub'),'onnxruntime':ort.__version__,'available_providers':ort.get_available_providers(),'requested_provider':'CUDAExecutionProvider','numpy':np.__version__,'opencv':cv2.__version__,'trimesh':trimesh.__version__,'mask_preset':request['mask_preset'],'limitations':['Right IoU mask is selected using the pose projection; it is pose-conditioned evidence.','5mm depth gate is a pilot heuristic, not camera accuracy.','Color/area/depth mask parameters are specific to this demonstration recording.']},indent=2))
+finally: context.release()

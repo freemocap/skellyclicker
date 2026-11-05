@@ -7,6 +7,7 @@ from freemocap_sdk.server import Connection, create_app
 from freemocap_sdk.logs import LogHub
 
 from .project_routes import router as project_router
+from .preparation import router as preparation_router, shutdown_jobs
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger("skellyclicker")
@@ -44,6 +45,7 @@ def build_app():
             yield
         finally:
             logger.info("SkellyClicker backend shutting down")
+            shutdown_jobs()
             for destination in destinations:
                 destination.removeHandler(hub)
             logger.setLevel(previous_level)
@@ -62,7 +64,7 @@ def build_app():
 
     return create_app(
         title="SkellyClicker",
-        routers=(router, project_router),
+        routers=(router, project_router, preparation_router),
         lifespan=lifespan,
         allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,

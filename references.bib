@@ -6,3 +6,17 @@
   review = {Local source inspected: native/tauri.conf.json, native/src/application/startup.rs, native/Cargo.toml and tools/tauri.ts},
   claim = {Use a native Tauri project and defer webview creation until managed application state exists; this source does not implement a bundled Python sidecar}
 }
+@misc{spatialhubLocalPoseAdapter,
+  title = {SpatialHub 0.1.7 installed FoundationPose adapter and mesh utilities},
+  url = {file:///C:/Users/jonma/AppData/Local/ZEDBenchy/pose-env/Lib/site-packages/spatialhub/},
+  urldate = {2026-11-05},
+  review = {Installed local source inspected; models/foundationpose/adapter.py SHA256 439381b700dfba750bbc39a5f01f7689dc58ea460efbff221bd7e70061c51a9a; utils/mesh.py SHA256 d97c537ab06f4779905e43cfe0793f44fb4fae9ef81d9fd41287c61626bf9123; no claim of upstream revision verification},
+  claim = {The runtime scales authored geometry into metres and centers its bounding box; original-STL poses must include that centering transform}
+}
+@misc{zedBenchyLocalFoundationPose,
+  title = {Local ZED and FoundationPose proof of concept},
+  url = {file:///C:/Users/jonma/AppData/Local/ZEDBenchy/fp_engine.py},
+  urldate = {2026-11-05},
+  review = {Read-only local source inspection of the external DLL setup, mesh simplification, ModernGL context and FoundationPose construction; demonstration outputs were not imported},
+  claim = {Established runtime configuration supplies the starting point for a parameterized fresh-input worker; demonstration color segmentation is recording-specific}
+}

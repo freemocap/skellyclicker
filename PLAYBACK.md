@@ -84,3 +84,17 @@ The active workspace is a semantic Project tab. Isolated interaction validation:
 `skellyclicker-ui/tests/native-project-picker.mjs`. The isolated test stubs only
 native endpoint discovery and uses the real backend/socket; it does not operate
 the user's native window.
+
+## Fresh preparation review slice
+
+The Project screen can prepare a bounded range (1–60 source frames) from its linked SVO, then review synchronized rectified images, depth, masks and candidate outlines. The application runs ZED replay and FoundationPose sequentially in explicitly configured external runtimes. The visible mask preset is specific to the current demonstration recording; it is not an arbitrary-object segmentation implementation. Geometry comes from the project's STL snapshot and authored units. The adapter follows the established local runtime setup [@zedBenchyLocalFoundationPose].
+
+SpatialHub converts mesh units to metres and centers geometry. The worker records that transform and writes both original-STL-to-left-camera and original-STL-to-right-camera matrices [@spatialhubLocalPoseAdapter]. Rectified intrinsics, stereo extrinsics and source image timestamps are queried during fresh replay. Depth is a NEURAL replay estimate. Pilot gate passes are machine candidates, never human approval; the right-camera mask agreement is pose-conditioned and the 5 mm depth threshold is a heuristic.
+
+Each attempt writes into a new project `working/preparation/<id>` directory. Cancellation affects only its child process tree. External workers receive null stdin so they cannot inherit the desktop backend's lifecycle control pipe. The frozen backend temporarily clears its DLL search directory for external startup and restores it afterward. SDK package data collection includes both `.worker` sources.
+
+Successful output publishes an immutable `results/<recording>/<attempt>/r001` directory with hashed inventory, calibration, geometry, software and worker provenance, exact int64 timing Parquet, and candidate Parquet. The project `sample_result` selects the result. JSON summaries and PNGs support review; Parquet holds authoritative numerical rows. Rejected candidates remain inspectable. Failed/cancelled attempts remain on disk and are not resumed automatically. Closing/reopening loads the selected published result, not an interrupted job.
+
+This slice provides image-sequence review, not encoded video, full 3D playback, point clouds, manual label approval or training. Runtime paths can be configured with `SKELLYCLICKER_ZED_RUNTIME`, `SKELLYCLICKER_ZED_SDK_BIN`, and `SKELLYCLICKER_POSE_DLLS`. Runtime availability is reported by `/api/preparation/runtime`; the application reports job failures in its live terminal.
+
+Validation: `python -m unittest discover -s backend/tests -p test_preparation.py` checks range bounds, preservation of later poses when the initial row has none, and exact nanosecond storage. From `skellyclicker-ui`, `node tests/preparation-controls.mjs` uses a separate installed Edge session and the running native backend to verify reopening, frame/view selection and completion loading. `node tests/native-fresh-samples.mjs` passively captures native image evidence. `node tests/start-fresh-preparation.mjs` intentionally starts a new real job; do not treat it as a harmless unit test.

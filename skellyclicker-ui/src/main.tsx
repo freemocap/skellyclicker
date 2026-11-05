@@ -7,6 +7,7 @@ import {stateKind} from './state-message';
 import {AppShell} from './AppShell';
 import {resolveBackendUrl} from './config';
 import './shell.css';
+import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
 
 function App({backendUrl}: {backendUrl: string}) {
@@ -59,7 +60,7 @@ function App({backendUrl}: {backendUrl: string}) {
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
-    <PlaybackWorkspace baseUrl={backendUrl} recording={null} showTimingNotice={false}/>
+    {project?<PreparationPanel baseUrl={backendUrl} project={project}/>:<PlaybackWorkspace baseUrl={backendUrl} recording={null} showTimingNotice={false}/>}
   </AppShell>;
 }
 

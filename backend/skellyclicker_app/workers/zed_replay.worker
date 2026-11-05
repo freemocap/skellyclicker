@@ -1,0 +1,55 @@
+"""Standalone ZED replay worker; executed only in configured ZED Python environment."""
+print('Starting standalone zed_replay worker', flush=True)
+import json, os, sys
+from pathlib import Path
+import importlib.metadata
+request=json.loads(Path(sys.argv[1]).read_text())
+out=Path(request['output']);out.mkdir(exist_ok=True)
+handles=[]
+for directory in request['runtime']['zed_dlls']:
+    handles.append(os.add_dll_directory(directory))
+    os.environ['PATH']=directory+os.pathsep+os.environ['PATH']
+import pyzed.sl as sl
+import cv2
+import numpy as np
+
+def emit(**value): print('SKELLY_PROGRESS '+json.dumps(value,allow_nan=False),flush=True)
+def save(name,value): (out/name).write_text(json.dumps(value,indent=2,allow_nan=False))
+def cancelled():
+    if (out/'cancel').exists(): raise InterruptedError('Preparation cancelled')
+
+camera=sl.Camera();parameters=sl.InitParameters()
+parameters.set_from_svo_file(request['source_svo']);parameters.svo_real_time_mode=False
+parameters.coordinate_units=sl.UNIT.METER;parameters.depth_mode=sl.DEPTH_MODE.NEURAL
+error=camera.open(parameters)
+if error!=sl.ERROR_CODE.SUCCESS: raise RuntimeError(f'ZED open failed: {error}')
+try:
+    info=camera.get_camera_information();config=info.camera_configuration;c=config.calibration_parameters
+    total=camera.get_svo_number_of_frames();start=request['start_frame'];count=request['frame_count']
+    if start+count>total: raise ValueError(f'Requested range exceeds {total} source frames')
+    K=lambda v:[[v.fx,0,v.cx],[0,v.fy,v.cy],[0,0,1]]
+    calibration={'schema_version':1,'recording_id':request['recording_id'],'source_sha256':request['source_sha256'],'serial':info.serial_number,'source_frame_count':total,'nominal_fps':config.fps,'image_width':config.resolution.width,'image_height':config.resolution.height,'clock_id':'zed-image-clock','timestamp_unit':'ns','camera_axes':'x right, y down, z forward','depth_units':'m','depth_method':'ZED NEURAL replay estimate','rectified':True,'left':K(c.left_cam),'right':K(c.right_cam),'T_left_from_right_m':c.stereo_transform.m.tolist(),'zed_sdk_version':sl.Camera.get_sdk_version()}
+    save('calibration.json',calibration)
+    frames=out/'frames';frames.mkdir(exist_ok=True)
+    left,right,depth=sl.Mat(),sl.Mat(),sl.Mat();samples=[]
+    camera.set_svo_position(start)
+    for offset in range(count):
+        cancelled();error=camera.grab()
+        if error!=sl.ERROR_CODE.SUCCESS: raise RuntimeError(f'ZED grab failed: {error}')
+        frame=camera.get_svo_position()
+        if frame!=start+offset: raise ValueError(f'Source frame mismatch: expected {start+offset}, got {frame}')
+        timestamp=camera.get_timestamp(sl.TIME_REFERENCE.IMAGE).get_nanoseconds()
+        if samples and timestamp<=samples[-1]['timestamp_ns']: raise ValueError('Source image clock is not increasing')
+        for result in (camera.retrieve_image(left,sl.VIEW.LEFT),camera.retrieve_image(right,sl.VIEW.RIGHT),camera.retrieve_measure(depth,sl.MEASURE.DEPTH)):
+            if result!=sl.ERROR_CODE.SUCCESS: raise RuntimeError(f'ZED retrieval failed: {result}')
+        for view,image in [('left',left),('right',right)]:
+            if not cv2.imwrite(str(frames/f'{frame:06d}-{view}.png'),image.get_data()[:,:,:3],[cv2.IMWRITE_PNG_COMPRESSION,1]):raise RuntimeError('Image write failed')
+        z=depth.get_data().copy();np.save(frames/f'{frame:06d}-depth.npy',z)
+        valid=np.isfinite(z)&(z>0)
+        preview=cv2.applyColorMap((255*(1-np.clip(np.where(valid,z,2),.15,2)/2)).astype('uint8'),cv2.COLORMAP_TURBO);preview[~valid]=0
+        cv2.imwrite(str(frames/f'{frame:06d}-depth.png'),preview)
+        samples.append({'source_frame':frame,'timestamp_ns':timestamp,'camera_ids':['left','right']})
+        emit(stage='replay',completed=offset+1,total=count,source_frame=frame)
+    save('samples.json',samples)
+    save('replay-software.json',{'python':sys.version,'zed_sdk':sl.Camera.get_sdk_version(),'numpy':np.__version__,'opencv':cv2.__version__})
+finally: camera.close()
