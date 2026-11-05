@@ -176,3 +176,9 @@ skellyclicker/.DS_Store
 .DS_Store
 .vscode/settings.json
 CLAUDE.md
+
+# Playback application build and verification outputs
+/skellyclicker-ui/node_modules/
+/skellyclicker-ui/dist/
+/.test-artifacts/
+/backend/.venv/

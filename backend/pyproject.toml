@@ -1,0 +1,19 @@
+[project]
+name = "skellyclicker-app"
+version = "0.1.0"
+description = "SkellyClicker playback application"
+requires-python = ">=3.11"
+dependencies = ["freemocap-sdk-server", "fastapi>=0.115"]
+
+[project.scripts]
+skellyclicker-playback = "skellyclicker_app.__main__:main"
+
+[tool.uv.sources]
+freemocap-sdk-server = {path = "../../../project/repos/sdk/packages/server", editable = true}
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["skellyclicker_app"]
