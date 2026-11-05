@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SkellyClicker",
+  "version": "0.1.0",
+  "identifier": "org.freemocap.skellyclicker",
+  "build": {
+    "beforeDevCommand": {"script": "npm run dev", "cwd": "../skellyclicker-ui"},
+    "devUrl": "http://127.0.0.1:5176",
+    "beforeBuildCommand": {"script": "npm run build", "cwd": "../skellyclicker-ui"},
+    "frontendDist": "../skellyclicker-ui/dist"
+  },
+  "app": {
+    "windows": [{"label": "main", "create": false, "title": "SkellyClicker", "width": 1440, "height": 960, "minWidth": 900, "minHeight": 600}],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:*; font-src 'self' data:; media-src 'self' blob: http://127.0.0.1:*; worker-src 'self' blob:; connect-src ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "resources": {"binaries/skellyclicker-backend/": "backend/"},
+    "icon": ["icons/icon.ico", "icons/icon.png"]
+  }
+}

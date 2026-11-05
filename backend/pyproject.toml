@@ -3,7 +3,7 @@ name = "skellyclicker-app"
 version = "0.1.0"
 description = "SkellyClicker playback application"
 requires-python = ">=3.11"
-dependencies = ["freemocap-sdk-server", "fastapi>=0.115"]
+dependencies = ["freemocap-sdk-server[bundle]", "fastapi>=0.115"]
 
 [project.scripts]
 skellyclicker-playback = "skellyclicker_app.__main__:main"

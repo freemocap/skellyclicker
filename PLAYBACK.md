@@ -1,54 +1,45 @@
-# SkellyClicker playback shell
+# Desktop playback application
 
-This first milestone runs the original Core-derived playback components through public SDK packages, with SkellyClicker branding and a separate backend. It opens an **empty playback workspace**: no recording selector/resource adapter, real video playback, labeling, training or pose editing is delivered in this milestone. The legacy labeling application and its environment remain separate.
+## Source and package boundaries
 
-## Launch
+The app consumes SDK packages through public imports. `@freemocap/ui` owns Core-derived playback controls, synchronized-video presentation, Parquet decoding and the original offscreen 3D worker. `@freemocap/client` owns HTTP/self-describing CBOR transport and image decoding. The Python SDK owns server composition, encoding, desktop readiness/shutdown and bundling. The Rust `freemocap-desktop` crate owns the child process lifetime.
 
-Requires Node 22 or newer, uv, and the sibling SDK checkout at `../../project/repos/sdk`. Build the SDK's client and UI packages with their documented `npm ci --ignore-scripts` and `npm run build` commands first. The Python SDK server is installed as an editable package by the backend configuration.
+SkellyClicker owns its Tauri identity/window/icons, product shell, `/api/status`, `skellyclicker_state` message schema and backend entry point. The native window is deferred until the SDK reports a ready owned backend, following SkellySpeak's state-before-webview startup pattern [@skellyspeakDesktopReference]. SkellySpeak's backend is not a Python sidecar; that reusable support is supplied by the SDK.
 
-From this repository, in two terminals:
+Local npm `file:`, uv editable and Cargo path dependencies point to `../../project/repos/sdk`. No private source aliases or runtime imports from `old/` are used. Replace local package references with versioned SDK artifacts when published.
 
-```powershell
-cd backend
-uv sync --locked
-uv run skellyclicker-playback
-```
+## Development setup
 
-```powershell
-cd skellyclicker-ui
-npm ci --ignore-scripts
-npm run dev
-```
+Windows prerequisites are Node22+, uv, Rust/MSVC and WebView2. Existing installations were verified on this machine; no system-wide prerequisite installation was performed.
 
-Open http://127.0.0.1:5176. Stop each process with Ctrl+C in its terminal.
+1. In each SDK `packages/client` and `packages/ui`, run its documented `npm ci --ignore-scripts` and `npm run build`.
+2. In `skellyclicker-ui`, run `npm ci --ignore-scripts`.
+3. In `backend`, run `uv sync --locked`.
+4. From this repository root, run `node tools/desktop.mjs dev --no-watch`.
 
-The backend defaults to `127.0.0.1:8006`, distinct from Core's current default `53117`. Override it with `--port` or `SKELLYCLICKER_PORT`; set the frontend's matching endpoint with `VITE_SKELLYCLICKER_BACKEND_URL`. The app binds locally and never kills another server to claim its port. Frontend origin port5176 is explicitly allowed by the app's backend CORS/WebSocket configuration.
+The desktop wrapper runs the SDK PyInstaller onedir bundler before Tauri. Its output includes Python and required packages, then Tauri maps the whole directory to bundled `backend/` resources. The SDK starts this hidden child, announces readiness only after ASGI startup and socket binding, and closes it on app exit. The native window obtains its endpoint through `backend_url`; HTTP and WebSocket remain the application transport.
 
-## Package boundary
+Desktop backend uses an available loopback port, distinct from Core's current default53117 in verified runs. It never kills or attaches to another service. The browser-only diagnostic entry remains `uv run skellyclicker-playback` (default8006, configurable) and `npm run dev` (5176); it is not the user distribution.
 
-The frontend imports `PlaybackWorkspace` and `styles.css` from `@freemocap/ui`, and HTTP/transport helpers from `@freemocap/client`. The SDK owns playback controls, synchronized video presentation, Parquet decoding and the original offscreen 3D worker. SkellyClicker owns branding, navigation, server configuration, `/api/status` and its independently validated `skellyclicker_state` messages.
+## Windows distribution
 
-Local npm `file:` dependencies and the uv editable source enable parallel SDK development. Vite excludes the UI package from prebundling and permits its installed built-asset directory so workers/fonts resolve. There are no private Core/SDK source aliases. Versioned package artifacts can replace local development dependencies later.
+Run `node tools/desktop.mjs build` from the repository root. This builds the frontend, native application and NSIS installer with the backend resources. The release executable was copied with its bundled backend to an independent portable directory and verified with no dev server. Its WebView served http://tauri.localhost/, obtained its owned backend through IPC, passed HTTP/WS and image decoding, and closed both processes with the window. No signing, public release upload or other-platform verification is included in this local milestone.
 
 ## Verification
 
-With both servers running, from `skellyclicker-ui`:
+- `backend/.venv/Scripts/python.exe -B backend/tests/check_lifecycle.py`: actual SDK runner startup, HTTP and graceful signal shutdown/port release.
+- `npm run test:backend` from the frontend: HTTP identity and two independently validated binary state updates (requires diagnostic backend8006).
+- `node tests/inspect-shell.mjs`: branding, empty playback canvas, original worker and absence of capture navigation/browser errors (requires UI5176/backend8006).
+- `node tests/image-roundtrip.mjs`: real JPEG through Python SDK CBOR packing, JS unpacking and browser SDK pixel decode (requires frontend dev server).
+- `node tests/inspect-native.mjs`: actual Tauri WebView, backend IPC discovery, HTTP/WS status and SDK image decode; attach through test-only local WebView CDP. `SKELLYCLICKER_NATIVE_LABEL` separates evidence files.
+- `backend/.venv/Scripts/python.exe -B tools/check_references.py`: source-reference validation.
 
-```powershell
-npm run build
-npm run test:backend
-node tests/inspect-shell.mjs
-node tests/image-roundtrip.mjs
-```
+Screenshots and reports live in ignored `.test-artifacts/`. Native development evidence is separate from built/installed distribution evidence. The delivered UI is an empty workspace, not verified loaded-recording playback. Large renderer/Parquet bundle warnings remain; no worker/performance redesign was introduced.
 
-From the repository root:
+Verified artifacts:
+- `native/target/release/bundle/portable/SkellyClicker_0.1.0_windows_x64.zip` (launch-tested portable directory; unzip and open SkellyClicker/skellyclicker.exe).
+- `native/target/release/bundle/nsis/SkellyClicker_0.1.0_x64-setup.exe` (built, unsigned, not installed during this check).
 
-```powershell
-backend/.venv/Scripts/python.exe -B backend/tests/check_lifecycle.py
-```
+Evidence: `.test-artifacts/native-dev.json/.png` records development mode; `.test-artifacts/native-portable.json/.png` records the built WebView and image result; `.test-artifacts/native-portable-shutdown.json` records normal close, owned process exit and port release. All test windows and task-owned servers were closed afterward. Desktop runtime does not need the source checkout, Python environment or npm server.
 
-Browser checks use installed Microsoft Edge by default; set `SKELLYCLICKER_BROWSER_CHANNEL` to another installed Playwright-supported channel if needed. The screenshot is saved under ignored `.test-artifacts/playback-shell.png`.
-
-Verified on Windows: HTTP identity; initial and request-response binary state updates through SDK validation; a real JPEG through Python CBOR/image packing, JS unpacking and browser pixel decoding; actual SDK runner startup, graceful signal shutdown and port release; visible branding, playback controls and worker canvas without capture navigation or browser errors; production build including both worker assets. Pillow is a test-only dependency for producing the image fixture in memory.
-
-Visual review compared the rendered shell with Core's playback layout source and existing playback screenshot: shared theme/fonts, sidebar/content proportions, video/3D division and timeline controls are retained. The product sidebar is intentionally limited to branding and an empty recording section; Core calibration/processing controls are not wired. This is not pixel-identical Core or evidence of loaded-recording playback. Large renderer/Parquet worker bundle warnings remain; no performance redesign was introduced.
+SDK integration baseline: `freemocap/sdk` commit `eacdc6f6f9ec737a48892fd68513e7954f4fb0e3` on `sfn26`; app tests exercised the editable sources that became that commit. The package manifests and lockfiles retain the local development links.

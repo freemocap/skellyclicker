@@ -26,6 +26,6 @@ def build_app():
     return create_app(
         title="SkellyClicker",
         routers=(router,),
-        allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176"),
+        allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,
     )

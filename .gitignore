@@ -19,3 +19,8 @@ __pycache__/
 # Current editor metadata may be recreated by an open IDE.
 /.idea/
 /old/local-editor-state/
+
+# Native desktop build outputs
+/native/target/
+/native/binaries/
+/native/gen/
