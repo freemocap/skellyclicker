@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<module external.system.id="pyproject.toml" type="PYTHON_MODULE" version="4">
-  <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$/old" />
-    <orderEntry type="jdk" jdkName="Python 3.10 virtualenv at C:\Users\jonma\github_repos\freemocap_organization\skellyclicker\.venv" jdkType="Python SDK" />
-    <orderEntry type="sourceFolder" forTests="false" />
-  </component>
-</module>
