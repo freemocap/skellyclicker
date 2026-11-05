@@ -6,20 +6,21 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:backend": "node --test tests/backend.integration.test.mjs"
   },
   "dependencies": {
     "@freemocap/client": "file:../../../project/repos/sdk/packages/client",
+    "@freemocap/ui": "file:../../../project/repos/sdk/packages/ui",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "@freemocap/ui": "file:../../../project/repos/sdk/packages/ui"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "4.3.3",
+    "@vitejs/plugin-react": "4.7.0",
     "typescript": "5.9.3",
-    "vite": "7.3.1"
+    "vite": "7.3.7"
   },
   "engines": {
     "node": ">=22"
