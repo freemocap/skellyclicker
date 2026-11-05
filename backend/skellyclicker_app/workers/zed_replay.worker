@@ -20,6 +20,7 @@ def cancelled():
 
 camera=sl.Camera();parameters=sl.InitParameters()
 parameters.set_from_svo_file(request['source_svo']);parameters.svo_real_time_mode=False
+parameters.coordinate_system=sl.COORDINATE_SYSTEM.IMAGE
 parameters.coordinate_units=sl.UNIT.METER;parameters.depth_mode=sl.DEPTH_MODE.NEURAL
 error=camera.open(parameters)
 if error!=sl.ERROR_CODE.SUCCESS: raise RuntimeError(f'ZED open failed: {error}')

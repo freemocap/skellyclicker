@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from freemocap_sdk.storage import atomic_json, inventory, resolve_relative, project_lock, publish_directory, file_digest
-from .projects import Project, Recording, read_model, open_project
+from .projects import Project, Recording, read_model, open_project, recording_structure
 
 router = APIRouter(prefix='/api/preparation')
 logger = logging.getLogger('skellyclicker.preparation')
@@ -122,7 +122,7 @@ def publish_result(job):
     atomic_json(output/'summary.json',summary)
     atomic_json(output/'provenance.json',{'request':request,'worker_sha256':{name:file_digest(job['work']/(name+'.py')) for name in ('zed_replay','fit_pose')},'replay':json.loads((output/'replay-software.json').read_text()),'pose':json.loads((output/'pose-software.json').read_text())})
     atomic_json(output/'manifest.json',{'schema_version':1,'descriptor':descriptor,'numerical_authority':['candidates.parquet','timing.parquet'],'derived_review_index':'summary.json','files':{k:v.model_dump() for k,v in inventory(output).items()}})
-    root=job['root'];relative=f"results/{request['recording_id']}/{job['status']['job_id']}/r001"
+    root=job['root'];relative=(recording_structure(root,request["recording_id"]).application_dir("skellyclicker")/"results"/job["status"]["job_id"]/"r001").relative_to(root).as_posix()
     destination=resolve_relative(root,relative);destination.parent.mkdir(parents=True,exist_ok=True)
     with project_lock(root):
         if job['cancel'].is_set(): raise InterruptedError('Preparation cancelled before publication')
@@ -139,7 +139,11 @@ def publish_result(job):
 
 def execute(job):
     try:
-        update(job,state='running',stage='replay')
+        update(job,state='running',stage='materializing full stereo inputs')
+        from .recording_layout import ensure_recording_inputs
+        recording=read_model(recording_structure(job['root'],job['request']['recording_id']).stereo_manifest_path,Recording)
+        ensure_recording_inputs(job['root'],recording,cancel=job['cancel'])
+        update(job,stage='replay')
         run_worker(job,'zed_replay',job['request']['runtime']['zed_python'])
         update(job,stage='fit',completed=0)
         run_worker(job,'fit_pose',job['request']['runtime']['pose_python'])
@@ -158,7 +162,7 @@ def start(request: PreparationRequest):
         if view['issues']: raise HTTPException(422,view['issues'])
         if len(view['recordings'])!=1 or len(view['targets'])!=1: raise HTTPException(422,'Select a project with one recording and one target for this first preparation workflow')
         root=Path(view['root']);recording=view['recordings'][0];target=view['targets'][0]
-        job_id='sample-'+uuid4().hex[:12];work=root/'working/preparation'/job_id;output=work/'output';output.mkdir(parents=True)
+        job_id='sample-'+uuid4().hex[:12];work=recording_structure(root,recording['recording_id']).application_dir('skellyclicker')/'working/preparation'/job_id;output=work/'output';output.mkdir(parents=True)
         config={**request.model_dump(),'recording_id':recording['recording_id'],'source_svo':recording['source']['path'],'source_sha256':recording['source']['sha256'],'stl':str(resolve_relative(root,target['geometry']['path'])),'target_sha256':target['geometry']['sha256'],'stl_units':target['authored_units'],'mask_preset':'benchy_recording_hsv_v1','runtime':runtime_config(),'output':str(output)}
         atomic_json(work/'request.json',config)
         job={'root':root,'manifest':Path(view['manifest_path']),'work':work,'output':output,'request':config,'status':{'job_id':job_id,'state':'queued','stage':'queued','completed':0,'total':request.frame_count},'cancel':threading.Event(),'process':None}

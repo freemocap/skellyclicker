@@ -15,9 +15,9 @@ from freemocap_sdk.recording import (RecordingTimeline, RecordingChannel, Channe
     PlaybackMedia, PlaybackManifest, RecordingResources, write_playback, create_recording_router)
 from skellyforge.core.skeleton.stl_rigid_body import build_stl_rigid_body
 from skellyforge.core.math.geometry.rotation_quaternion import RotationQuaternion
-from skellyforge.core.math.geometry.coordinate_systems.coordinate_system_registry import CoordinateSystemRegistry
-from skellyforge.core.math.geometry.coordinate_systems.coordinate_system_transform import CoordinateSystemTransform
-from .projects import Project, Target, read_model
+from skellyforge.core.math.geometry.coordinate_systems import (
+    AnatomicalDirection, CoordinateSystemConvention, CoordinateSystemRegistry, CoordinateSystemTransform)
+from .projects import Project, Target, read_model, recording_structure
 
 logger=logging.getLogger('skellyclicker.playback')
 _registered: dict[str, RecordingResources]={}
@@ -32,16 +32,20 @@ def register_project(root: Path, project: Project):
     if not project.playback_result: return None
     folder=resolve_relative(root,project.playback_result)
     manifest=PlaybackManifest.model_validate_json((folder/'playback.json').read_text())
-    media={m.video_filename:folder/m.video_filename for r in manifest.runs for m in r.media}
+    locations=json.loads((folder/'media.json').read_text(encoding='utf-8'))
+    media={m.video_filename:resolve_relative(root,locations[m.video_filename]) for r in manifest.runs for m in r.media}
     _registered[manifest.recording_id]=RecordingResources(manifest=manifest,parquet=folder/'display.parquet',videos=media)
     return {'id':manifest.recording_id,'displayName':f'{project.project_id} - fresh pose candidates'}
 
 
 def camera_to_world():
-    registry=CoordinateSystemRegistry.from_document(source='SkellyClicker rectified-camera boundary',document={'default':'blender','conventions':{
-        'blender':{'x_axis':'right','y_axis':'forward','z_axis':'up','handedness':'right','description':'Display world'},
-        'optical':{'x_axis':'right','y_axis':'down','z_axis':'forward','handedness':'right','description':'Rectified camera'}}})
-    return CoordinateSystemTransform(from_convention=registry.get(name='optical'),to_convention=registry.get(name='blender')).matrix
+    # Forge owns the canonical convention; only the camera I/O boundary is app-owned.
+    canonical = CoordinateSystemRegistry.from_default_yaml().default
+    optical = CoordinateSystemConvention(
+        name='rectified_optical', description='Rectified image camera coordinates',
+        x_direction=AnatomicalDirection.RIGHT, y_direction=AnatomicalDirection.DOWN,
+        z_direction=AnatomicalDirection.FORWARD)
+    return CoordinateSystemTransform(from_convention=optical, to_convention=canonical).matrix
 
 
 def convert_geometry(mesh, target):
@@ -78,6 +82,22 @@ def model_definition(rigid,local,vertices,faces,edges,model_id,color,opacity):
             'material':{'color':color,'opacity':opacity},'double_sided':True}]}],'excluded_origin_edges':[],'excluded_bones':[segment]}}
 
 
+def calibrated_cameras(cal, optical_to_world):
+    """Publish camera-to-world poses and their inverse optical extrinsics in mm."""
+    cameras=[]
+    for index,camera in enumerate(('left','right')):
+        world_from_camera=np.eye(4);world_from_camera[:3,:3]=optical_to_world
+        if camera=='right':
+            stereo=np.array(cal['T_left_from_right_m']);world_from_camera[:3,:3]=optical_to_world@stereo[:3,:3]
+            world_from_camera[:3,3]=optical_to_world@stereo[:3,3]*1000.
+        camera_from_world=np.linalg.inv(world_from_camera);K=np.array(cal[camera])
+        cameras.append({'id':camera,'index':index,'image_size':[cal['image_width'],cal['image_height']],
+            'intrinsics':{'fx':K[0,0],'fy':K[1,1],'cx':K[0,2],'cy':K[1,2],'k1':0.,'k2':0.,'p1':0.,'p2':0.},
+            'extrinsics':{'quaternion_wxyz':RotationQuaternion.from_rotation_matrix(matrix=camera_from_world[:3,:3]).as_array().tolist(),'translation':camera_from_world[:3,3].tolist()},
+            'world_position':world_from_camera[:3,3].tolist(),'world_orientation':world_from_camera[:3,:3].tolist()})
+    return cameras
+
+
 def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
     def check_cancelled():
         if cancelled(): raise InterruptedError("Playback preparation cancelled")
@@ -102,7 +122,11 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
         pose=np.array(row['T_left_from_stl_m']);poses[i]=np.eye(4)
         poses[i,:3,:3]=optical_to_world@pose[:3,:3]*source_to_mm
         poses[i,:3,3]=optical_to_world@pose[:3,3]*1000.
-    playback_id='playback-'+uuid4().hex[:12];work=root/'working/playback'/playback_id;work.mkdir(parents=True)
+    paths=recording_structure(root,authority['descriptor']['recording_id'])
+    extension=paths.application_dir('skellyclicker')
+    playback_id='playback-'+uuid4().hex[:12];work=extension/'working/playback'/playback_id;work.mkdir(parents=True)
+    scene_frame={'name':'blender_world','basis':'blender_x_right_y_forward_z_up','units':'mm',
+                 'alignment':None,'additional_transform':None}
     group='stereo';clock=RecordingTimeline(sensor_group=group,source='timing:'+group,frame_numbers=tuple(frames.tolist()),timestamps_s=tuple(times.tolist()))
     models=[];channels=[];samples=[];statics=[];sources={}
     for label,color,mask,reference in [('candidate_pass','#5ce69a',accepted,False),('candidate_rejected','#ffa244',~accepted,False),('authored_reference','#b99aff',np.ones(n,bool),True)]:
@@ -120,12 +144,12 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
             ('LANDMARKS_3D',rigid.feature_names,{'x':'mm','y':'mm','z':'mm'},positions),
             ('SEGMENT_ORIGINS',(rigid.segment_name,),{'x':'mm','y':'mm','z':'mm'},segment_poses[:,None,:3,3]),
             ('ROTATIONS_WORLD',(rigid.segment_name,),{'w':'1','x':'1','y':'1','z':'1'},quats)]:
-            channel=RecordingChannel(sensor_group=group,source=label,reference_frame='blender_world',kind=kind,names=names,components=components)
+            channel=RecordingChannel(sensor_group=group,source=label,reference_frame=scene_frame['name'],kind=kind,names=names,components=components)
             channels.append(channel);samples.append(ChannelSamples(run_id=0,channel=channel,frame_numbers=frames,timestamps_s=times,values=values))
         for kind,name,component in [('MODEL_SCALE','object','scale'),('SEGMENT_LENGTHS',rigid.segment_name,'length')]:
-            channel=RecordingChannel(sensor_group=group,source=label,reference_frame='blender_world',kind=kind,names=(name,),components={component:'mm'})
+            channel=RecordingChannel(sensor_group=group,source=label,reference_frame=scene_frame['name'],kind=kind,names=(name,),components={component:'mm'})
             statics.append({'channel':channel.model_dump(mode='json'),'values':{name:{component:rigid.reference_unit_mm}}})
-    media=[];fps=float(cal['nominal_fps']);ffmpeg=shutil.which('ffmpeg')
+    media=[];media_locations={};media_hashes={};fps=float(cal['nominal_fps']);ffmpeg=shutil.which('ffmpeg')
     if not ffmpeg:raise RuntimeError('ffmpeg is required for buffered playback media')
     for camera in ('left','right'):
         check_cancelled()
@@ -149,18 +173,9 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
             subprocess.run(command,check=True,stdin=subprocess.DEVNULL,capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW if __import__('os').name=='nt' else 0)
             media.append(PlaybackMedia(video_source=source,video_filename=filename,nominal_fps=fps,timeline=camera_clock))
             logger.info('Encoded %s: %d frames for buffered SDK playback',filename,n)
-    cameras=[]
-    for index,camera in enumerate(('left','right')):
-        world_from_camera=np.eye(4);world_from_camera[:3,:3]=optical_to_world
-        if camera=='right':
-            stereo=np.array(cal['T_left_from_right_m']);world_from_camera[:3,:3]=optical_to_world@stereo[:3,:3]
-            world_from_camera[:3,3]=optical_to_world@stereo[:3,3]*1000.
-        camera_from_world=np.linalg.inv(world_from_camera);K=np.array(cal[camera])
-        cameras.append({'id':camera,'index':index,'image_size':[cal['image_width'],cal['image_height']],
-            'intrinsics':{'fx':K[0,0],'fy':K[1,1],'cx':K[0,2],'cy':K[1,2],'k1':0.,'k2':0.,'p1':0.,'p2':0.},
-            'extrinsics':{'quaternion_wxyz':RotationQuaternion.from_rotation_matrix(matrix=camera_from_world[:3,:3]).as_array().tolist(),'translation':camera_from_world[:3,3].tolist()},
-            'world_position':world_from_camera[:3,3].tolist(),'world_orientation':world_from_camera[:3,:3].tolist()})
-    run=PlaybackRun(run_id=0,model_sources=sources,models=tuple(models),channels=tuple(channels),static_channels=tuple(statics),timelines=(clock,),media=tuple(media),camera_geometry={group:tuple(cameras)})
+    cameras=calibrated_cameras(cal,optical_to_world)
+    run=PlaybackRun(run_id=0,reference_frames={scene_frame['name']:scene_frame},
+        scene_reference_frames={group:scene_frame['name']},model_sources=sources,models=tuple(models),channels=tuple(channels),static_channels=tuple(statics),timelines=(clock,),media=tuple(media),camera_geometry={group:tuple(cameras)})
     manifest=PlaybackManifest(recording_id=playback_id,revision=playback_id,selected_run_id=0,runs=(run,))
     provenance={'source_result':project.sample_result,'source_manifest_sha256':file_digest(result/'manifest.json'),'source_timestamp_origin_ns':str(times_ns[0]),'source_timestamps_ns':[str(x) for x in times_ns],
         'display_world':'Blender +X right +Y forward +Z up, mm; optical-to-world conversion once','optical_to_world':optical_to_world.tolist(),
@@ -168,8 +183,24 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
         'candidate_status':{str(r['source_frame']):r['status'] for r in rows},'human_review':'unreviewed','surface_simplified_faces':len(faces),'source_geometry_sha256':target.geometry.sha256,'encoded_fps':fps,'encoded_frame_indices':'0..N-1 map in order to source_frame_numbers, never substitute for source identities'}
     write_playback(path=work/'display.parquet',manifest=manifest,samples=samples,provenance=provenance,cancelled=cancelled)
     atomic_json(work/'playback.json',manifest.model_dump(mode='json'));atomic_json(work/'provenance.json',provenance)
+    # Sample videos live below explicit clip directories, never alongside the full
+    # synchronized inputs that Core enumerates. Each publication has unique paths.
+    for entry in media:
+        base=paths.videos_synchronized_dir if entry.video_source=='synchronized' else paths.videos_annotated_dir
+        clip=base/'clips'/playback_id
+        clip.mkdir(parents=True,exist_ok=True)
+        video=work/entry.video_filename
+        destination_video=clip/entry.video_filename
+        if destination_video.exists():raise FileExistsError(destination_video)
+        shutil.copyfile(video,destination_video)
+        if file_digest(video)!=file_digest(destination_video):raise ValueError('Published video hash mismatch')
+        media_locations[entry.video_filename]=destination_video.relative_to(root).as_posix()
+        media_hashes[entry.video_filename]={'sha256':file_digest(destination_video),'bytes':destination_video.stat().st_size}
+        video.unlink()  # Only this attempt's newly encoded staging file; published media is retained.
+    atomic_json(work/'media.json',media_locations)
+    atomic_json(work/'media_hashes.json',media_hashes)
     atomic_json(work/'inventory.json',{k:v.model_dump() for k,v in inventory(work).items()})
-    relative='playback/'+playback_id;destination=resolve_relative(root,relative);destination.parent.mkdir(exist_ok=True)
+    relative=(extension/'playback'/playback_id).relative_to(root).as_posix();destination=resolve_relative(root,relative);destination.parent.mkdir(exist_ok=True)
     with project_lock(root):
         check_cancelled()
         project=read_model(manifest_path,Project)

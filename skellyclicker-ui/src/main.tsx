@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {PlaybackWorkspace, BottomLogPanel, LogStore, ServerConnectionStatus} from '@freemocap/ui';
+import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
 import {createHttpClient, TransportService, ConnectionState} from '@freemocap/client';
 import {stateKind} from './state-message';
@@ -60,7 +60,14 @@ function App({backendUrl}: {backendUrl: string}) {
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
-    {project?.playback&&<div className="playback-provenance-note">Fresh pose candidates · green: passed pilot gates · orange: rejected · purple: authored STL reference · all unreviewed. Points are derived STL bounds, not detector predictions.</div>}
+    {project?.playback&&<Legend label="Pose candidates" items={[
+      {label:'Passed gates',color:'#5ce69a',description:'Passed the configured pilot gates; not human approval'},
+      {label:'Rejected',color:'#ffa244',description:'Failed one or more pilot gates; shown for inspection'},
+      {label:'Authored reference',color:'#b99aff',description:'Unposed STL at the world origin; not a detected object'},
+    ]} note="All unreviewed" details={<>
+      <p>Points show derived STL bounds, not detector predictions or approved labels.</p>
+      <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
+    </>}/> }
     <PlaybackWorkspace baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }

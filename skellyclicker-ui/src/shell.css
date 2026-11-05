@@ -56,6 +56,3 @@ html, body, #root {height:100%; margin:0;}
 .project-child-recordings .sdk-browser {background:transparent;}
 .skellyclicker-top-panes {flex:1;min-height:0;}
 .skellyclicker-top-panes .skellyclicker-sidebar,.skellyclicker-top-panes .skellyclicker-main {height:100%;box-sizing:border-box;}
-.playback-provenance-note {font-size:11px;padding:6px 10px;color:var(--gray-200);background:var(--gray-900);flex-shrink:0;}
-
-.preparation-controls {margin-top:12px;padding:8px;font-size:12px;border-top:1px solid var(--gray-600);}.preparation-controls label {display:flex;justify-content:space-between;gap:8px;margin:8px 0;}.preparation-controls input {width:80px;}.preparation-controls button {margin:4px;padding:6px;}.preparation-controls [role=alert]{color:#ffaaa8;}

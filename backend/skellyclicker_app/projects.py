@@ -8,6 +8,7 @@ import shutil
 import tempfile
 
 from pydantic import BaseModel, ConfigDict, Field
+from freemocap_sdk.recording_structure import RecordingStructure
 from freemocap_sdk.storage import atomic_json, file_digest, resolve_relative, project_lock, publish_directory
 
 ID = r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$"
@@ -70,6 +71,11 @@ class OpenProject(Model):
     project_path: str
 
 
+def recording_structure(root: Path, recording_id: str) -> RecordingStructure:
+    """The project owns its catalog; the SDK owns every path inside a recording."""
+    return RecordingStructure(base_directory=root/'recordings', recording_name=recording_id)
+
+
 def artifact(path: Path, stored_path: str | None = None) -> Artifact:
     if not path.is_file():
         raise ValueError(f"File does not exist: {path}")
@@ -95,7 +101,7 @@ def create_project(request: CreateProject) -> dict:
     target = Target(object_id=request.object_id, authored_units=request.authored_units,
         source_path=str(stl), geometry=artifact(stl, f"{target_folder}/{request.object_id}.stl"))
     project = Project(project_id=root.name,
-        recording_manifests=[f"recordings/{recording_id}/{recording_id}_recording.json"],
+        recording_manifests=[recording_structure(root,recording_id).stereo_manifest_path.relative_to(root).as_posix()],
         target_manifests=[f"{target_folder}/{request.object_id}_target.json"])
     root.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{root.name}-pending-", dir=root.parent))

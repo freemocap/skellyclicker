@@ -1,0 +1,55 @@
+"""Decode the complete linked SVO into synchronized views; no pose/depth inference."""
+import json, os, subprocess, sys
+from pathlib import Path
+request=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+output=Path(request['output']); output.mkdir(parents=True,exist_ok=True)
+handles=[os.add_dll_directory(p) for p in request['runtime']['zed_dlls']]
+for p in request['runtime']['zed_dlls']:os.environ['PATH']=p+os.pathsep+os.environ['PATH']
+import pyzed.sl as sl
+import numpy as np
+camera=sl.Camera();options=sl.InitParameters()
+options.set_from_svo_file(request['source_svo']);options.svo_real_time_mode=False
+options.coordinate_system=sl.COORDINATE_SYSTEM.IMAGE;options.coordinate_units=sl.UNIT.METER
+options.depth_mode=sl.DEPTH_MODE.NONE
+error=camera.open(options)
+if error!=sl.ERROR_CODE.SUCCESS:raise RuntimeError(f'ZED open failed: {error}')
+encoders={};logs=[]
+try:
+ config=camera.get_camera_information().camera_configuration;cal=config.calibration_parameters
+ total=camera.get_svo_number_of_frames();width=config.resolution.width;height=config.resolution.height;fps=config.fps
+ K=lambda v:[[v.fx,0,v.cx],[0,v.fy,v.cy],[0,0,1]]
+ calibration={'schema_version':1,'source_frame_count':total,'nominal_fps':fps,'image_width':width,'image_height':height,
+  'serial':camera.get_camera_information().serial_number,'rectified':True,'camera_axes':'x right, y down, z forward',
+  'left':K(cal.left_cam),'right':K(cal.right_cam),'T_left_from_right_m':cal.stereo_transform.m.tolist(),
+  'zed_sdk_version':sl.Camera.get_sdk_version(),'source_sha256':request['source_sha256']}
+ images={'left':sl.Mat(),'right':sl.Mat()};samples=[]
+ for name in images:
+  logfile=(output/(name+'-encoder.log')).open('wb');logs.append(logfile)
+  destination=Path(request['videos'][name]);destination.parent.mkdir(parents=True,exist_ok=True)
+  if destination.exists():raise FileExistsError(destination)
+  encoders[name]=subprocess.Popen([request['ffmpeg'],'-hide_banner','-loglevel','error','-nostdin','-f','rawvideo','-pixel_format','bgr24',
+   '-video_size',f'{width}x{height}','-framerate',str(fps),'-i','pipe:0','-an','-c:v','libx264','-preset','fast','-crf','18',
+   '-pix_fmt','yuv420p','-movflags','+faststart',str(destination)],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=logfile,
+   creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+ camera.set_svo_position(0)
+ for index in range(total):
+  if (output/'cancel').exists():raise InterruptedError('Stereo decode cancelled')
+  if camera.grab()!=sl.ERROR_CODE.SUCCESS:raise RuntimeError(f'SVO grab failed at {index}')
+  frame=camera.get_svo_position();stamp=camera.get_timestamp(sl.TIME_REFERENCE.IMAGE).get_nanoseconds()
+  if frame!=index or (samples and stamp<=samples[-1]['timestamp_ns']):raise ValueError('Source identity or clock mismatch')
+  for name,view in [('left',sl.VIEW.LEFT),('right',sl.VIEW.RIGHT)]:
+   if camera.retrieve_image(images[name],view)!=sl.ERROR_CODE.SUCCESS:raise RuntimeError(f'Retrieve failed: {name}/{frame}')
+   encoders[name].stdin.write(np.ascontiguousarray(images[name].get_data()[:,:,:3]).tobytes())
+  samples.append({'source_frame':frame,'timestamp_ns':stamp})
+  if index%100==0:print('SKELLY_PROGRESS '+json.dumps({'stage':'decode stereo','completed':index+1,'total':total}),flush=True)
+ for process in encoders.values():
+  process.stdin.close()
+  if process.wait(timeout=120)!=0:raise RuntimeError('Video encoding failed; inspect encoder log')
+ (output/'calibration.json').write_text(json.dumps(calibration,indent=2),encoding='utf-8')
+ (output/'samples.json').write_text(json.dumps(samples),encoding='utf-8')
+ print(json.dumps({'stage':'complete','frames':total}),flush=True)
+finally:
+ camera.close()
+ for process in encoders.values():
+  if process.poll() is None:process.terminate();process.wait(timeout=10)
+ for stream in logs:stream.close()

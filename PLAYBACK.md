@@ -91,9 +91,9 @@ The Project screen can prepare a bounded range (1–60 source frames) from its l
 
 SpatialHub converts mesh units to metres and centers geometry. The worker records that transform and writes both original-STL-to-left-camera and original-STL-to-right-camera matrices [@spatialhubLocalPoseAdapter]. Rectified intrinsics, stereo extrinsics and source image timestamps are queried during fresh replay. Depth is a NEURAL replay estimate. Pilot gate passes are machine candidates, never human approval; the right-camera mask agreement is pose-conditioned and the 5 mm depth threshold is a heuristic.
 
-Each attempt writes into a new project `working/preparation/<id>` directory. Cancellation affects only its child process tree. External workers receive null stdin so they cannot inherit the desktop backend's lifecycle control pipe. The frozen backend temporarily clears its DLL search directory for external startup and restores it afterward. SDK package data collection includes both `.worker` sources.
+Each attempt writes into `recordings/<recording>/skellyclicker/working/preparation/<id>`. Cancellation affects only its child process tree. External workers receive null stdin so they cannot inherit the desktop backend's lifecycle control pipe. The frozen backend temporarily clears its DLL search directory for external startup and restores it afterward. SDK package data collection includes the external `.worker` sources and SDK recording-path resources.
 
-Successful output publishes an immutable `results/<recording>/<attempt>/r001` directory with hashed inventory, calibration, geometry, software and worker provenance, exact int64 timing Parquet, and candidate Parquet. The project `sample_result` selects the result. JSON summaries and PNGs support review; Parquet holds authoritative numerical rows. Rejected candidates remain inspectable. Failed/cancelled attempts remain on disk and are not resumed automatically. Closing/reopening loads the selected published result, not an interrupted job.
+Successful output publishes an immutable `recordings/<recording>/skellyclicker/results/<attempt>/r001` directory with hashed inventory, calibration, geometry, software and worker provenance, exact int64 timing Parquet, and candidate Parquet. The project `sample_result` selects the result. JSON summaries and PNGs support review; Parquet holds authoritative numerical rows. Rejected candidates remain inspectable. Failed/cancelled attempts remain on disk and are not resumed automatically. Closing/reopening loads the selected published result, not an interrupted job.
 
 The Project screen uses the SDK PlaybackWorkspace for buffered H.264 stereo video and recorded 3D model playback. It loads numerical Parquet once per revision; normal playback never requests per-frame PNGs. Point clouds, manual label approval and training remain later work. Runtime paths can be configured with `SKELLYCLICKER_ZED_RUNTIME`, `SKELLYCLICKER_ZED_SDK_BIN`, and `SKELLYCLICKER_POSE_DLLS`. Runtime availability is reported by `/api/preparation/runtime`; the application reports job failures in its live terminal.
 
@@ -101,10 +101,83 @@ Validation: `python -m unittest discover -s backend/tests -p test_preparation.py
 
 ## Integrated SDK playback boundary
 
-`playback_adapter.py` converts the selected fresh result into an immutable `playback/<revision>` display artifact. It uses Forge's public rigid STL definition and coordinate conversion APIs [@forgeRigidStlAdapter], then the SDK manifest, dense channel writer, recording router and existing PlaybackWorkspace [@sdkRecordedPlayback]. Core is not imported. Source int64 nanoseconds remain authoritative; relative display seconds and encoded-video indices map explicitly back to source frames.
+`playback_adapter.py` converts the selected fresh result into an immutable `recordings/<recording>/skellyclicker/playback/<revision>` display artifact. It uses Forge's public rigid STL definition and coordinate conversion APIs [@forgeRigidStlAdapter], then the SDK manifest, dense channel writer, recording router and existing PlaybackWorkspace [@sdkRecordedPlayback]. Core is not imported. Source int64 nanoseconds remain authoritative; relative display seconds and encoded-video indices map explicitly back to source frames.
 
 The three models distinguish finite candidates that passed pilot gates (green), finite rejected candidates (orange), and the unposed authored STL reference at world origin (purple). Missing state channels contain NaN, never a fabricated pose. The actual STL surface is simplified for display, with original geometry hash and invertible source/segment transforms retained. Eight derived bounding-box landmarks are geometric control points, not detector predictions or approved labels. They are projected onto annotated videos from the same candidate pose. Measured display values use millimetres in Blender axes; rectified optical-camera conversion occurs once at the adapter boundary. The static reference placement is a comparison aid, not a measured observation.
 
 Original and annotated stereo videos use browser-compatible H.264 with faststart and SDK byte-range/caching support. Parquet carries the self-describing display manifest and provenance. The UI uses the SDK's existing offscreen renderer and bounded buffer ownership, not another renderer. The sidebar, media/3D split, camera tile grid and bottom log panel are resizable. Preparation controls stay in the sidebar and never replace playback.
 
 Run `backend/.venv/Scripts/python.exe tools/verify_playback.py <project-folder>` to compare stored display rotations/positions and stereo projections against the authoritative pose result, and to check media counts and hashes. Its explicit 0.001 mm/pixel numerical tolerance accommodates float32 pose-matrix orthogonality error during unit-quaternion conversion; it is not a claim of physical measurement accuracy. The current dataset is a one-second bounded sample, not the full recording.
+
+
+### Explicit scene frame and themed review controls
+
+Playback publishes `reference_frames` and `scene_reference_frames` alongside the
+channels and camera geometry. The `blender_world` definition binds camera-to-world
+poses and all world-space channels to Blender axes in millimetres. Forge's maintained
+canonical convention is loaded at the app's optical-camera boundary and bundled
+with the desktop backend. ZED acquisition explicitly selects its IMAGE convention.
+No camera-only display rotation or inverse producer compensation belongs in this
+path. The SDK retains the frame definition through playback selection and worker
+calibration delivery [@forgeRigidStlAdapter; @sdkRecordedPlayback].
+
+The preparation form uses the SDK `ControlSection`, `NumberField`, and `ButtonSm`;
+the scene legend uses `Legend`. Its swatches distinguish passed gates, rejected
+candidates, and the unposed authored reference. All candidates remain unreviewed.
+Details explain derived bounding-box points and the reference placement. Invalid
+source ranges disable preparation; inspection never starts a job automatically.
+
+The scene audit additionally checks independent expected optical-axis directions,
+the recorded stereo baseline, positive full-mesh camera depth, and full original
+STL projections on raw source frames 12 and 21. The separate synthetic test uses
+a nonidentity stereo rotation to expose inverse/composition mistakes. These checks
+supplement numerical serialization tests; they do not establish training-label
+accuracy or human acceptance. The actual-camera checks in `verify_playback.py`
+are specific to the current rectified ZED review fixture.
+
+
+## Recording folder contract
+
+The SDK `RecordingStructure` supplies shared paths; SkellyClicker supplies its
+source adapter and application extension. Preparing the first bounded pose sample
+also materializes the full source as rectified synchronized H.264 views. Later
+attempts verify and reuse those hashed inputs. Exact source nanoseconds and frame
+indices remain in timing sidecars; encoded video time is not the source clock.
+
+```text
+recordings/<recording>/
+  <recording>_recording_info.json
+  <recording>_calibration.toml
+  videos/
+    stereo/<recording>_stereo_sources.json
+    synchronized/left.mp4, right.mp4
+    synchronized/clips/<revision>/synchronized-left.mp4, synchronized-right.mp4
+    annotated/clips/<revision>/annotated-left.mp4, annotated-right.mp4
+  skellyclicker/
+    inputs/<revision>/
+    results/<attempt>/r001/
+    playback/<revision>/
+    working/
+    updates/
+```
+
+SDK timing files accompany the synchronized views. The stereo manifest explicitly
+links the hashed original SVO and factory configuration; these external originals
+are not copied or silently relocated. Full videos and bounded sample clips have
+separate paths. The display revision's `media.json` resolves clips relative to the
+project root, and `media_hashes.json` records their identities. Calibration records
+queried rectified stereo geometry in millimetres; it does not claim a board solve.
+
+The current recording has 1,519 frames in each full view and 30 frames in each
+review clip. Its one-time layout update retains the old result/playback directories
+and records the previous project manifest under `skellyclicker/updates/`. Working
+staging files are retained as well. These are preserved audit copies, not alternate
+selected inputs or an automatic legacy migration interface.
+
+FreeMoCap Core has not been changed or runtime-tested for this layout. Its remaining
+legacy video-folder readers need alignment before direct discovery and fresh
+processing can be claimed. SDK display Parquet is distinct from Core recording
+Parquet: no misleading root `<recording>_data.parquet` is written. Direct Core
+processing, portable external-source relinking and saved rigid-result interchange
+remain unverified. The known SDK end/replay frame-reset defect also remains open;
+ordinary playback and scrubbing checks do not establish loop correctness.
