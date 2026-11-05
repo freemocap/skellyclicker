@@ -87,7 +87,7 @@ the user's native window.
 
 ## Fresh preparation review slice
 
-The Project screen can prepare a bounded range (1–60 source frames) from its linked SVO, then publish buffered stereo videos and a derived SDK display revision with synchronized fitted STL surfaces and geometric control points. Depth and mask artifacts remain in the source result. The application runs ZED replay and FoundationPose sequentially in explicitly configured external runtimes. The visible mask preset is specific to the current demonstration recording; it is not an arbitrary-object segmentation implementation. Geometry comes from the project's STL snapshot and authored units. The adapter follows the established local runtime setup [@zedBenchyLocalFoundationPose].
+The Project screen can prepare a bounded range (1–900 source frames) from its linked SVO, then publish buffered stereo videos and a derived SDK display revision with synchronized fitted STL surfaces and geometric control points. Depth and mask artifacts remain in the source result. The application runs ZED replay and FoundationPose sequentially in explicitly configured external runtimes. The visible mask preset is specific to the current demonstration recording; it is not an arbitrary-object segmentation implementation. Geometry comes from the project's STL snapshot and authored units. The adapter follows the established local runtime setup [@zedBenchyLocalFoundationPose].
 
 SpatialHub converts mesh units to metres and centers geometry. The worker records that transform and writes both original-STL-to-left-camera and original-STL-to-right-camera matrices [@spatialhubLocalPoseAdapter]. Rectified intrinsics, stereo extrinsics and source image timestamps are queried during fresh replay. Depth is a NEURAL replay estimate. Pilot gate passes are machine candidates, never human approval; the right-camera mask agreement is pose-conditioned and the 5 mm depth threshold is a heuristic.
 
@@ -179,5 +179,36 @@ legacy video-folder readers need alignment before direct discovery and fresh
 processing can be claimed. SDK display Parquet is distinct from Core recording
 Parquet: no misleading root `<recording>_data.parquet` is written. Direct Core
 processing, portable external-source relinking and saved rigid-result interchange
-remain unverified. The known SDK end/replay frame-reset defect also remains open;
-ordinary playback and scrubbing checks do not establish loop correctness.
+remain unverified. Native acceptance must cover end/replay, repeated loops and near-end seeks;
+ordinary playback and emitted-packet checks do not establish continuous visual
+synchronization. Use `tests/reconstruction-playback.mjs --sustained` from the UI
+package; set `SKELLYCLICKER_TEST_CDP_PORT` only to an isolated native test window.
+
+
+## Stereo reconstruction playback
+
+The reconstruction producer retains rectified RGB and full-resolution ZED NEURAL
+depth, then projects finite samples on a four-pixel image grid into the declared
+Blender world frame in millimetres. Display filtering retains depths from 0.17 to
+3 metres. Archived arrays retain the denser grid; display chunks cap each frame
+at 25,000 points through deterministic index subsampling. This is stereo-derived
+point geometry, not a reconstructed surface or independently validated depth.
+
+The agreed SDK integration uses one persistent point geometry and typed GPU
+attributes, explicit update ranges and draw count [@threeBufferAttributes]
+[@threeBufferGeometry]. Fifteen-frame self-describing chunks carry the complete
+reference definition, source-frame IDs and exact nanosecond clock alongside float32
+XYZ and uint8 RGB payloads. Bounded worker fetching and cache ownership belong to
+the SDK. No per-point JavaScript objects or full-recording cloud preload is needed.
+
+The native preparation form accepts up to 900 source frames per job. Jobs expose
+progress, cancellation and live logs; the current job can be recovered by the UI
+within the same backend session. The first long segment uses source frames90–840
+(751frames,25.001002seconds), with751 finite candidate poses:208 passed the
+existing pilot gates and543 were rejected. All remain unreviewed. Full-resolution
+depth and the source calibration are retained beside the point-cloud archive.
+
+The SDK-backed viewer receives the cloud manifest through its public optional
+`pointCloud` input. App routes serve immutable manifest/chunk resources; the
+existing buffered videos contain rendered STL silhouettes in both cameras.
+Source PNGs are retained for inspection but are not fetched during playback.

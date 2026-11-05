@@ -26,8 +26,9 @@ target=json.loads((root/project['target_manifests'][0]).read_text())
 mesh=trimesh.load_mesh(root/target['geometry']['path'])
 mesh_m=np.asarray(mesh.vertices)*(.001 if target['authored_units']=='mm' else 1.)
 scene_checks=[];panels=[]
-for frame in (12,21):
- row=next(row for row in rows if row['source_frame']==frame)
+selected=[next(row for row in rows if row['accepted'] and row.get('T_left_from_stl_m')),next(row for row in rows if not row['accepted'] and row.get('T_left_from_stl_m'))]
+for row in selected:
+ frame=row['source_frame']
  pose=np.array(row['T_left_from_stl_m']);optical=mesh_m@pose[:3,:3].T+pose[:3,3]
  # Explicit axis expectation, not reading the matrix written by the producer.
  world=np.column_stack((optical[:,0],optical[:,2],-optical[:,1]))*1000.

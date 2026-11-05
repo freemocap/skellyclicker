@@ -6,7 +6,7 @@ export interface ProjectView {
   project: {project_id: string; uuid: string; created_at?: string};
   recordings: {recording_id: string; source: {path: string; bytes?: number}; calibration_state: string; streams: {camera_id: string}[]}[];
   targets: {object_id: string; authored_units: string}[];
-  issues: string[]; sample_state: string; playback: {id:string;displayName?:string}|null;
+  issues: string[]; sample_state: string; playback: {id:string;displayName?:string;pointCloudManifest?:string|null}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}
 const recentKey='skellyclicker.recentProjects';

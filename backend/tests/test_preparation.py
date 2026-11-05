@@ -11,7 +11,7 @@ from skellyclicker_app.preparation import PreparationRequest,publish_result
 
 class PreparationTest(unittest.TestCase):
  def test_bounded_range(self):
-  for count in (0,61):
+  for count in (0,901):
    with self.assertRaises(ValidationError):PreparationRequest(project_path='x',frame_count=count)
  def test_publication_preserves_later_pose_and_integer_clock(self):
   with tempfile.TemporaryDirectory() as directory:

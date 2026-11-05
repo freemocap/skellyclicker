@@ -26,7 +26,7 @@ _guard = threading.RLock()
 class PreparationRequest(BaseModel):
     project_path: str
     start_frame: int = Field(default=0, ge=0)
-    frame_count: int = Field(default=30, ge=1, le=60)
+    frame_count: int = Field(default=30, ge=1, le=900)
 
 
 def runtime_config():
@@ -145,6 +145,8 @@ def execute(job):
         ensure_recording_inputs(job['root'],recording,cancel=job['cancel'])
         update(job,stage='replay')
         run_worker(job,'zed_replay',job['request']['runtime']['zed_python'])
+        from .point_cloud import write_clouds
+        write_clouds(job, update)
         update(job,stage='fit',completed=0)
         run_worker(job,'fit_pose',job['request']['runtime']['pose_python'])
         update(job,stage='publishing');publish_result(job)
@@ -169,6 +171,14 @@ def start(request: PreparationRequest):
         _jobs[job_id]=job;update(job)
         thread=threading.Thread(target=execute,args=(job,),daemon=True);job['thread']=thread;thread.start()
         return dict(job['status'])
+
+@router.get('/current')
+def current(project_path: str):
+    manifest=Path(project_path).resolve()
+    with _guard:
+        matching=[job for job in _jobs.values() if job['manifest'].resolve()==manifest]
+        return dict(matching[-1]['status']) if matching else None
+
 
 @router.get('/status/{job_id}')
 def status(job_id: str):

@@ -1,8 +1,11 @@
 """Convert app-owned fresh candidates into the SDK's existing recorded playback contract."""
 from pathlib import Path
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
 import itertools
 import json
 import logging
+import re
 import shutil
 import subprocess
 from uuid import uuid4
@@ -21,11 +24,24 @@ from .projects import Project, Target, read_model, recording_structure
 
 logger=logging.getLogger('skellyclicker.playback')
 _registered: dict[str, RecordingResources]={}
+_clouds: dict[str, Path]={}
 
 def resolve_recording(recording_id):
     return _registered[recording_id]
 
 router=create_recording_router(resolve_recording)
+
+
+@router.get('/{recording_id}/point-cloud/{filename}')
+def point_cloud_file(recording_id: str, filename: str):
+    folder=_clouds.get(recording_id)
+    if folder is None:raise HTTPException(404,'No published point cloud')
+    if filename!='manifest.json' and not re.fullmatch(r'chunk-\d{4}\.bin',filename):
+        raise HTTPException(404,'Unknown cloud resource')
+    path=resolve_relative(folder,filename)
+    if not path.is_file():raise HTTPException(404,'Missing cloud resource')
+    return FileResponse(path,media_type='application/json' if filename.endswith('.json') else 'application/octet-stream',
+        headers={'Cache-Control':'public, max-age=31536000, immutable'})
 
 
 def register_project(root: Path, project: Project):
@@ -35,7 +51,10 @@ def register_project(root: Path, project: Project):
     locations=json.loads((folder/'media.json').read_text(encoding='utf-8'))
     media={m.video_filename:resolve_relative(root,locations[m.video_filename]) for r in manifest.runs for m in r.media}
     _registered[manifest.recording_id]=RecordingResources(manifest=manifest,parquet=folder/'display.parquet',videos=media)
-    return {'id':manifest.recording_id,'displayName':f'{project.project_id} - fresh pose candidates'}
+    cloud=folder/'point_cloud'
+    if (cloud/'manifest.json').is_file():_clouds[manifest.recording_id]=cloud
+    return {'id':manifest.recording_id,'displayName':f'{project.project_id} - fresh pose candidates',
+            'pointCloudManifest':f'/freemocap/recordings/{manifest.recording_id}/point-cloud/manifest.json' if manifest.recording_id in _clouds else None}
 
 
 def camera_to_world():
@@ -165,7 +184,7 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
                 color='#5ce69a' if row['accepted'] else '#ffa244'
                 for x,y in pixels:draw.ellipse((x-2,y-2,x+2,y+2),fill=color)
                 for a,b in edges:draw.line([tuple(pixels[a]),tuple(pixels[b])],fill=color,width=1)
-            image.save(annotated/f'{frame:06d}.png')
+            image.save(annotated/f'{frame:06d}.png',compress_level=1)
         for source,pattern in [('synchronized',str(result/'frames'/('%06d-'+camera+'.png'))),('annotated',str(annotated/'%06d.png'))]:
             check_cancelled()
             filename=source+'-'+camera+'.mp4';destination=work/filename
@@ -199,6 +218,10 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
         video.unlink()  # Only this attempt's newly encoded staging file; published media is retained.
     atomic_json(work/'media.json',media_locations)
     atomic_json(work/'media_hashes.json',media_hashes)
+    if (result/'point_cloud/manifest.json').is_file():
+        from .point_cloud import write_display_clouds
+        write_display_clouds(result/'point_cloud',work/'point_cloud',revision=playback_id,
+            reference_frame={'id':scene_frame['name'],'definition':scene_frame},cancelled=cancelled)
     atomic_json(work/'inventory.json',{k:v.model_dump() for k,v in inventory(work).items()})
     relative=(extension/'playback'/playback_id).relative_to(root).as_posix();destination=resolve_relative(root,relative);destination.parent.mkdir(exist_ok=True)
     with project_lock(root):

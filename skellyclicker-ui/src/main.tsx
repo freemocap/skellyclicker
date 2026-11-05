@@ -68,7 +68,7 @@ function App({backendUrl}: {backendUrl: string}) {
       <p>Points show derived STL bounds, not detector predictions or approved labels.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
-    <PlaybackWorkspace baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
+    <PlaybackWorkspace pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }
 
