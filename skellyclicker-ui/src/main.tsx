@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
@@ -9,10 +9,15 @@ import {resolveBackendUrl} from './config';
 import './shell.css';
 import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
+import {SidebarProcessingAction} from '@freemocap/ui';
+import './training-set.css';
+
+const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => ({default: module.TrainingSetPanel})));
 
 function App({backendUrl}: {backendUrl: string}) {
   const [logs] = useState(() => new LogStore({storageKey: 'skellyclicker.logs'}));
   const [project, setProject] = useState<ProjectView | null>(null);
+  const [trainingOpen,setTrainingOpen]=useState(false);
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
   const [connectionError, setConnectionError] = useState<string|null>(null);
@@ -56,10 +61,11 @@ function App({backendUrl}: {backendUrl: string}) {
     stream.connect();
     return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/>}</>}
+  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<><div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div><PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/></>}</>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
+    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} onClose={()=>setTrainingOpen(false)}/></Suspense>}
     {project?.playback&&<Legend label="Pose candidates" items={[
       {label:'Passed gates',color:'#5ce69a',description:'Passed the configured pilot gates; not human approval'},
       {label:'Rejected',color:'#ffa244',description:'Failed one or more pilot gates; shown for inspection'},

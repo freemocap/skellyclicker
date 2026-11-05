@@ -3,9 +3,9 @@ import {RecordingBrowser, type BrowserEntry} from '@freemocap/ui';
 
 export interface ProjectView {
   root: string; manifest_path: string;
-  project: {project_id: string; uuid: string; created_at?: string};
-  recordings: {recording_id: string; source: {path: string; bytes?: number}; calibration_state: string; streams: {camera_id: string}[]}[];
-  targets: {object_id: string; authored_units: string; authored_geometry?: {path:string}|null}[];
+  project: {project_id: string; uuid: string; created_at?: string; sample_result?:string|null; playback_result?:string|null; recording_manifests?:string[]; target_manifests?:string[]};
+  recordings: {recording_id: string; source: {path: string; bytes?: number; sha256?:string}; calibration_state: string; streams: {camera_id: string}[]}[];
+  targets: {object_id: string; authored_units: string; geometry?:{path:string;sha256:string}; authored_geometry?: {path:string;sha256?:string}|null}[];
   issues: string[]; sample_state: string; playback: {id:string;displayName?:string;pointCloudManifest?:string|null}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}
