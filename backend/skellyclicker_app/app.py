@@ -1,16 +1,21 @@
+import asyncio
+import logging
 import time
+from contextlib import asynccontextmanager
 from fastapi import APIRouter
 from freemocap_sdk.server import Connection, create_app
+from freemocap_sdk.logs import LogHub
+
+from .project_routes import router as project_router
 
 router = APIRouter(prefix="/api")
-
+logger = logging.getLogger("skellyclicker")
 
 @router.get("/status")
 async def status():
     return {"application": "skellyclicker", "mode": "playback", "recording": None}
 
-
-async def stream_updates(connection: Connection):
+async def state_updates(connection: Connection):
     sequence = 0
     while True:
         await connection.send_message(
@@ -21,11 +26,44 @@ async def stream_updates(connection: Connection):
         await connection.receive_json()
         sequence += 1
 
-
 def build_app():
+    hub = LogHub(capacity=1000)
+
+    @asynccontextmanager
+    async def lifespan(app):
+        previous_level = logger.level
+        logger.setLevel(logging.INFO)
+        # Uvicorn uses non-propagating loggers; attach once at each owned boundary.
+        destinations = [logging.getLogger()]
+        destinations.extend(logging.getLogger(name) for name in ("uvicorn", "uvicorn.access")
+                            if not logging.getLogger(name).propagate)
+        for destination in destinations:
+            destination.addHandler(hub)
+        logger.info("SkellyClicker backend ready; live logs connected to the SDK terminal")
+        try:
+            yield
+        finally:
+            logger.info("SkellyClicker backend shutting down")
+            for destination in destinations:
+                destination.removeHandler(hub)
+            logger.setLevel(previous_level)
+            hub.close()
+
+    async def stream_updates(connection: Connection):
+        tasks = [asyncio.create_task(state_updates(connection)), asyncio.create_task(hub.forward(connection))]
+        try:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     return create_app(
         title="SkellyClicker",
-        routers=(router,),
+        routers=(router, project_router),
+        lifespan=lifespan,
         allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,
     )

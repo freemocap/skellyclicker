@@ -43,3 +43,30 @@ Verified artifacts:
 Evidence: `.test-artifacts/native-dev.json/.png` records development mode; `.test-artifacts/native-portable.json/.png` records the built WebView and image result; `.test-artifacts/native-portable-shutdown.json` records normal close, owned process exit and port release. All test windows and task-owned servers were closed afterward. Desktop runtime does not need the source checkout, Python environment or npm server.
 
 SDK integration baseline: `freemocap/sdk` commit `eacdc6f6f9ec737a48892fd68513e7954f4fb0e3` on `sfn26`; app tests exercised the editable sources that became that commit. The package manifests and lockfiles retain the local development links.
+
+## Fresh projects and live backend logs
+
+The current native development slice creates and opens fresh projects with linked
+ZED SVO originals and a copied STL reference. The Project sidebar accepts a folder
+or its ID-bearing manifest; existing folders are never overwritten. File hashes
+bind the original media and reference geometry. Calibration remains unqueried
+until fresh sample preparation; there is no prior-project import.
+
+The full-width bottom panel uses the SDK's `BottomLogPanel` and `LogStore`, fed by
+`TransportService.subscribeToLog` on the existing WebSocket. The app attaches the
+SDK `LogHub` during server lifespan and removes it at shutdown. Startup history,
+project operations, warnings and Uvicorn messages are actual backend records.
+The SDK owns bounded buffering, validation, replay identity and terminal controls.
+
+Run `node tools/desktop.mjs dev --no-watch` for a visible native app with Vite
+frontend HMR. Python backend changes require closing the app and rerunning that
+command to rebuild its owned frozen backend. SDK UI source changes require the
+SDK package build; worker changes may also require a WebView reload. This is not
+full-stack hot reload. Release builds still use the established onedir backend.
+
+Validation: `backend/tests/test_projects.py` checks relocation, source integrity,
+missing input and path boundaries; `skellyclicker-ui/tests/logs.integration.test.mjs`
+checks startup replay and live warnings through the public SDK client. Native
+inspection scripts are `tests/native-project-review.mjs` and
+`tests/native-live-logs.mjs` in the UI package. Their screenshots/reports belong in
+ignored `.test-artifacts/`, and are not production data.
