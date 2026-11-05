@@ -1,5 +1,5 @@
 html, body, #root {height:100%; margin:0;}
-.skellyclicker-app {height:100dvh; display:grid; grid-template-columns:minmax(220px, 24%) minmax(0, 1fr); grid-template-rows:minmax(0, 1fr) auto; gap:4px; padding:4px; box-sizing:border-box; background:var(--gray-900, #121c1c); color:var(--gray-100, #e1e5e5); font-family:Inter, sans-serif;}
+.skellyclicker-app {height:100dvh; display:grid; grid-template-columns:minmax(220px, 24%) minmax(0, 1fr); grid-template-rows:minmax(0, 1fr) auto; gap:4px; padding:4px; box-sizing:border-box; background:var(--gray-900, #121c1c); color:var(--gray-100, #e1e5e5); font-family:var(--font-sans, sans-serif);}
 .skellyclicker-sidebar, .skellyclicker-main {min-height:0; border-radius:8px; background:var(--gray-800, #242e2e); overflow:hidden;}
 .skellyclicker-sidebar {padding:16px; overflow:auto;}
 .skellyclicker-sidebar header {display:flex; align-items:center; gap:12px; margin-bottom:24px;}

@@ -1,38 +1,46 @@
-# skellyclicker
+# SkellyClicker
 
-For labelling and training data through DeepLabCut.
+The current source is a playback-oriented frontend and a small SDK-backed Python server; Tauri desktop packaging is the next active implementation step. It reuses FreeMoCap's playback components, with SkellyClicker branding and its own backend port.
 
-[![DOI](https://zenodo.org/badge/955944295.svg)](https://doi.org/10.5281/zenodo.19389888)
+```text
+backend/
+  skellyclicker_app/    Current Python server source
+  tests/               Lifecycle and image-transport checks
+  pyproject.toml       Backend package and SDK dependency
+  uv.lock              Backend dependency lock
+  .venv/               Local backend environment (ignored)
+skellyclicker-ui/
+  src/                 Current React frontend and its logo
+  tests/               Browser and transport checks
+  package.json         Frontend scripts and SDK dependencies
+  package-lock.json    Frontend dependency lock
+  node_modules/        Local frontend dependencies (ignored)
+  dist/                Built frontend (ignored)
+old/                   Previous application, preserved only as reference
+PLAYBACK.md            Detailed launch, package boundaries and verification
+LICENSE                Repository license
+```
 
-## Installation
+## Run the current app
 
-1. Clone the repository
+First build the SDK packages as described in [PLAYBACK.md](PLAYBACK.md). Then use two terminals from this repository:
 
-2. Change the directory to the cloned repository
+```powershell
+cd backend
+uv sync --locked
+uv run skellyclicker-playback
+```
 
-    - `cd skellyclicker`
+```powershell
+cd skellyclicker-ui
+npm ci --ignore-scripts
+npm run dev
+```
 
-3. Create a new conda environment from the environment yaml
+Open http://127.0.0.1:5176. The backend listens on http://127.0.0.1:8006. Stop each server with Ctrl+C in its terminal.
 
-    - `conda env create -f skellyclicker_env.yaml`
+The verified development shell opens an empty playback workspace with the existing FreeMoCap playback controls and 3D renderer. Loading real recordings, labeling, training and pose editing are subsequent work; they are not implemented by this shell.
 
-## How To Use
+## Previous version
 
-1. Activate the environment.
-
-2. Open the GUI.
-    - `python skellyclicker/__main__.py`
-
-3. Start a new session or load an existing one.
-    - When loading a session, look for the `.json` file you saved on a previous session.
-
-4. Label the videos by clicking `load videos` on the first iteration, or `open videos` on subsequent iterations
-    - Make sure you save the videos after labelling
-    
-5. Create a DeepLabCut project or load an existing project if you haven't yet
-
-6. Train the model with the `Train Network` button
-
-7. Click `Analyze Videos` to run the model on videos. If you run the model on the training videos, this will allow you to see the models output in the next round of labelling. 
-
-8. Repeat steps 4-7 until the model performs sufficiently well.
+Everything specific to the previous version lives in `old/`: Python source, original assets, legacy entry point, package/environment files, point definitions, README and editor snapshot. Its local Python3.10 environment was moved to `old/.venv` and remains ignored. It is preserved as reference, not maintained as a runnable environment after relocation. The new app imports nothing from `old/` and owns a separate copy of the logo it uses. Git metadata and the license remain at the repository root.

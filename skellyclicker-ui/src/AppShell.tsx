@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import logo from '../../skellyclicker/ui/assets/skellyclicker-logo.svg';
+import logo from './assets/skellyclicker-logo.svg';
 
 /** Product chrome around the SDK-owned playback workspace. */
 export function AppShell({children, sidebar, status}: {

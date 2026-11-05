@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1 --port 5176 --strictPort",
     "test:backend": "node --test tests/backend.integration.test.mjs"
   },
   "dependencies": {
@@ -16,6 +16,8 @@
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.20.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "4.7.0",
