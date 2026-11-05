@@ -8,6 +8,7 @@ from freemocap_sdk.logs import LogHub
 
 from .project_routes import router as project_router
 from .preparation import router as preparation_router, shutdown_jobs
+from .playback_adapter import router as playback_router
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger("skellyclicker")
@@ -64,7 +65,7 @@ def build_app():
 
     return create_app(
         title="SkellyClicker",
-        routers=(router, project_router, preparation_router),
+        routers=(router, project_router, preparation_router, playback_router),
         lifespan=lifespan,
         allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,

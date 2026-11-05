@@ -130,6 +130,9 @@ def publish_result(job):
         publish_directory(staging=output,destination=destination)
         project.sample_result=relative
         atomic_json(job['manifest'],project.model_dump(mode='json'))
+    update(job,stage='encoding playback')
+    from .playback_adapter import build_project_playback
+    build_project_playback(job['manifest'], cancelled=job['cancel'].is_set)
     update(job,state='complete',stage='complete',completed=len(rows),total=len(rows),accepted=summary['accepted'],result=relative)
     logger.info('Fresh sample result ready: %d frames, %d passed pilot gates (not human approved)',len(rows),summary['accepted'])
 

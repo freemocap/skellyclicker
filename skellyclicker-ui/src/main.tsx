@@ -56,11 +56,12 @@ function App({backendUrl}: {backendUrl: string}) {
     stream.connect();
     return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell sidebar={<ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>}
+  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/>}</>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
-    {project?<PreparationPanel baseUrl={backendUrl} project={project}/>:<PlaybackWorkspace baseUrl={backendUrl} recording={null} showTimingNotice={false}/>}
+    {project?.playback&&<div className="playback-provenance-note">Fresh pose candidates · green: passed pilot gates · orange: rejected · purple: authored STL reference · all unreviewed. Points are derived STL bounds, not detector predictions.</div>}
+    <PlaybackWorkspace baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }
 

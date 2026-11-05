@@ -56,6 +56,7 @@ class Project(Model):
     recording_manifests: list[str]
     target_manifests: list[str]
     sample_result: str | None = None
+    playback_result: str | None = None
 
 class CreateProject(Model):
     project_path: str
@@ -150,8 +151,10 @@ def open_project(path: Path) -> dict:
         geometry = resolve_relative(root, target.geometry.path)
         if not geometry.is_file() or file_digest(geometry) != target.geometry.sha256:
             issues.append(f"Missing or changed target geometry: {target.object_id}")
+    from .playback_adapter import register_project
+    playback = register_project(root, project)
     return {"root": str(root), "manifest_path": str(manifest), "project": project.model_dump(mode="json"),
         "recordings": [r.model_dump(mode="json") for r in recordings],
         "targets": [t.model_dump(mode="json") for t in targets], "issues": issues,
-        "sample_state": "prepared" if project.sample_result else "not_prepared", "playback": None}
+        "sample_state": "prepared" if project.sample_result else "not_prepared", "playback": playback}
 

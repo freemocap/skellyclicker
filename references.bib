@@ -20,3 +20,17 @@
   review = {Read-only local source inspection of the external DLL setup, mesh simplification, ModernGL context and FoundationPose construction; demonstration outputs were not imported},
   claim = {Established runtime configuration supplies the starting point for a parameterized fresh-input worker; demonstration color segmentation is recording-specific}
 }
+@misc{forgeRigidStlAdapter,
+  title = {SkellyForge rigid STL frame and coordinate conversion interfaces},
+  url = {https://github.com/freemocap/skellyforge/tree/871edd6b3a9cd6d8fc92738fc50d298b50c84761/skellyforge/core},
+  urldate = {2026-11-05},
+  review = {Local source inspected: skeleton/stl_rigid_body.py and math/geometry coordinate-system and quaternion modules; installed editable source verified; unrelated local tools were not modified},
+  claim = {Forge owns the original-mesh-to-segment reference transform, declared unit conversion and quaternion math reused by the app display adapter}
+}
+@misc{sdkRecordedPlayback,
+  title = {FreeMoCap SDK recorded playback resources and shared layout},
+  url = {https://github.com/freemocap/sdk/tree/72e0a5ade853fd0c00f128870e60d78e64ab7d85/packages},
+  urldate = {2026-11-05},
+  review = {Local server recording.py, client playback data/parquet contracts and UI PlaybackWorkspace, recording provider, surface renderer, shared pane and frame-transfer paths inspected; actual native presentation tested},
+  claim = {Buffered media, one-time Parquet decoding, static geometry and bounded numerical worker transfers support integrated playback without per-image frame requests}
+}

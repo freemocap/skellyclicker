@@ -2,13 +2,15 @@
 name = "skellyclicker-app"
 version = "0.1.0"
 description = "SkellyClicker playback application"
-requires-python = ">=3.11"
-dependencies = ["freemocap-sdk-server[bundle]", "fastapi>=0.115", "pyarrow>=18"]
+requires-python = ">=3.11,<3.13"
+dependencies = ["freemocap-sdk-server[bundle]", "fastapi>=0.115", "pyarrow>=18", "skellyforge", "trimesh>=4", "fast-simplification>=0.1", "pillow>=13.0.0"]
 
 [project.scripts]
 skellyclicker-playback = "skellyclicker_app.__main__:main"
 
 [tool.uv.sources]
+skellyforge = {path = "../../../project/repos/skellyforge", editable = true}
+skellylogs = {path = "../../../project/repos/utils/skellylogs", editable = true}
 freemocap-sdk-server = {path = "../../../project/repos/sdk/packages/server", editable = true}
 
 [build-system]

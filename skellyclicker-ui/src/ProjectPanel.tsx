@@ -6,7 +6,7 @@ export interface ProjectView {
   project: {project_id: string; uuid: string; created_at?: string};
   recordings: {recording_id: string; source: {path: string; bytes?: number}; calibration_state: string; streams: {camera_id: string}[]}[];
   targets: {object_id: string; authored_units: string}[];
-  issues: string[]; sample_state: string; playback: null;
+  issues: string[]; sample_state: string; playback: {id:string;displayName?:string}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}
 const recentKey='skellyclicker.recentProjects';
@@ -53,7 +53,7 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
     }catch(e){setError(String(e));}finally{setBusy(false);setBusyId(null);}
   }
   const projects:BrowserEntry[]=recent.map(item=>({id:item.id,name:item.name,path:item.path,timestamp:item.timestamp,subtitle:`${item.recordings} recording${item.recordings===1?'':'s'} · ${item.targets} reference${item.targets===1?'':'s'}`,status:item.id===project?.project.uuid?{label:'Open',tone:'success'}:undefined,details:[{label:'Manifest',value:item.path}]}));
-  const recordings:BrowserEntry[]=(project?.recordings ?? []).map(recording=>({id:recording.recording_id,name:recording.recording_id,path:recording.source.path,cameraCount:recording.streams.length,sizeBytes:recording.source.bytes,subtitle:recording.streams.map(stream=>stream.camera_id).join(' + '),status:{label:'Linked original',tone:'neutral'},details:[{label:'Original',value:recording.source.path},{label:'Calibration',value:recording.calibration_state==='ready'?'Ready':'Awaiting fresh replay'},{label:'Reference',value:project!.targets.map(t=>`${t.object_id} (${t.authored_units})`).join(', ')}]}));
+  const recordings:BrowserEntry[]=(project?.recordings ?? []).map(recording=>({id:recording.recording_id,name:recording.recording_id,path:recording.source.path,cameraCount:recording.streams.length,sizeBytes:recording.source.bytes,subtitle:recording.streams.map(stream=>stream.camera_id).join(' + '),status:{label:'Linked original',tone:'neutral'},details:[{label:'Original',value:recording.source.path},{label:'Calibration',value:project?.playback?'Fresh replay calibration loaded':recording.calibration_state==='ready'?'Ready':'Awaiting fresh replay'},{label:'Reference',value:project!.targets.map(t=>`${t.object_id} (${t.authored_units})`).join(', ')}]}));
   return <div className="project-browser-stack">
     <RecordingBrowser title="Projects" entries={projects} selectedId={project?.project.uuid} busyId={busyId} loading={busy} error={!mode?error:null} onSelect={id=>{const entry=recent.find(p=>p.id===id);if(entry)void submit('open',entry.path,id);}} onBrowse={()=>show('open')} browseLabel="Open project" onCreate={()=>show('create')} createLabel="New project" emptyMessage="Open a project or create a new one to begin."/>
     {project&&<div className="project-child-recordings"><RecordingBrowser title="Recordings" entries={recordings} selectedId={recordingId} onSelect={setRecordingId} error={project.issues.join('\n')||null} emptyMessage="No recordings in this project."/></div>}

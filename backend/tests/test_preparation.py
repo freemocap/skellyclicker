@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from pydantic import ValidationError
 import pyarrow.parquet as pq
 from skellyclicker_app.projects import CreateProject,create_project
@@ -23,7 +24,8 @@ class PreparationTest(unittest.TestCase):
    for name in ('zed_replay','fit_pose'):(work/(name+'.py')).write_text('pass')
    request={'frame_count':2,'start_frame':0,'recording_id':'capture','source_sha256':view['recordings'][0]['source']['sha256'],'target_sha256':view['targets'][0]['geometry']['sha256'],'mask_preset':'test'}
    job={'root':root,'work':work,'output':output,'manifest':Path(view['manifest_path']),'request':request,'status':{'job_id':'test'},'cancel':threading.Event()}
-   publish_result(job)
+   with patch('skellyclicker_app.playback_adapter.build_project_playback'):
+    publish_result(job)
    result=root/job['status']['result'];table=pq.read_table(result/'candidates.parquet')
    self.assertEqual(table['T_left_from_stl_m'].to_pylist(),[None,rows[1]['T_left_from_stl_m']])
    self.assertEqual(pq.read_table(result/'timing.parquet')['timestamp_ns'].to_pylist(),[r['timestamp_ns'] for r in rows])
