@@ -64,11 +64,15 @@ function App({backendUrl}: {backendUrl: string}) {
       {label:'Passed gates',color:'#5ce69a',description:'Passed the configured pilot gates; not human approval'},
       {label:'Rejected',color:'#ffa244',description:'Failed one or more pilot gates; shown for inspection'},
       {label:'Authored reference',color:'#b99aff',description:'Unposed STL at the world origin; not a detected object'},
+      ...(project.targets.some(t=>t.authored_geometry)?[
+        {label:'Keypoints',color:'#ff45e6',description:'Authored points projected through the fitted pose; hollow image points are mesh-self-occluded'},
+        {label:'Mesh outline',color:'#37eaff',description:'Thin visible mesh crease and silhouette edges in annotated images'},
+      ]:[]),
     ]} note="All unreviewed" details={<>
-      <p>Points show derived STL bounds, not detector predictions or approved labels.</p>
+      <p>Points show target geometry projected through the fitted pose, not detector predictions or approved labels.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
-    <PlaybackWorkspace pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
+    <PlaybackWorkspace pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }
 

@@ -5,7 +5,7 @@ export interface ProjectView {
   root: string; manifest_path: string;
   project: {project_id: string; uuid: string; created_at?: string};
   recordings: {recording_id: string; source: {path: string; bytes?: number}; calibration_state: string; streams: {camera_id: string}[]}[];
-  targets: {object_id: string; authored_units: string}[];
+  targets: {object_id: string; authored_units: string; authored_geometry?: {path:string}|null}[];
   issues: string[]; sample_state: string; playback: {id:string;displayName?:string;pointCloudManifest?:string|null}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}

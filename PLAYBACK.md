@@ -199,7 +199,7 @@ attributes, explicit update ranges and draw count [@threeBufferAttributes]
 [@threeBufferGeometry]. Fifteen-frame self-describing chunks carry the complete
 reference definition, source-frame IDs and exact nanosecond clock alongside float32
 XYZ and uint8 RGB payloads. Bounded worker fetching and cache ownership belong to
-the SDK. No per-point JavaScript objects or full-recording cloud preload is needed.
+the SDK. No per-point JavaScript objects are created. Short clips preload and retain their complete dense cloud data using the SDK byte budget and configurable concurrency; larger recordings use its rolling cache policy.
 
 The native preparation form accepts up to 900 source frames per job. Jobs expose
 progress, cancellation and live logs; the current job can be recovered by the UI
@@ -212,3 +212,17 @@ The SDK-backed viewer receives the cloud manifest through its public optional
 `pointCloud` input. App routes serve immutable manifest/chunk resources; the
 existing buffered videos contain rendered STL silhouettes in both cameras.
 Source PNGs are retained for inspection but are not fetched during playback.
+
+## Authored geometry overlays
+
+Targets can reference a hash-bound `authored_geometry` manifest. It identifies the exact ordered keypoints and connection topology, the matching STL hash, an original-mesh millimeter origin, and a dense binary outline asset. Authored point coordinates remain in original STL millimeters; conversion to source mesh units and the Forge segment frame is explicit. The same point array supplies the 3D landmarks and camera projections.
+
+The recovered outline projector retains the original crease/silhouette edge selection and BVH self-visibility tolerances. Preparation runs it through Node on the current fitted poses, streams one projection at a time, and encodes thin cyan mesh lines with contrasting magenta keypoints into a new annotated video revision. Filled points are mesh-self-visible; hollow points are self-occluded. External occlusion is unknown. These are pose-projected authored points, not detector predictions or accepted training labels. Raw images, fits, gate results and prior playback revisions remain unchanged. Node and ffmpeg must be available for this preparation step.
+
+The dense outline container begins with a little-endian uint32 JSON header length; header entries give typed-array constructor, byte offset and element count. Payload starts at an eight-byte boundary; arrays preserve the original vertex/triangle/edge/BVH ordering. Project files contain data rather than executable JavaScript. The generic projector code is versioned with the application.
+
+Playback verification distinguishes cloud loading/cache misses from unavailable presentation clocks. Readiness means the short cloud clip is resident; it does not by itself prove synchronized video presentation. The test harness checks that replay and seeks issue no cloud requests after readiness and reports each hiding reason separately.
+
+For the current Benchy review fixture, run `node tools/verify_presentation.mjs` with the source backend on port 8006 and the UI on port 5176, then `backend/.venv/Scripts/python.exe -B tools/check_presentation_pixels.py`. The headless check captures the actual displayed canvases and an independent browser decoder at identical dimensions, with normal browser security intact. It covers raw/annotated views, both cameras, local frames 0/375/600/650/749 and cache reuse across media choice and seeks. Results and screenshots stay under ignored `.test-artifacts/`.
+
+The native sustained harness is `skellyclicker-ui/tests/reconstruction-playback.mjs --sustained`; use `SKELLYCLICKER_TEST_CDP_PORT` only for a task-owned native review window. Without it, tests use headless Edge and discover the backend from the existing native window, or use `SKELLYCLICKER_TEST_BACKEND_URL`. Capture comparisons count actual committed image pairs and source frame identities, not requested seek times.

@@ -47,6 +47,7 @@ class Target(Model):
     geometry: Artifact
     authored_units: Literal["mm", "m"]
     authored_frame: str = "original STL coordinates"
+    authored_geometry: Artifact | None = None
     source_path: str
 
 class Project(Model):
