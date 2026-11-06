@@ -19,7 +19,7 @@ from .job_lifecycle import jobs,guard,busy
 router=APIRouter(prefix='/api/refinement')
 GRAPH=compile_graph(GraphDefinition(nodes=(GraphNode(id='mine_examples',operation='mine_examples',effects=('read_record','write_disk')),),edges=()))
 class MineRequest(TrainingRequest):
-    image_limit:int=Field(default=30,ge=1,le=200)
+    image_limit:int=Field(default=100,ge=1,le=200)
     spacing_seconds:float=Field(default=.5,ge=0,le=60)
     confidence_threshold:float=Field(default=.2,ge=0,le=1)
     near_error_threshold:float=Field(default=.03,gt=0,le=1)
@@ -68,6 +68,8 @@ def start(request:MineRequest):
             if not videos or any(not Path(v).is_file() for v in videos.values()):raise ValueError('Materialize synchronized recording videos before refinement')
             source_prepared=json.loads((previous/'prepared.json').read_text())
             reviewed=result_view(manifest);selection=selection_view(manifest)
+            from .refinement_membership import rejected_image_ids
+            excluded=set(selection['selected_image_ids'])|rejected_image_ids(manifest)
         except (ValueError,OSError,KeyError,TypeError) as error:raise HTTPException(422,str(error)) from error
         job={}
         def observe(snapshot):
@@ -77,6 +79,19 @@ def start(request:MineRequest):
         job.update(kind='refinement',manifest=manifest,root=manifest.parent,work=work,request=request.model_dump(),status={'state':'queued'},cancel=RunCancellation(run),run=run,process=None,started=time.monotonic())
         atomic_json(work/'request.json',request.model_dump())
         def mine_handler(_,ctx):
+            from .viewpoint_quality import mesh_frame,viewing_direction,spherical_bin
+            stl=resolve_relative(bound.root,bound.target.geometry.path)
+            center,_,_=mesh_frame(stl,bound.target.geometry.sha256,bound.target.geometry.bytes,stl.stat().st_mtime_ns,bound.target.authored_units)
+            poses={r['source_frame']:r for r in bound.rows}
+            bins={}
+            for frame,row in poses.items():
+                for camera in videos:
+                    direction=viewing_direction(row.get('T_'+camera+'_from_stl_m'),center)
+                    if direction is not None:bins[f'{frame}:{camera}']=spherical_bin(direction,12,6)
+            occupancy={}
+            for image in (reviewed['images'] if reviewed else []):
+                cell=bins.get(f"{image['source_frame']}:{image['camera_id']}")
+                if image['image_id'] in selection['selected_image_ids'] and cell is not None:occupancy[str(cell)]=occupancy.get(str(cell),0)+1
             cache=projection_source(bound,work,ctx);accepted={r['source_frame'] for r in bound.rows if r['accepted']};references={}
             with cache.open() as stream:
                 for line in stream:
@@ -86,7 +101,7 @@ def start(request:MineRequest):
             shutil.copyfile(parent['source_path'],work/'model.pt')
             if file_digest(work/'model.pt')!=parent['sha256']:raise ValueError('Checkpoint changed during snapshot')
             cutoff=int(dataset['manifest']['validation_start_ns'])-round(dataset['manifest']['guard_seconds']*1_000_000_000)
-            worker={**request.model_dump(),'checkpoint':str(work/'model.pt'),'checkpoint_sha256':parent['sha256'],'pose_config':source_prepared['pose'],'keypoint_count':len(bound.authored['names']),'videos':videos,'source_frames':timing['source_frame_indices'],'timestamps_ns':[str(t) for t in timing['timestamps_ns']],'training_cutoff_ns':str(cutoff),'references':references,'reviewed_keys':[f"{r['source_frame']}:{r['camera_id']}" for r in reviewed['images']] if reviewed else []}
+            worker={**request.model_dump(),'checkpoint':str(work/'model.pt'),'checkpoint_sha256':parent['sha256'],'pose_config':source_prepared['pose'],'keypoint_count':len(bound.authored['names']),'videos':videos,'source_frames':timing['source_frame_indices'],'timestamps_ns':[str(t) for t in timing['timestamps_ns']],'training_cutoff_ns':str(cutoff),'references':references,'viewpoint_bins':bins,'viewpoint_occupancy':occupancy,'reviewed_keys':[f"{r['source_frame']}:{r['camera_id']}" for r in reviewed['images'] if r['image_id'] in excluded] if reviewed else []}
             atomic_json(work/'worker-request.json',worker)
             atomic_json(work/'binding.json',{'pose_sha256':bound.pose_hash,'target_sha256':bound.target_hash,'selection_sha256':selection['sha256'],'label_manifest_sha256':reviewed['manifest_sha256'] if reviewed else None})
             ctx.progress(0,len(worker['source_frames'])*len(videos),'images','Scanning synchronized recording')

@@ -135,3 +135,28 @@ class ReceiptTest(unittest.TestCase):
   rid=self.batch();result=result_view(self.manifest);image=result['images'][0];selected=selection_view(self.manifest)
   save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=selected['sha256'],moment_id=image['moment_id'],source_frame=image['source_frame'],timestamp_ns=image['timestamp_ns'],camera_id=image['camera_id'],selected=False))
   with self.assertRaises(HTTPException):accept(rid,Accept(project_path=str(self.manifest),image_keys=['11:left']))
+
+
+class AugmentationPoolTest(ExactAdditionTest):
+ def test_ranked_out_images_can_be_added_but_manual_rejections_stay_out(self):
+  from freemocap_sdk.storage import atomic_json
+  from skellyclicker_app.label_routes import result_view,save_selection,SelectMoment
+  from skellyclicker_app.selection_storage import write_selection
+  from skellyclicker_app.refinement_membership import rejected_image_ids
+  from skellyclicker_app.projects import Project,read_model
+  self.run_job();result=result_view(self.manifest);images=result['images'];bad=images[0]
+  save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=selection_view(self.manifest)['sha256'],moment_id=bad['moment_id'],source_frame=bad['source_frame'],timestamp_ns=bad['timestamp_ns'],camera_id=bad['camera_id'],selected=False))
+  selected=selection_view(self.manifest);kept=images[1];unused=images[2]
+  revision=write_selection(self.root,'capture',result['path'],result['manifest_sha256'],[kept],selected['sha256'],reason='bulk_keep',membership_change={'ranking':{'policy':'quality_viewpoints'}})
+  project=read_model(self.manifest,Project);project.active_review=revision;atomic_json(self.manifest,project.model_dump())
+  self.assertEqual(rejected_image_ids(self.manifest),{bad['image_id']})
+  self.request=self.request.model_copy(update={'image_keys':[f"{r['source_frame']}:{r['camera_id']}" for r in [bad,unused]]})
+  self.run_job()
+  self.assertEqual(set(selection_view(self.manifest)['selected_image_ids']),{kept['image_id'],unused['image_id']})
+  self.assertEqual(rejected_image_ids(self.manifest),{bad['image_id']})
+
+ def test_viewpoint_coverage_accounts_for_existing_dataset(self):
+  rows=[{'group':g,'source_frame':i,'camera_id':'left','timestamp_ns':str(i),'score':score,'viewpoint_bin':cell} for i,(g,cell,score) in enumerate([('near_miss',0,100),('near_miss',1,2),('major_failure',0,100),('major_failure',2,1)])]
+  chosen=worker.select_refinement_examples(rows,2,0,{'0':100})
+  self.assertEqual({r['viewpoint_bin'] for r in chosen},{1,2})
+  self.assertEqual({r['group'] for r in chosen},{'near_miss','major_failure'})

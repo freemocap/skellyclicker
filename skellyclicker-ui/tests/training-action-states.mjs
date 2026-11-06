@@ -5,15 +5,17 @@ if(!backend){const native=await chromium.connectOverCDP('http://127.0.0.1:9224')
 const config=await(await fetch(backend+'/api/training/configuration')).json();
 const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1440,height:960}});
 const fixture={project:{manifest_path:'/fixture/project.json',root:'/fixture',project:{project_id:'State verification',uuid:'fixture'},recordings:[],targets:[],issues:[],sample_state:'prepared',playback:null}};
-let starts=0,previews=0,cancels=0,payload;const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+let starts=0,previews=0,cancels=0,payload,analyses=0,analysisPayload;const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 const make=(status,stage,detail='',completed=null,total=null)=>({run_id:'fixture-run',sequence:Math.random()*10000,status,cancel_requested:false,graph:config.graph,operations:['freeze_inputs','prepare_trainer','train_model','publish_run'].map(operation_id=>({operation_id,label:operation_id,status:operation_id===stage?'running':'waiting',detail:operation_id===stage?detail:'',completed:operation_id===stage?completed:null,total:operation_id===stage?total:null,unit:operation_id===stage&&total?'epochs':null,dependencies:[],waiting_for:[],blocked_by:[],files_read:[],files_written:[],items:[],elapsed_seconds:0,progress_fraction:null,effects:[],stage:null})),metrics:[],previews:[],elapsed_seconds:12,error:null});
 const prepared=make('running','prepare_trainer','Preparing official DLC project');
 await page.addInitScript(fixture=>{window.fixture=fixture;},fixture);
 await page.route('http://training-fixture.invalid/**',async route=>{
  const url=new URL(route.request().url());let value;
  if(url.pathname.endsWith('/preview-images'))value={epochs:[],epoch:null,images:[]};
- else if(url.pathname.endsWith('/checkpoints'))value={checkpoints:[],recommended_path:null,recommendation:'No checkpoints'};
+ else if(url.pathname.endsWith('/checkpoints'))value={checkpoints:[{path:'checkpoints/epoch-000008.pt',sha256:'saved-hash',epoch:8,validation_mean_px:2}],recommended_path:'checkpoints/epoch-000008.pt',recommendation:'Lowest mean validation keypoint error'};
  else if(url.pathname==='/api/refinement/latest')value=null;
+ else if(url.pathname==='/api/refinement/runs'&&route.request().method()==='POST'){analyses++;analysisPayload=route.request().postDataJSON();value={run_id:'analysis-fixture'};}
+ else if(url.pathname==='/api/refinement/runs/analysis-fixture')value={run_id:'analysis-fixture',snapshot:{status:'complete',operations:[]},result:{counts:{scanned:3038},proposals:[],scope:'fixture'},accepted:null};
  else if(url.pathname.endsWith('/configuration'))value=config;
  else if(url.pathname.endsWith('/preview')){previews++;value={image_count:31,keypoint_count:52,counts:{training:22,validation:8,guard:1},expected_selection_sha256:'fresh-'+previews,expected_label_manifest_sha256:'labels'};}
  else if(url.pathname.endsWith('/runs')&&route.request().method()==='POST'){starts++;payload=route.request().postDataJSON();await new Promise(r=>setTimeout(r,700));value={run_id:'fixture-run',snapshot:prepared};}
@@ -46,5 +48,17 @@ try{
  await page.evaluate(v=>window.setTrainingSnapshot(v),make('running','train_model','Training',4,12));await expect(page.locator('.training-dashboard > .run-summary')).toContainText('Last update');await page.emulateMedia({reducedMotion:'reduce'});expect(await page.locator('.training-dashboard > .run-summary .sdk-run-indicator').evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
  for(const [terminal,label] of [['failed','Failed'],['cancelled','Cancelled']]){await page.evaluate(v=>window.setTrainingSnapshot(v),make(terminal,null));await expect(page.locator('.training-dashboard > .run-summary')).toContainText(label);await expect(group.getByRole('button',{name:'Start training',exact:true})).toBeEnabled();}
  await page.evaluate(v=>window.setTrainingSnapshot(v),make('complete',null));await expect(page.locator('.training-dashboard > .run-summary')).toContainText('Finished');await expect(group.getByRole('button',{name:'Start training',exact:true})).toBeEnabled();expect(await positions()).toEqual(initial);
+ await expect(page.getByRole('button',{name:'Add training images',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Add training images',exact:true}).click();
+ const augmentation=page.getByRole('dialog',{name:'Add training images',exact:true});
+ await expect(augmentation.getByRole('spinbutton',{name:'Target new images'})).toHaveValue('100');
+ expect(analyses).toBe(0);expect(starts).toBe(1);
+ await augmentation.getByRole('button',{name:'Analyze recording and recommend images'}).click();
+ await expect(augmentation).toContainText('No eligible additions found');
+ expect(analyses).toBe(1);expect(analysisPayload.parent_run_id).toBe('fixture-run');expect(analysisPayload.parent_checkpoint).toBe('checkpoints/epoch-000008.pt');expect(analysisPayload.parent_checkpoint_sha256).toBe('saved-hash');expect(analysisPayload.image_limit).toBe(100);expect(starts).toBe(1);
+ await page.screenshot({path:'../.test-artifacts/augmentation-review.png'});
+ await augmentation.getByRole('button',{name:'Close Add training images',exact:true}).click();
+ await page.screenshot({path:'../.test-artifacts/augmentation-training.png'});
+ await page.setViewportSize({width:800,height:960});await page.screenshot({path:'../.test-artifacts/augmentation-training-narrow.png'});
  expect(errors).toEqual([]);await writeFile('../.test-artifacts/training-action-states.json',JSON.stringify({states:['idle','starting','preparing','running','evaluating','saving','cancelling','finished'],positions:initial,starts,cancels,configuredEpochs:payload.epochs,previewRequests:previews,errors},null,2));console.log('PASS stable shared actions, config retention, fresh preview, duplicate guard and all lifecycle stages; isolated fixture only');
 }catch(e){console.log({errors,body:(await page.locator('body').innerText()).slice(0,500)});throw e;}finally{await browser.close();}

@@ -16,6 +16,8 @@ export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRem
  const [checkpoints,setCheckpoints]=useState<{checkpoints:Checkpoint[];recommended_path:string|null;recommendation:string}|null>(null);
  const [datasetReceiptRevision,setDatasetReceiptRevision]=useState('');
  const [checkpointError,setCheckpointError]=useState('');
+ const [augmentOpen,setAugmentOpen]=useState(false);
+ const recommended=checkpoints?.checkpoints.find(c=>c.path===checkpoints.recommended_path);
  const [history,setHistory]=useState<SavedRun[]>([]);
  const [configuration,setConfiguration]=useState<{graph:PipelineGraph;defaults:Config;backend:string}|null>(null);
  const [runConfig,setRunConfig]=useState<Config|null>(null);
@@ -25,6 +27,7 @@ export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRem
  const submission=useRef(false),cancelSubmission=useRef(false);
  const [now,setNow]=useState(Date.now()),[receivedAt,setReceivedAt]=useState(Date.now()),[startedAt,setStartedAt]=useState(Date.now());
  const [runId,setRunId]=useState<string|null>(null),[recovered,setRecovered]=useState<PipelineSnapshot|null>(null);
+ const augmentationConfig=config&&recommended?{...config,parent_run_id:runId,parent_checkpoint:recommended.path,parent_checkpoint_sha256:recommended.sha256}:null;
  const snapshot=runId?(snapshots[runId]??recovered):null;
  const state=trainingState(snapshot,starting,cancelling),running=state.busy;
  const key='skellyclicker.training-run:'+project?.manifest_path;
@@ -94,6 +97,7 @@ export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRem
  return <div className="training-dashboard">
  {toolbarTarget?createPortal(commands,toolbarTarget):commands}
  <header className="training-results-heading"><div><h2>Training results</h2><p>{project?.project.project_id??'Open a project to train'} · {runId?`run ${runId.slice(0,8)} · ${snapshot?.status??'loading'}`:'No run selected'}</p></div><div className="training-run-options">{!!history.length&&<SettingSelectInput label="Displayed run" value={runId??''} disabled={running} options={[{value:'',label:'Select saved run'},...history.map(r=>({value:r.run_id,label:`${r.run_id.slice(0,8)} · ${r.status} · ${r.epoch?`epoch ${r.epoch}`:'no epochs yet'}`}))]} onChange={id=>{if(id)void selectRun(id);}}/>}</div></header>
+ {runId&&!running&&<section className="training-augment" aria-label="Next training round"><div><h3>{snapshot?.status==='complete'?'Training round complete':'Saved training round'}</h3><p>Keep {includedImageCount??preview?.image_count??'your'} included images. Analyze the recording, review up to 100 new examples, then add them to the next round.</p>{recommended?<p>Use epoch {recommended.epoch} · {checkpoints?.recommendation}</p>:<p role="status">{checkpointError||'No usable checkpoint is available for this run yet.'}</p>}</div><ButtonSm text="Add training images" buttonType="secondary" disabled={!augmentationConfig||recovering} onClick={()=>setAugmentOpen(true)}/></section>}
  <ResizablePanelGroup direction="horizontal" autoSaveId="skellyclicker-training-columns" className="training-columns"><ResizablePanel defaultSize={48} minSize={25}><div className="training-results-body">
  <details><summary>Evaluation settings · next run: {config?.pose_validation?'2D + optional pose':'2D only, pose off'} · {config?.checkpoint_metric==='p95_px'?'95th percentile':config?.checkpoint_metric==='pose'?'pose ranking':'mean pixel error'}</summary>{evaluationControls}</details>
  <div className="metric-grid">{snapshot?.metrics.map(series=><MetricSeriesChart key={series.operation_id+series.id} series={series} height={200} color={series.id.includes('train_')?'var(--color-info)':'#c7a4ff'}/>)}</div>
@@ -103,6 +107,7 @@ export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRem
  {project&&config&&generationTarget&&createPortal(<>{startingModel}<RefinementPanel baseUrl={baseUrl} projectPath={project.manifest_path} config={config} trainingActive={running} snapshots={snapshots} activeRunId={starting?null:runId} onDatasetChanged={revision=>{setDatasetReceiptRevision(revision);onDatasetChanged?.(revision);}} onGoTraining={onGoTraining}/></>,generationTarget)}
  </div>
  </ResizablePanel><ResizableHandle aria-label="Resize training results and checkpoint images"/><ResizablePanel defaultSize={52} minSize={25}><CheckpointImages key={runId??'empty'} baseUrl={baseUrl} projectPath={project?.manifest_path} runId={runId} latestStep={Math.max(0,...(snapshot?.previews.map(p=>p.step)??[]))} active={running}/></ResizablePanel></ResizablePanelGroup>
+ {augmentOpen&&project&&augmentationConfig&&createPortal(<PipelineWindow title="Add training images" subtitle={`Recommended epoch ${recommended?.epoch} · existing images are retained`} onClose={()=>setAugmentOpen(false)}><RefinementPanel baseUrl={baseUrl} projectPath={project.manifest_path} config={augmentationConfig} trainingActive={running} snapshots={snapshots} onDatasetChanged={revision=>{setDatasetReceiptRevision(revision);onDatasetChanged?.(revision);}} onGoTraining={()=>{chooseCheckpoint(recommended!.path);setAugmentOpen(false);onGoTraining?.();}}/></PipelineWindow>,document.body)}
  {open&&configuration&&config&&createPortal(<PipelineWindow title="Configure training" subtitle={running?'Running':project?.project.project_id} onClose={()=>setOpen(false)}><div className="training-configuration"><div className="training-command-bar">{actions}</div>{runFacts}{status}{evaluationControls}<PipelinePanel graphLayout="single-row" graph={snapshot&&running?snapshot.graph:configuration.graph} nodePresentation={presentations} operations={running?snapshot?.operations??[]:[]} locked={running} view={view} onViewChange={setView} notice={error||previewError?<p>{error||previewError}</p>:null} actions={<p>{shownConfig?.epochs} epochs · maximum {shownConfig?.max_seconds} seconds{preview?` · ${preview.image_count} included images`:''}</p>}/></div></PipelineWindow>,document.body)}
  </div>;
 }

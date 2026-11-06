@@ -140,7 +140,10 @@ def handlers(request,work,run_id):
             publish_directory(staging=output,destination=destination)
             moments={row['moment_id']:row for row in pq.read_table(destination/'moments.parquet').to_pylist()}
             all_images=[{**row,**moments[row['moment_id']],'image_id':row['moment_id']+':'+row['camera_id']} for row in pq.read_table(destination/'images.parquet').to_pylist()]
-            included=[r for r in all_images if r['image_id'] not in old_ids or r['image_id'] in kept_ids]
+            from .refinement_membership import rejected_image_ids
+            rejected=rejected_image_ids(bound.manifest) if request.image_keys is not None else set()
+            additions=set(request.image_keys or [])
+            included=[r for r in all_images if r['image_id'] not in old_ids or r['image_id'] in kept_ids or (f"{r['source_frame']}:{r['camera_id']}" in additions and r['image_id'] not in rejected)]
             after_ids={r['image_id'] for r in included}
             change={'before_count':len(kept_ids),'added_count':len(after_ids-kept_ids),'after_count':len(after_ids),'added_image_ids':sorted(after_ids-kept_ids)}
             review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),included,previous_selection['sha256'],reason='generated_candidates_included',membership_change=change)

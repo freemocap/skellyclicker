@@ -180,3 +180,18 @@ html, body, #root {height:100%; margin:0;}
 .training-dashboard{overflow:hidden;min-height:0}.training-results-heading{flex-shrink:0}.training-columns{flex:1;min-height:240px}.training-results-body{height:100%;overflow:auto;padding-right:14px;box-sizing:border-box}.checkpoint-browser{height:100%;overflow:auto;padding-left:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}.checkpoint-browser header{display:flex;align-items:center;gap:8px}.checkpoint-epoch-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.checkpoint-epoch-controls>label{display:flex;align-items:center;gap:8px;flex:1;min-width:160px}.checkpoint-epoch-controls input{min-width:0;flex:1}.checkpoint-display-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.checkpoint-display-controls label{display:flex;align-items:center;gap:6px}.checkpoint-display-controls input[type=range]{width:100px}.checkpoint-image-grid{display:grid;gap:12px;align-content:start}.checkpoint-image-grid figure{margin:0;min-width:0}.checkpoint-image-open{display:block;width:100%;padding:0;border:1px solid var(--gray-600);background:var(--gray-900);cursor:zoom-in}.checkpoint-image-open .sdk-annotation-image{display:block;aspect-ratio:16/10}.checkpoint-image-open .sdk-annotation-image img{object-fit:contain;width:100%;height:100%}.checkpoint-image-grid figcaption{padding:6px 0;font-size:12px}.checkpoint-browser :is(button,input):focus-visible{outline:2px solid var(--blue-400);outline-offset:3px}
 
 .checkpoint-browser input{accent-color:var(--color-info)}
+
+.training-augment {display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 20px;margin:0 16px 16px;border:2px solid var(--color-info);border-radius:8px;}
+.training-augment h3 {margin:0 0 8px;font-size:18px;}
+.training-augment p {margin:4px 0;max-width:75ch;}
+.training-augment .button.sm {min-height:52px;min-width:210px;font-size:16px;border:2px solid var(--color-info);}
+.refinement-method {max-width:85ch;}
+@media(max-width:850px){.training-augment{align-items:stretch;flex-direction:column;gap:12px;}.training-augment .button.sm{width:100%;}}
+
+.training-augment .button.sm .text{font-size:16px;}
+.training-augment{flex-shrink:0;}
+.checkpoint-display-controls .sdk-setting-select{min-width:140px;}
+
+.refinement-panel>.refinement-intro{margin-top:16px;margin-bottom:8px;}
+.refinement-panel>.refinement-method{margin-bottom:16px;}
+.refinement-panel>.refinement-actions{margin-top:12px;margin-bottom:16px;}

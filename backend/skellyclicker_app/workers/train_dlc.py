@@ -200,15 +200,22 @@ def preview_checkpoint(request,checkpoint,epoch):
     del runner;gc.collect();torch.cuda.empty_cache()
     emit('checkpoint',path=checkpoint.relative_to(WORK).as_posix(),sha256=checkpoint_hash,epoch=epoch)
 
-def select_refinement_examples(candidates, limit, spacing_ns):
-    """Balance error groups and spread samples in source time within each camera."""
-    groups={name:sorted((r for r in candidates if r['group']==name),key=lambda r:(-r['score'],r['source_frame'],r['camera_id'])) for name in ('near_miss','major_failure')}
-    selected=[]
+def select_refinement_examples(candidates, limit, spacing_ns, initial_occupancy=None):
+    """Balance failure groups; fill underrepresented views before score ties."""
+    groups={name:[r for r in candidates if r['group']==name] for name in ('near_miss','major_failure')}
+    occupancy={str(k):v for k,v in (initial_occupancy or {}).items()};selected=[]
+    def priority(row):
+        cell=row.get('viewpoint_bin')
+        return (cell is None,occupancy.get(str(cell),0),-row['score'],row['source_frame'],row['camera_id'])
     def take(group):
+        groups[group].sort(key=priority)
         while groups[group]:
             row=groups[group].pop(0)
             if all(row['camera_id']!=other['camera_id'] or abs(int(row['timestamp_ns'])-int(other['timestamp_ns']))>=spacing_ns for other in selected):
-                selected.append(row);return True
+                selected.append(row)
+                if row.get('viewpoint_bin') is not None:
+                    cell=str(row['viewpoint_bin']);occupancy[cell]=occupancy.get(cell,0)+1
+                return True
         return False
     while len(selected)<limit:
         counts={g:sum(r['group']==g for r in selected) for g in groups}
@@ -249,12 +256,12 @@ def mine(request):
                             elif normalized_error>=request['near_error_threshold']:
                                 group='near_miss';score=normalized_error;reason=f'Median point error is {normalized_error:.1%} of projected target size'
                             else:group='agreement';reason='Prediction agrees with the prepared pose within the configured threshold'
-                    row={'source_frame':frame,'local_frame':local,'camera_id':camera,'timestamp_ns':str(stamp),'key':key,'group':group,'score':score,'reason':reason,'normalized_error':normalized_error,'prediction':finite_list(pred)}
+                    row={'source_frame':frame,'local_frame':local,'camera_id':camera,'timestamp_ns':str(stamp),'key':key,'group':group,'score':score,'reason':reason,'normalized_error':normalized_error,'viewpoint_bin':request.get('viewpoint_bins',{}).get(key),'prediction':finite_list(pred)}
                     output.write(json.dumps(row,allow_nan=False)+'\n');counts['scanned']+=1;counts[group]+=1
                     if group in ('near_miss','major_failure'):candidates.append(row)
                     if counts['scanned']%10==0:emit('scan_progress',completed=counts['scanned'],total=total)
             finally:capture.release()
-    selected=select_refinement_examples(candidates,request['image_limit'],round(request['spacing_seconds']*1_000_000_000))
+    selected=select_refinement_examples(candidates,request['image_limit'],round(request['spacing_seconds']*1_000_000_000),request.get('viewpoint_occupancy'))
     (WORK/'previews').mkdir(exist_ok=True)
     for row in selected:
         check_stop();capture=cv2.VideoCapture(request['videos'][row['camera_id']]);capture.set(cv2.CAP_PROP_POS_FRAMES,row['local_frame']);ok,image=capture.read();capture.release()

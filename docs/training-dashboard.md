@@ -167,3 +167,29 @@ Regression evidence: backend receipt tests cover duplicate acceptance, failed pu
 Training keeps curves on the left and saved checkpoint samples on the right. The epoch slider indexes actual saved prediction epochs (including sparse save intervals), not fabricated intermediate images. Follow latest tracks newly saved epochs; manual browsing stays on the chosen epoch and never changes the next run’s starting checkpoint. A completed 100-epoch run with save_every=1 exposes100 saved epochs.
 
 Image size, target crop/full frame, annotations, raw-on-hover and the SDK full-resolution image dialog are available in the gallery. The API renders frozen source images with saved prediction coordinates and frozen labels; it does not rerun inference or modify historical outputs. Crop bounds use the reference points consistently across epochs and annotation modes. The four fixed training/validation camera samples are shown, rather than implying that every training image was evaluated. Missing data and unavailable saved predictions are reported explicitly.
+
+
+## Add images after a training round
+
+The outlined **Add training images** action stays above the Training results.
+It opens review with the displayed run's recommended checkpoint (including its
+hash and ranking explanation), independently of an older Starting model choice.
+The default target is 100 additional camera images. **Analyze recording and
+recommend images** launches inference; opening the dialog launches nothing.
+
+Analysis balances near misses and major failures, then favors source viewpoint
+bins underrepresented in the existing dataset before breaking ties by error.
+It scans the one synchronized recording supported by this adapter. Current
+members, explicit human removals, and validation/guard frames are not proposed.
+Images omitted by a recorded Best-N ranking remain candidates. Verified source
+poses are required; the target count is a maximum, not a guarantee.
+
+Review magenta reference labels against cyan predictions. **Add N images**
+preserves existing members and commits only the kept additions. The receipt
+reports the actual before/added/after counts. **Go to Training** selects the
+recommended model for continuation; starting training remains a separate action.
+Training loss is unchanged. Older run datasets and checkpoints remain immutable.
+
+The acquisition metric is raw 2D disagreement with prepared STL projections.
+Shared multiview reconstruction/reprojection error and Viewer playback of the
+saved full-recording predictions are not yet connected to this workflow.
