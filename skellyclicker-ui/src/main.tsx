@@ -1,10 +1,10 @@
 import {useEffect, useRef, useState, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
+import {WorkspaceTabs, PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
 import {createHttpClient, TransportService, ConnectionState, pipelineSnapshotKind, type PipelineSnapshot} from '@freemocap/client';
 import {stateKind} from './state-message';
-import {AppShell} from './AppShell';
+import {AppShell,type WorkspaceView} from './AppShell';
 import {TrainingDashboard} from './TrainingDashboard';
 import {resolveBackendUrl} from './config';
 import './shell.css';
@@ -26,7 +26,8 @@ function App({backendUrl}: {backendUrl: string}) {
   const getTargetCrop=useTargetCrop(backendUrl,project?.playback?.targetCropUrl);
   const playbackControls=useRef<PlaybackWorkspaceHandle|null>(null);
   const [presented,setPresented]=useState<PresentedFrame|null>(null);
-  const review=useCandidateReview({baseUrl:backendUrl,project,controls:playbackControls,presented,refreshKey:Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')});
+  const [datasetRefreshRevision,setDatasetRefreshRevision]=useState('');
+  const review=useCandidateReview({baseUrl:backendUrl,project,controls:playbackControls,presented,refreshKey:Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')+':'+datasetRefreshRevision});
   const [session,setSession]=useState<SessionState>(emptySession);
   const [restoring,setRestoring]=useState(true),[sessionError,setSessionError]=useState('');
   const saveQueue=useRef(Promise.resolve());
@@ -56,10 +57,13 @@ function App({backendUrl}: {backendUrl: string}) {
     finally{if(!signal?.aborted)setRestoring(false);}
   }
   useEffect(()=>{const abort=new AbortController();void restoreSession(abort.signal);return()=>abort.abort();},[backendUrl]);
-  const [trainingOpen,setTrainingOpen]=useState(false);
+  const [generationTarget,setGenerationTarget]=useState<HTMLDivElement|null>(null);
+  const [generationMode,setGenerationMode]=useState<'recording'|'model'>(()=>localStorage.getItem('skellyclicker.generation-view')==='model'?'model':'recording');
   const [sidebarRequest,setSidebarRequest]=useState(0);
   const [toolbarTarget,setToolbarTarget]=useState<HTMLDivElement|null>(null);
-  const [resultView,setResultView]=useState<'training'|'checkpoints'>(()=>localStorage.getItem('skellyclicker.results-view')==='checkpoints'?'checkpoints':'training');
+  const [resultView,setResultView]=useState<'generation'|'training'|'checkpoints'>(()=>{const saved=localStorage.getItem('skellyclicker.results-view');return saved==='checkpoints'||saved==='generation'?saved:'training';});
+  function goTo(view:WorkspaceView){if(view!=='viewer'){setResultView(view);localStorage.setItem('skellyclicker.results-view',view);}saveSession({workspace:view==='viewer'?'viewer':'training'});}
+  async function openGeneratedImages(){if(!project)return;const response=await fetch(backendUrl+'/api/projects/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_path:project.manifest_path})});if(!response.ok)throw new Error('Could not open generated images. Retry.');acceptProject(await response.json());saveSession({sidebar:'images',workspace:'viewer'});setSidebarRequest(v=>v+1);}
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
   const [connectionError, setConnectionError] = useState<string|null>(null);
@@ -103,7 +107,7 @@ function App({backendUrl}: {backendUrl: string}) {
     void checkHttp();
     return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>setTrainingOpen(true):undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={view=>{if(view!=='viewer'){setResultView(view);localStorage.setItem('skellyclicker.results-view',view);}saveSession({workspace:view==='viewer'?'viewer':'training'});}} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard toolbarTarget={toolbarTarget} surface={resultView} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>{setGenerationMode('recording');localStorage.setItem('skellyclicker.generation-view','recording');goTo('generation');}:undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={goTo} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard generationTarget={generationTarget} onGoTraining={()=>goTo('training')} onDatasetChanged={(revision)=>setDatasetRefreshRevision(revision)} toolbarTarget={toolbarTarget} surface={resultView==='checkpoints'?'checkpoints':'training'} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
     {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
@@ -113,6 +117,15 @@ function App({backendUrl}: {backendUrl: string}) {
     </div>}
     {!restoring&&(review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
   </>}
+    generation={<div className="generation-page">
+      <WorkspaceTabs label="Generation method" value={generationMode} onChange={value=>{const mode=value as 'recording'|'model';setGenerationMode(mode);localStorage.setItem('skellyclicker.generation-view',mode);}} tabs={[{id:'recording',label:'Recording images',panelId:'generation-recording'},{id:'model',label:'Find more examples',panelId:'generation-model'}]}/>
+      <div className="generation-body">
+        <section id="generation-recording" role="tabpanel" aria-label="Recording images" hidden={generationMode!=='recording'}>
+          {project?<Suspense fallback={<p role="status">Loading recording…</p>}><TrainingSetPanel embedded key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>goTo('viewer')} onReview={openGeneratedImages}/></Suspense>:<p role="status">No project selected</p>}
+        </section>
+        <section id="generation-model" role="tabpanel" aria-label="Find more examples" hidden={generationMode!=='model'}><div ref={setGenerationTarget} className="generation-refinement-target"/></section>
+      </div>
+    </div>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     >
@@ -130,7 +143,7 @@ function App({backendUrl}: {backendUrl: string}) {
     </>}/> }
     <PlaybackWorkspace navigationGroups={review.navigationGroups} renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>
-    {project&&<Suspense fallback={null}><TrainingSetPanel open={trainingOpen} key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)} onReview={async()=>{const response=await fetch(backendUrl+'/api/projects/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_path:project.manifest_path})});if(!response.ok)throw new Error('Could not open generated images. Retry.');acceptProject(await response.json());saveSession({sidebar:'images',workspace:'viewer'});setSidebarRequest(v=>v+1);setTrainingOpen(false);}}/></Suspense>}
+
   </>;
 }
 

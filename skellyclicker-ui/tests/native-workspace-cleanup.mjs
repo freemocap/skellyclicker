@@ -12,7 +12,7 @@ try{
  const hide=page.getByRole('button',{name:'Hide project / images',exact:true});if(await hide.count())await hide.click();
  const collapseLogs=page.getByRole('button',{name:'Collapse log panel',exact:true});if(await collapseLogs.count())await collapseLogs.click();
  const tabs=page.getByRole('tablist',{name:'Workspace views'});
- await tabs.getByRole('tab',{name:'Viewer',exact:true}).click();await tabs.getByRole('tab',{name:'Viewer',exact:true}).press('ArrowRight');await expect(tabs.getByRole('tab',{name:'Training',exact:true})).toBeFocused();
+ await tabs.getByRole('tab',{name:'Viewer',exact:true}).click();await tabs.getByRole('tab',{name:'Viewer',exact:true}).press('ArrowRight');await expect(tabs.getByRole('tab',{name:'Generate training data',exact:true})).toBeFocused();await tabs.getByRole('tab',{name:'Generate training data',exact:true}).press('ArrowRight');await expect(tabs.getByRole('tab',{name:'Training',exact:true})).toBeFocused();
  await expect(page.locator('.metric-line[d]')).toHaveCount(4);
  await expect(page.locator('#viewer-view')).toHaveCSS('opacity','0');
  await page.screenshot({path:'../.test-artifacts/ux-integration/training.png'});
@@ -22,7 +22,7 @@ try{
  await page.reload({waitUntil:'domcontentloaded'});await expect(tabs.getByRole('tab',{name:'Checkpoint images',exact:true})).toHaveAttribute('aria-selected','true');
  await tabs.getByRole('tab',{name:'Checkpoint images',exact:true}).press('Home');await expect(tabs.getByRole('tab',{name:'Viewer',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Configure training',exact:true}).click();await expect(page.getByRole('dialog',{name:'Configure training',exact:true})).toBeVisible();await page.getByRole('dialog',{name:'Configure training',exact:true}).press('Escape');
- await page.getByRole('button',{name:'Create image training set',exact:true}).click();await expect(page.getByRole('dialog',{name:'Create image training set',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close Create image training set',exact:true}).click();
+ await page.getByRole('button',{name:'Create image training set',exact:true}).click();await expect(page.getByRole('tabpanel',{name:'Generate training data',exact:true})).toBeVisible();await expect(page.getByRole('dialog',{name:'Create image training set',exact:true})).toHaveCount(0);await tabs.getByRole('tab',{name:'Viewer',exact:true}).click();
  await page.getByRole('button',{name:'Project / images',exact:true}).click();await page.getByRole('button',{name:'Images',exact:true}).click();await expect(page.locator('.sdk-image-card')).toHaveCount(membership.selected_image_ids.length);
  await page.getByRole('button',{name:'Project',exact:true}).click();await expect(page.locator('.project-browser-stack')).toBeVisible();await page.getByRole('button',{name:'Images',exact:true}).click();await page.getByRole('button',{name:'Hide project / images',exact:true}).click();
  const closeLogsAgain=page.getByRole('button',{name:'Collapse log panel',exact:true});if(await closeLogsAgain.count())await closeLogsAgain.click();await page.getByRole('button',{name:'Restore log panel',exact:true}).click();await expect(page.getByRole('button',{name:'Collapse log panel',exact:true})).toBeVisible();await page.getByRole('button',{name:'Collapse log panel',exact:true}).click();

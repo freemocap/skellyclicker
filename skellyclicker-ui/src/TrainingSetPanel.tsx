@@ -8,7 +8,7 @@ import {useLabelRun} from './useLabelRun';
 import {useStlSelection} from './useStlSelection';
 
 /** Core-derived SDK rows and composition; this app supplies only labeling semantics and state. */
-export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,open=true}:{baseUrl:string;project:ProjectView;snapshots:Record<string,PipelineSnapshot>;onClose:()=>void;onReview:()=>Promise<void>;open?:boolean}) {
+export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,open=true,embedded=false}:{baseUrl:string;project:ProjectView;snapshots:Record<string,PipelineSnapshot>;onClose:()=>void;onReview:()=>Promise<void>;open?:boolean;embedded?:boolean}) {
   const [showRun,setShowRun]=useState(true);
   const [view,setView]=useState<'graph'|'list'>('graph');
   const [summary,setSummary]=useState<PreparedSummary|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState('');
@@ -118,7 +118,7 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
   const count=config.scope==='all'?summary?.calibration.source_frame_count:config.mode==='reuse'?candidates.length:Math.ceil(Number(config.count)/Number(config.step));
   const buttonText=config.scope==='all'?'Generate all images':`Generate ${count?count*2:''} images`;
   if(!open)return null;
-  return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
+  const content=<>
     <WorkspaceToolbar label="Image generation" details={<>
       <span>{count?`${count.toLocaleString()} frames / ${(count*2).toLocaleString()} images · `:''}Both cameras</span>
     </>}>
@@ -140,5 +140,6 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
       notice={messages.length?<ul className="training-errors">{messages.map(message=><li key={message}>{message}</li>)}</ul>:null}
       actions={<>{run.snapshot&&<ButtonSm text={showRun?"Workflow settings":"Run progress"} buttonType="secondary" onClick={()=>setShowRun(v=>!v)}/>}<AnchoredInfo title="Image generation" text="Generate prepares missing recording frames, fits the STL and creates labeled images. New images are included; prior exclusions are preserved. Review the result before starting training."/></>}/>
     }
-  </PipelineWindow>;
+  </>;
+  return embedded?<section className="generation-recording" aria-label="Recording image generation">{content}</section>:<PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>{content}</PipelineWindow>;
 }
