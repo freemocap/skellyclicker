@@ -9,6 +9,8 @@ from freemocap_sdk.logs import LogHub
 from .project_routes import router as project_router
 from .preparation import router as preparation_router, shutdown_jobs
 from .playback_adapter import router as playback_router
+from .label_routes import router as label_router, task_router, registry
+from freemocap_sdk.pipeline import stream_pipeline_snapshots
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger("skellyclicker")
@@ -53,7 +55,7 @@ def build_app():
             hub.close()
 
     async def stream_updates(connection: Connection):
-        tasks = [asyncio.create_task(state_updates(connection)), asyncio.create_task(hub.forward(connection))]
+        tasks = [asyncio.create_task(state_updates(connection)), asyncio.create_task(hub.forward(connection)), asyncio.create_task(stream_pipeline_snapshots(connection,registry))]
         try:
             done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
@@ -65,7 +67,7 @@ def build_app():
 
     return create_app(
         title="SkellyClicker",
-        routers=(router, project_router, preparation_router, playback_router),
+        routers=(router, project_router, preparation_router, playback_router, label_router, task_router),
         lifespan=lifespan,
         allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,

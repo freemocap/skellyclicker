@@ -26,6 +26,7 @@ from .authored_geometry import load_authored_geometry, project_authored_geometry
 logger=logging.getLogger('skellyclicker.playback')
 _registered: dict[str, RecordingResources]={}
 _clouds: dict[str, Path]={}
+_crop_projects: dict[str, tuple[Path, Project]]={}
 
 def resolve_recording(recording_id):
     return _registered[recording_id]
@@ -45,16 +46,25 @@ def point_cloud_file(recording_id: str, filename: str):
         headers={'Cache-Control':'public, max-age=31536000, immutable'})
 
 
+@router.get('/{recording_id}/target-crops')
+def target_crops(recording_id: str):
+    from .target_crops import target_crop_metadata
+    if recording_id not in _crop_projects:raise HTTPException(404,'No target projection')
+    try:return target_crop_metadata(*_crop_projects[recording_id],recording_id)
+    except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+
 def register_project(root: Path, project: Project):
     if not project.playback_result: return None
     folder=resolve_relative(root,project.playback_result)
     manifest=PlaybackManifest.model_validate_json((folder/'playback.json').read_text())
     locations=json.loads((folder/'media.json').read_text(encoding='utf-8'))
     media={m.video_filename:resolve_relative(root,locations[m.video_filename]) for r in manifest.runs for m in r.media}
+    _crop_projects[manifest.recording_id]=(root,project)
     _registered[manifest.recording_id]=RecordingResources(manifest=manifest,parquet=folder/'display.parquet',videos=media)
     cloud=folder/'point_cloud'
     if (cloud/'manifest.json').is_file():_clouds[manifest.recording_id]=cloud
-    return {'id':manifest.recording_id,'displayName':f'{project.project_id} - fresh pose candidates',
+    return {'id':manifest.recording_id,'targetCropUrl':f'/freemocap/recordings/{manifest.recording_id}/target-crops','displayName':f'{project.project_id} - fresh pose candidates',
             'pointCloudManifest':f'/freemocap/recordings/{manifest.recording_id}/point-cloud/manifest.json' if manifest.recording_id in _clouds else None}
 
 

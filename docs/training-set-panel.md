@@ -74,3 +74,38 @@ New projects copy the selected STL into `recordings/<recording-id>/skellyclicker
 `target_snapshot.canonicalize_target` explicitly copies and verifies an existing library target into this recording-local location, preserves original/library bytes, and updates the catalog last under the project lock. Authored keypoints and outline bytes retain their hashes; the authored manifest changes only to use local paths. A retained update record contains the previous project manifest and source provenance. Reads never relocate data implicitly.
 
 Validation: `python -B -m unittest discover -s backend/tests` covers new-project placement, automatic selection, explicit correction, same-mesh/unit identity, authored points, unchanged originals and relocation. Native OS Browse/Cancel remains unverified because computer-use access to SkellyClicker was denied.
+
+## Executable prepared-data slice
+
+| Stage | Existing interface and owner | Behavior in this slice |
+| --- | --- | --- |
+| Bind inputs | SDK storage identities/relative paths; APP Project/Target and canonical recording extension | Validate source, pose/timing/calibration, STL units, ordered authored points and cached projection identities. |
+| Choose moments | APP configuration semantics; Arrow tables from existing preparation | Range, fit filter, ordered stride, then cap; preserve exact int64 timestamps and stereo grouping. |
+| Project labels | APP load_authored_geometry/camera_projections and existing project_authored_geometry Three.js worker | Reuse only hash-bound projections of the same geometry, poses and calibration; retain invalid/occluded rows explicitly. |
+| Publish candidates | SDK project_lock/publish_directory/atomic_json/inventory | Publish immutable unreviewed Parquet artifacts and update the APP selection pointer last. |
+| Run/status/cancel | SDK compiled graph, synchronous PipelineRun, registry/router and snapshot forwarding | Execute inside the existing APP job lifetime; one shared admission gate with preparation; stream retained full snapshots through the existing connection. |
+| Result review selection | SDK confirmed presented-frame and seek handle; APP revisioned selection | Select exact published moments, never infer source identity from displayed counters. Selection is not approval. |
+
+SkellyForge already supplies rigid STL model construction, rotation and coordinate conventions through normal installed imports in playback_adapter and recording_layout. The first prepared-data run needs no new SkellyCam/SkellyTracker dependency, capture, detector, depth or pose execution. Their independently owned capabilities remain available for later fresh-input stages. No Core runtime dependency or subrepository branch change is introduced.
+
+## Candidate execution and review
+
+The panel now offers Preview candidates and Generate candidates for compatible prepared inputs. Preview is read-only. During execution, the existing graph/list panel shows the four actual SDK operations; Workflow settings returns to the full workflow. Run cancellation is cooperative, and publication checks cancellation immediately before its atomic commit. A successful committed publication remains successful if cancellation arrives afterward.
+
+The app shares its admission lock and job catalog with preparation. SDK PipelineRun.execute schedules graph operations inside the admitted APP job thread. The existing WebSocket forwards full retained pipeline_snapshot messages through the SDK forwarder; the client subscribes through TransportService and retains sequence ordering per run. HTTP status is for inspection/recovery, not progress polling. Backend restart does not resume interrupted work; request/status files remain in the recording's working/labels directory.
+
+Routes: POST /api/labels/preview; POST /api/labels/runs; SDK GET /api/label-tasks and GET/POST /api/label-tasks/{run_id}[/cancel]; GET /api/labels/runs/{run_id}/result; GET /api/labels/result; GET/POST /api/labels/selection. Stale input or competing mutations return409; invalid configuration returns422. Earlier run result endpoints retain their own result identity after later runs.
+
+Saved candidates live under recording/skellyclicker/labels/<run-id>/r001 with moments.parquet, images.parquet, labels.parquet and manifest.json. Images reference the verified original prepared PNGs; no annotated overlays become training images. Every label retains ordered keypoint index, native pixel coordinates, projection validity, in-bounds status, mesh self-visibility and unknown external occlusion. Exact nanoseconds stay int64 in Parquet and strings in JSON. Manifest identities bind source, poses, calibration, target, ordered definition, projection bytes, configuration, executable recipe bytecode and available package versions. Missing bundled distribution metadata is explicitly null.
+
+Generated candidate review uses PlaybackWorkspace controlsRef/onPresentedFrame. Navigation awaits the actual synchronized pair; selection reads getPresentedFrame again at the action boundary. The app checks that recording/source frame against the published moments, whose exact timestamp is sent to the server. Each selection write creates a retained review revision and checks expected result/selection identities under the project lock. Selected moments remain unreviewed. Rigid-pose correction, keypoint editing, human approval, approved-dataset publication and training are not implemented by this slice.
+
+Verification: backend/tests/test_labels.py covers success, failure, cancellation, competing runs, stale writes, retained two-run results and selection persistence. tests/native-label-generation.mjs runs the actual prepared fixture through the native controls and reloads the saved selection. tests/reconstruction-playback.mjs --sustained uses the existing app when SKELLYCLICKER_TEST_CDP_PORT=9224 and checks paired playback, cloud/model alignment, loops and seeks.
+
+## Synchronized target close-ups
+
+Playback opens on annotated media when available; Raw remains a session choice. The SDK owns the outlined selector and the close-up canvas, which draws from the same committed bitmap as the full camera view. A bottom band keeps the full image unobscured. There is no second player, decoder, clock, or per-frame request.
+
+The APP supplies `PlaybackWorkspace.getTargetCrop` through `useTargetCrop`. It loads compact metadata once from the registered playback's target-crops endpoint. Bounds derive from the existing hash-verified dense projected outline and ordered points, with 20% padding (at least 16 pixels) and image clipping. Missing, nonfinite, behind-camera and wholly off-image projections are unavailable; they never reuse a prior frame's crop. The provider checks recording identity, exact media filename, published source frame and image dimensions. Raw and Annotated use the same geometry bounds. The backend streams the dense cache into a bounded four-entry compact cache; no fitting or media generation is performed.
+
+`backend/tests/test_target_crops.py` tests edge clipping and unavailable projections. `tests/native-target-crops.mjs` checks native Annotated default, source 90/120 and other seeks, mode changes, zoom, playback and loop frame/epoch equality. Evidence lives under ignored `.test-artifacts/target-closeups-native.*`.

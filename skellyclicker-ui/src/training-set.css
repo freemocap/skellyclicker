@@ -1,3 +1,7 @@
 .training-field-value {font-size:13px;color:var(--gray-100);overflow-wrap:anywhere;}
 .training-errors {margin:0;padding:8px 12px 8px 30px;color:var(--color-error,#ffaaa8);font-size:13px;}
 .training-entry {margin:12px 0;}
+.candidate-review { padding: 12px; border-top: 1px solid var(--border-color, #3b4d4d); }
+.candidate-review h3 { font-size: 16px; margin: 0 0 8px; }
+.candidate-review p { overflow-wrap: anywhere; }
+.candidate-review > div { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }

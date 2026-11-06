@@ -20,8 +20,7 @@ from .projects import Project, Recording, read_model, open_project, recording_st
 
 router = APIRouter(prefix='/api/preparation')
 logger = logging.getLogger('skellyclicker.preparation')
-_jobs = {}
-_guard = threading.RLock()
+from .job_lifecycle import jobs as _jobs, guard as _guard, busy
 
 class PreparationRequest(BaseModel):
     project_path: str
@@ -157,7 +156,7 @@ def execute(job):
 @router.post('/start')
 def start(request: PreparationRequest):
     with _guard:
-        if any(j['status']['state'] in ('queued','running','cancelling') for j in _jobs.values()): raise HTTPException(409,'A preparation job is already active')
+        if busy(): raise HTTPException(409,'A preparation job is already active')
         readiness=runtime()
         if not readiness['available']: raise HTTPException(422,readiness)
         view=open_project(Path(request.project_path))
@@ -225,4 +224,4 @@ def shutdown_jobs():
         if job['thread'].is_alive():
             job['cancel'].set()
             if job['process'] is not None: terminate_owned(job['process'])
-            job['thread'].join(timeout=5)
+            job['thread'].join(timeout=None if 'run' in job else 5)

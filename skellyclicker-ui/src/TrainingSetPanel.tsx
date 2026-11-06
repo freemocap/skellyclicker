@@ -3,10 +3,13 @@ import {ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,Setting
 import type {ProjectView} from './ProjectPanel';
 import {trainingGraph,defaultConfig,validateConfig,candidateFrames,readConfig,type PreparedSummary,type TrainingConfig} from './training-workflow';
 import './training-set.css';
+import type {PipelineSnapshot} from '@freemocap/client';
+import {useLabelRun} from './useLabelRun';
 import {useStlSelection} from './useStlSelection';
 
 /** Core-derived SDK rows and composition; this app supplies only labeling semantics and state. */
-export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;project:ProjectView;onClose:()=>void}) {
+export function TrainingSetPanel({baseUrl,project,snapshots,onClose}:{baseUrl:string;project:ProjectView;snapshots:Record<string,PipelineSnapshot>;onClose:()=>void}) {
+  const [showRun,setShowRun]=useState(true);
   const [view,setView]=useState<'graph'|'list'>('graph');
   const [summary,setSummary]=useState<PreparedSummary|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState('');
   const [config,setConfig]=useState<TrainingConfig>(defaultConfig(null)),[saveError,setSaveError]=useState('');
@@ -30,6 +33,7 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
     const next={...config,[key]:value};setConfig(next);
     try {localStorage.setItem(storageKey,JSON.stringify({version:1,binding,config:next}));setSaveError('');}catch {setSaveError('Configuration is not saved: browser storage is unavailable.');}
   }
+  const run=useLabelRun(baseUrl,project.manifest_path,config,snapshots);
   const problems=validateConfig(config,summary);
   const candidates=useMemo(()=>candidateFrames(config,summary),[config,summary]);
   const sourceValid=project.issues.length===0&&project.recordings.length===1&&project.targets.length===1;
@@ -74,7 +78,7 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
         {row('Track iterations','Fixed tracking iteration count in the existing adapter.',fixedNumber('Track iterations',3,''))}
         {row('Depth error gate','Pilot median absolute depth error threshold, with stereo IoU/coverage gates. Not a camera accuracy claim or label approval.',fixedNumber('Depth error gate',5,'mm'))}
       </>},
-    generate_candidates:{label:'Generate keypoint candidates',kind:'computation',availability:'unimplemented',reason:'The viewer has projected overlays. Durable label generation is not yet connected.',description:'Prepared-data subgraph: bind verified inputs → choose moments → project the ordered target definition → publish unreviewed candidates. Store moments/labels/images in Parquet with source provenance.',
+    generate_candidates:{label:'Generate keypoint candidates',kind:'computation',availability:reusable?'available':'unavailable',reason:'Generate unreviewed candidate labels from verified prepared poses and the ordered target definition.',description:'Prepared-data subgraph: bind verified inputs → choose moments → project the ordered target definition → publish unreviewed candidates. Store moments/labels/images in Parquet with source provenance.',
       summary:reusable?<SettingsSummaryChip>{candidates.length} pairs · {candidates.length*2} images</SettingsSummaryChip>:null,
       configuration:<>
         {row('Fit filter','Apply range, then fit filter, stride and optional cap. Failed fits remain available for review; selection never implies approval.',<SettingSelectInput label="Fit filter" value={config.fit} options={[{value:'all',label:'All candidates'},{value:'passed',label:'Passed gates'},{value:'failed',label:'Failed gates'}]} onChange={v=>change('fit',v)}/>,true)}
@@ -95,12 +99,22 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
         {row('Image source','Use original native images, never annotated overlays.',value('Original images'))}
       </>},
   };
-  const messages=[...project.issues,...problems,...(error?[error]:[]),...(saveError?[saveError]:[]),...(stl.error?[stl.error]:[]),...(stl.validated&&!stl.compatible?['Selected STL or units differ from the current target. Existing poses and target points cannot be reused; prepare this target before generating labels.']:[])];
+  const executionPresentation:Record<string,PipelineStagePresentation>={
+    bind_inputs:{label:'Bind verified inputs',kind:'source',availability:'available',description:'Verify the selected recording, poses, calibration, STL and ordered keypoints.',reason:'Uses the current prepared-data identities.'},
+    choose_moments:{label:'Choose paired moments',kind:'computation',availability:'available',description:'Apply range, fit filter, stride and optional cap in order.',reason:'Retains exact source frames and integer timestamps.'},
+    project_labels:{label:'Project candidate labels',kind:'computation',availability:'available',description:'Reuse identity-verified projections or the established authored geometry projector.',reason:'Keeps all ordered points, invalid rows and visibility meaning.'},
+    publish_candidates:{label:'Save unreviewed candidates',kind:'publication',availability:'available',description:'Publish immutable label, image-index and moment tables with provenance.',reason:'Generated candidates are not an approved training dataset.'},
+  };
+  const showingRun=!!run.snapshot&&showRun;
+  const messages=[...project.issues,...problems,...(error?[error]:[]),...(saveError?[saveError]:[]),...(stl.error?[stl.error]:[]),...(run.error?[run.error]:[]),...(run.snapshot?.error?[run.snapshot.error]:[]),...(stl.validated&&!stl.compatible?['Selected STL or units differ from the current target. Existing poses and target points cannot be reused; prepare this target before generating labels.']:[])];
   return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
-    {!loaded?<p role="status">Loading…</p>:<PipelinePanel graph={trainingGraph} nodePresentation={nodePresentation} view={view} onViewChange={setView}
+    {!loaded?<p role="status">Loading…</p>:<PipelinePanel locked={run.running} graph={showingRun?run.snapshot!.graph:trainingGraph} nodePresentation={showingRun?executionPresentation:nodePresentation} operations={showingRun?run.snapshot!.operations:[]} view={view} onViewChange={setView}
       notice={messages.length?<ul className="training-errors">{messages.map(message=><li key={message}>{message}</li>)}</ul>:null}
-      actions={<><AnchoredInfo title="Training-set workflow" text="This panel edits a configuration draft, stored in this browser for these project inputs. It does not generate labels, review candidates or publish a dataset yet. Existing artifacts remain unchanged. The run action becomes available when those stages are connected."/>
-        <ButtonSm text="Create training set" iconClass="processmocap-icon" className="primary accent mp-process" textColor="text-white" disabled tooltip tooltipText="Label generation, review and dataset publication are not connected yet."/>
+      actions={<>{run.snapshot&&<ButtonSm text={showRun?"Workflow settings":"Run progress"} onClick={()=>setShowRun(v=>!v)}/>}<span role="status">{run.snapshot?`${run.snapshot.status}${run.snapshot.cancel_requested?" (cancellation requested)":""} · ${run.snapshot.operations.find(op=>op.status==='running')?.detail??''}`:run.preview?`${run.preview.moment_count} pairs · ${run.preview.image_count} images · ${run.preview.label_count} labels`:null}</span><AnchoredInfo title="Training-set workflow" text="Preview validates the current prepared inputs without processing. Generate candidates publishes unreviewed projected labels; selection for review is separate from human approval and dataset publication."/>
+        <ButtonSm text="Preview candidates" onClick={()=>void run.inspect()} disabled={!reusable||run.running}/>
+        <ButtonSm text="Generate candidates" iconClass="processmocap-icon" className="primary accent mp-process" textColor="text-white" onClick={()=>void run.start()} disabled={!reusable||!run.preview||run.running}/>
+        {run.running&&<ButtonSm text="Cancel run" onClick={()=>void run.cancel()} disabled={!run.snapshot}/>}
+        {run.snapshot?.status==='complete'&&<ButtonSm text="Review candidates" onClick={onClose}/>}
       </>}/>
     }
   </PipelineWindow>;

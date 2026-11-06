@@ -1,12 +1,14 @@
 import {useEffect, useRef, useState, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus} from '@freemocap/ui';
+import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
-import {createHttpClient, TransportService, ConnectionState} from '@freemocap/client';
+import {createHttpClient, TransportService, ConnectionState, pipelineSnapshotKind, type PipelineSnapshot} from '@freemocap/client';
 import {stateKind} from './state-message';
 import {AppShell} from './AppShell';
 import {resolveBackendUrl} from './config';
 import './shell.css';
+import {useTargetCrop} from './useTargetCrop';
+import {CandidateReviewPanel} from './CandidateReviewPanel';
 import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
 import {SidebarProcessingAction} from '@freemocap/ui';
@@ -17,6 +19,10 @@ const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => 
 function App({backendUrl}: {backendUrl: string}) {
   const [logs] = useState(() => new LogStore({storageKey: 'skellyclicker.logs'}));
   const [project, setProject] = useState<ProjectView | null>(null);
+  const [pipelineSnapshots,setPipelineSnapshots]=useState<Record<string,PipelineSnapshot>>({});
+  const getTargetCrop=useTargetCrop(backendUrl,project?.playback?.targetCropUrl);
+  const playbackControls=useRef<PlaybackWorkspaceHandle|null>(null);
+  const [presented,setPresented]=useState<PresentedFrame|null>(null);
   const [trainingOpen,setTrainingOpen]=useState(false);
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
@@ -27,7 +33,7 @@ function App({backendUrl}: {backendUrl: string}) {
     const client = createHttpClient({baseUrl: backendUrl});
     const streamUrl = new URL(backendUrl + '/websocket/connect');
     streamUrl.protocol = streamUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-    const stream = new TransportService({url: streamUrl.href, kinds: {skellyclicker_state: stateKind}});
+    const stream = new TransportService({url: streamUrl.href, kinds: {skellyclicker_state: stateKind,pipeline_snapshot:pipelineSnapshotKind}});
     const abort = new AbortController();
     let active = true;
     const stateChanged = (state: ConnectionState) => {
@@ -40,6 +46,7 @@ function App({backendUrl}: {backendUrl: string}) {
     const unsubscribe = stream.subscribeToKind('skellyclicker_state', () => {
       if (active) setMessages(count => count + 1);
     });
+    const unsubscribePipeline=stream.subscribeToKind('pipeline_snapshot',message=>{if(active)setPipelineSnapshots(previous=>{const next=message.snapshot;return previous[next.run_id]?.sequence>=next.sequence?previous:{...previous,[next.run_id]:next};});});
     const unsubscribeErrors = stream.subscribeToProtocolErrors(error => {
       if (active) setConnectionError(`Stream error: ${String(error)}`);
     });
@@ -59,13 +66,13 @@ function App({backendUrl}: {backendUrl: string}) {
       if(response.ok&&active)setProject(await response.json());
     }).catch(()=>{/* Backend logs retain project errors; connection monitor owns transport errors. */});
     stream.connect();
-    return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
+    return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<><div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div><PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/></>}</>}
+  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<><div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div><PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/><CandidateReviewPanel baseUrl={backendUrl} project={project} controls={playbackControls} presented={presented} refreshKey={Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')}/></>}</>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
-    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} onClose={()=>setTrainingOpen(false)}/></Suspense>}
+    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)}/></Suspense>}
     {project?.playback&&<Legend label="Pose candidates" items={[
       {label:'Passed gates',color:'#5ce69a',description:'Passed the configured pilot gates; not human approval'},
       {label:'Rejected',color:'#ffa244',description:'Failed one or more pilot gates; shown for inspection'},
@@ -78,7 +85,7 @@ function App({backendUrl}: {backendUrl: string}) {
       <p>Points show target geometry projected through the fitted pose, not detector predictions or approved labels.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
-    <PlaybackWorkspace pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
+    <PlaybackWorkspace getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }
 

@@ -60,6 +60,8 @@ class Project(Model):
     target_manifests: list[str]
     sample_result: str | None = None
     playback_result: str | None = None
+    label_result: str | None = None
+    active_review: str | None = None
 
 class CreateProject(Model):
     project_path: str
@@ -184,4 +186,3 @@ def open_project(path: Path) -> dict:
         "recordings": [r.model_dump(mode="json") for r in recordings],
         "targets": [t.model_dump(mode="json") for t in targets], "issues": issues,
         "sample_state": "prepared" if project.sample_result else "not_prepared", "playback": playback}
-
