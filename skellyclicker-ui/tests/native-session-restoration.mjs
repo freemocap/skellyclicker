@@ -17,7 +17,7 @@ try{
  await expect(p.getByRole('button',{name:'Create image training set',exact:true})).toBeVisible({timeout:60000});
  await expect(p.getByRole('tab',{name:session.workspace==='training'?'Training dashboard':'Viewer',exact:true})).toHaveAttribute('aria-selected','true');
  await expect(p.locator('.project-child-recordings button[aria-pressed="true"]')).toContainText(session.recording_id);
- await expect(p.getByLabel('Saved training run',{exact:true})).toHaveValue(session.training_run_id);
+ await expect(p.getByLabel('Displayed run',{exact:true})).toHaveValue(session.training_run_id);
  expect(await p.locator('video').evaluateAll(es=>es.every(e=>e.paused))).toBe(true);
  if(process.argv.includes('--after')){
   const before=JSON.parse(await readFile('../.test-artifacts/session-before.json','utf8'));

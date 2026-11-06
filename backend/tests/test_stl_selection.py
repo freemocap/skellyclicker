@@ -27,6 +27,7 @@ class StlSelectionTest(unittest.TestCase):
             self.assertEqual(check()["path"], str(stl.resolve()))
             copy = root / "copy.stl"; copy.write_bytes(stl.read_bytes())
             self.assertTrue(check(copy)["compatible"])
+            self.assertEqual(check(copy)["path"], str(stl.resolve()))
             self.assertFalse(check(copy, "m")["compatible"])
             copy.write_bytes(trimesh.creation.box(extents=[2, 3, 4]).export(file_type="stl"))
             self.assertFalse(check(copy)["compatible"])

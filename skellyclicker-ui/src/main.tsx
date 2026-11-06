@@ -20,6 +20,7 @@ const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => 
 
 function App({backendUrl}: {backendUrl: string}) {
   const [logs] = useState(() => new LogStore({storageKey: 'skellyclicker.logs'}));
+  const [logPersistenceError,setLogPersistenceError]=useState<string|null>(null);
   const [project, setProject] = useState<ProjectView | null>(null);
   const [pipelineSnapshots,setPipelineSnapshots]=useState<Record<string,PipelineSnapshot>>({});
   const getTargetCrop=useTargetCrop(backendUrl,project?.playback?.targetCropUrl);
@@ -59,7 +60,6 @@ function App({backendUrl}: {backendUrl: string}) {
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
   const [connectionError, setConnectionError] = useState<string|null>(null);
-  const [messages, setMessages] = useState(0);
   const actions = useRef<{reconnect:()=>void; disconnect:()=>void}|null>(null);
   useEffect(() => {
     const client = createHttpClient({baseUrl: backendUrl});
@@ -73,11 +73,10 @@ function App({backendUrl}: {backendUrl: string}) {
     };
     stream.on('state-change',stateChanged);
     stateChanged(stream.getState());
-    logs.start();
-    const unsubscribeLogs = stream.subscribeToLog(record => logs.add(record));
-    const unsubscribe = stream.subscribeToKind('skellyclicker_state', () => {
-      if (active) setMessages(count => count + 1);
-    });
+    let unsubscribeLogs=()=>{};
+    const persistLogs=()=>logs.persistNow();
+    window.addEventListener('beforeunload',persistLogs);
+    const logErrorTimer=setInterval(()=>setLogPersistenceError(logs.persistenceError),1000);
     const unsubscribePipeline=stream.subscribeToKind('pipeline_snapshot',message=>{if(active)setPipelineSnapshots(previous=>{const next=message.snapshot;return previous[next.run_id]?.sequence>=next.sequence?previous:{...previous,[next.run_id]:next};});});
     const unsubscribeErrors = stream.subscribeToProtocolErrors(error => {
       if (active) setConnectionError(`Stream error: ${String(error)}`);
@@ -87,17 +86,23 @@ function App({backendUrl}: {backendUrl: string}) {
       try {
         const response=await client.assetResponse('/api/status',{signal:abort.signal});
         if(!response.ok)throw new Error(`HTTP ${response.status}`);
-        if((await response.json()).application!=='skellyclicker')throw new Error('The endpoint is not a SkellyClicker backend.');
+        const identity=await response.json();
+        if(identity.application!=='skellyclicker')throw new Error('The endpoint is not a SkellyClicker backend.');
+        if(typeof identity.log_session_id!=='string')throw new Error('Restart SkellyClicker to activate the updated backend and log session.');
+        if(!active)return;
+        logs.beginSession(identity.log_session_id);logs.start();
+        unsubscribeLogs();unsubscribeLogs=stream.subscribeToLog(record=>logs.add(record));
+        stream.connect();
         if(active)setHttpStatus('available');
       }catch(error){if(active){setHttpStatus('unavailable');setConnectionError(String(error));}}
     }
-    actions.current={reconnect:()=>{stream.disconnect();stream.connect();void checkHttp();},disconnect:()=>stream.disconnect()};
+    actions.current={reconnect:()=>{stream.disconnect();void checkHttp();},disconnect:()=>stream.disconnect()};
     void checkHttp();
-    stream.connect();
-    return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
+    return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell view={session.workspace} onView={workspace=>saveSession({workspace})} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+  return <><AppShell view={session.workspace} onView={workspace=>saveSession({workspace})} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
+    {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
     {review.catalog&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
       <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>saveSession({sidebar:'images'})}/>
@@ -108,8 +113,7 @@ function App({backendUrl}: {backendUrl: string}) {
   </>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
-    status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
-    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)}/></Suspense>}
+    >
     {project?.playback&&<Legend label="Pose candidates" items={[
       {label:'Passed gates',color:'#5ce69a',description:'Passed the configured pilot gates; not human approval'},
       {label:'Rejected',color:'#ffa244',description:'Failed one or more pilot gates; shown for inspection'},
@@ -118,12 +122,14 @@ function App({backendUrl}: {backendUrl: string}) {
         {label:'Keypoints',color:'#ff45e6',description:'Authored points projected through the fitted pose; hollow image points are mesh-self-occluded'},
         {label:'Mesh outline',color:'#37eaff',description:'Thin visible mesh crease and silhouette edges in annotated images'},
       ]:[]),
-    ]} note="Include images to approve them for training" details={<>
-      <p>Points show target geometry projected through the fitted pose, not detector predictions. Inclusion records your approval for training.</p>
+    ]} note="Training-set images are approved for training" details={<>
+      <p>Points show target geometry projected through the fitted pose, not detector predictions. Training-set membership records your approval for training.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
     <PlaybackWorkspace navigationGroups={review.navigationGroups} renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
-  </AppShell>;
+  </AppShell>
+    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)} onPrepare={()=>{setTrainingOpen(false);saveSession({sidebar:'project'});}}/></Suspense>}
+  </>;
 }
 
 const root = createRoot(document.getElementById('root')!);

@@ -1,78 +1,80 @@
-import {useEffect,useState} from 'react';
-
-import {SidebarProcessingAction as ButtonSm,SettingSelectInput,AnchoredInfo,PipelinePanel,PipelineWindow,SettingRow,ValueSelector,MetricSeriesChart,SamplePreviewGrid,type PipelineGraph,type PipelineStagePresentation} from '@freemocap/ui';
-
+import {useEffect,useRef,useState} from 'react';
+import {ButtonSm,SettingSelectInput,AnchoredInfo,PipelinePanel,PipelineWindow,SettingRow,ValueSelector,MetricSeriesChart,SamplePreviewGrid,type PipelineGraph,type PipelineStagePresentation} from '@freemocap/ui';
 import type {PipelineSnapshot} from '@freemocap/client';
-
 import type {ProjectView} from './ProjectPanel';
-
-
-
-type Config={python_path:string;epochs:number;batch_size:number;save_every:number;seed:number;max_seconds:number;validation_fraction:number;guard_seconds:number};
-
+import {RefinementPanel} from './RefinementPanel';
+import {TrainingActions} from './TrainingActions';
+import {trainingState} from './training-state';
+type Checkpoint={path:string;sha256:string;epoch:number;validation_mean_px:number|null};
+type Config={parent_run_id:string|null;parent_checkpoint:string|null;parent_checkpoint_sha256:string|null;python_path:string;epochs:number;batch_size:number;save_every:number;seed:number;max_seconds:number;validation_fraction:number;guard_seconds:number};
 type SavedRun={run_id:string;status:string;counts:{training:number;validation:number;guard:number}|null;keypoint_count:number|null;epoch:number};
-
 type Preview={image_count:number;moment_count:number;keypoint_count:number;counts:{training:number;validation:number;guard:number};expected_selection_sha256:string;expected_label_manifest_sha256:string};
-
 const labels={freeze_inputs:'Freeze included images',prepare_trainer:'Prepare DeepLabCut',train_model:'Train and evaluate',publish_run:'Save run artifacts'};
-
-export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRememberRun}:{baseUrl:string;project:ProjectView|null;snapshots:Record<string,PipelineSnapshot>;rememberedRun:string|null;onRememberRun:(id:string)=>void}) {
-
+export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRememberRun,selectionRevision}:{baseUrl:string;project:ProjectView|null;snapshots:Record<string,PipelineSnapshot>;rememberedRun:string|null;onRememberRun:(id:string)=>void;selectionRevision?:string|null}){
+ const [checkpoints,setCheckpoints]=useState<{checkpoints:Checkpoint[];recommended_path:string|null;recommendation:string}|null>(null);
+ const [checkpointError,setCheckpointError]=useState('');
  const [history,setHistory]=useState<SavedRun[]>([]);
-
  const [configuration,setConfiguration]=useState<{graph:PipelineGraph;defaults:Config;backend:string}|null>(null);
-
+ const [runConfig,setRunConfig]=useState<Config|null>(null);
  const [config,setConfig]=useState<Config|null>(null),[preview,setPreview]=useState<Preview|null>(null);
-
- const [open,setOpen]=useState(false),[view,setView]=useState<'graph'|'list'>('graph'),[error,setError]=useState(''),[pending,setPending]=useState(false);
-
- const [now,setNow]=useState(Date.now());
-
- const [receivedAt,setReceivedAt]=useState(Date.now());
-
+ const [open,setOpen]=useState(false),[view,setView]=useState<'graph'|'list'>('graph'),[error,setError]=useState(''),[previewError,setPreviewError]=useState('');
+ const [starting,setStarting]=useState(false),[cancelling,setCancelling]=useState(false),[recovering,setRecovering]=useState(true),[validating,setValidating]=useState(false);
+ const submission=useRef(false),cancelSubmission=useRef(false);
+ const [now,setNow]=useState(Date.now()),[receivedAt,setReceivedAt]=useState(Date.now()),[startedAt,setStartedAt]=useState(Date.now());
  const [runId,setRunId]=useState<string|null>(null),[recovered,setRecovered]=useState<PipelineSnapshot|null>(null);
-
  const snapshot=runId?(snapshots[runId]??recovered):null;
-
- useEffect(()=>{setReceivedAt(Date.now());},[snapshot?.sequence,runId]);
-
- useEffect(()=>{if(!snapshot||!['queued','running'].includes(snapshot.status))return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[snapshot?.status]);
-
- const running=pending||!!snapshot&&['queued','running'].includes(snapshot.status);
-
+ const state=trainingState(snapshot,starting,cancelling),running=state.busy;
  const key='skellyclicker.training-run:'+project?.manifest_path;
-
+ const draftKey='skellyclicker.training-draft:'+project?.manifest_path;
+ useEffect(()=>{
+  setCheckpoints(null);setCheckpointError('');if(!runId||!project||running)return;
+  const abort=new AbortController();void fetch(baseUrl+'/api/training/runs/'+runId+'/checkpoints?project_path='+encodeURIComponent(project.manifest_path),{signal:abort.signal}).then(async r=>{if(!r.ok)throw new Error('Checkpoint selection is unavailable until the updated backend is running. Saved files remain intact.');const value=await r.json();if(!abort.signal.aborted)setCheckpoints(value);}).catch(e=>{if(!abort.signal.aborted)setCheckpointError(String(e));});return()=>abort.abort();
+ },[baseUrl,runId,project?.manifest_path,running]);
  const selectedRun=history.find(r=>r.run_id===runId);
+ const shownConfig=running?(runConfig??config):config;
+ useEffect(()=>{setRunConfig(null);if(!runId||!project)return;const abort=new AbortController();void fetch(baseUrl+'/api/training/runs/'+runId+'/artifact?project_path='+encodeURIComponent(project.manifest_path)+'&path=request.json',{signal:abort.signal}).then(async r=>{if(r.ok){const value=await r.json();if(!abort.signal.aborted)setRunConfig(value);}}).catch(()=>{});return()=>abort.abort();},[baseUrl,runId,project?.manifest_path]);
  const displayedCounts=selectedRun?.counts??preview?.counts;
  const displayedKeypoints=selectedRun?.keypoint_count??preview?.keypoint_count;
-
+ useEffect(()=>{setReceivedAt(Date.now());},[snapshot?.sequence,runId]);
+ useEffect(()=>{if(!running)return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[running]);
+ useEffect(()=>{if(!state.active){setCancelling(false);cancelSubmission.current=false;}},[state.active]);
  useEffect(()=>{if(!project)return;const abort=new AbortController();void fetch(baseUrl+'/api/training/runs?project_path='+encodeURIComponent(project.manifest_path),{signal:abort.signal}).then(async r=>{if(r.ok)setHistory(await r.json());}).catch(()=>{});return()=>abort.abort();},[baseUrl,project?.manifest_path,snapshot?.status]);
+ async function selectRun(id:string){if(!project||running)return;try{const r=await fetch(baseUrl+'/api/training/runs/'+id+'?project_path='+encodeURIComponent(project.manifest_path));if(!r.ok)throw new Error('Saved run unavailable');setRecovered(await r.json());setRunId(id);localStorage.setItem(key,id);onRememberRun(id);setError('');}catch(e){setError(String(e));}}
+ useEffect(()=>{const abort=new AbortController();void fetch(baseUrl+'/api/training/configuration',{signal:abort.signal}).then(async r=>{if(!r.ok)throw new Error('Training configuration unavailable');const value=await r.json();if(!abort.signal.aborted)setConfiguration(value);}).catch(e=>{if(!abort.signal.aborted)setError(String(e));});return()=>abort.abort();},[baseUrl]);
+ useEffect(()=>{if(!configuration)return;let draft={};try{const saved=JSON.parse(localStorage.getItem(draftKey)??'null');if(saved&&typeof saved==='object')draft=Object.fromEntries(Object.entries(saved).filter(([k,v])=>k in configuration.defaults&&(k.startsWith('parent_')?(v===null||typeof v==='string'):typeof v===typeof configuration.defaults[k as keyof Config])));}catch{}setConfig({...configuration.defaults,...draft});},[configuration,draftKey]);
+ useEffect(()=>{setRunId(null);setRecovered(null);setPreview(null);setRecovering(true);if(!project){setRecovering(false);return;}const id=rememberedRun??localStorage.getItem(key);if(!id){setRecovering(false);return;}const abort=new AbortController();void fetch(baseUrl+'/api/training/runs/'+id+'?project_path='+encodeURIComponent(project.manifest_path),{signal:abort.signal}).then(async r=>{if(!r.ok)throw new Error('Saved training run unavailable');const value=await r.json();if(!abort.signal.aborted){setRunId(id);setRecovered(value);if(!rememberedRun)onRememberRun(id);}}).catch(e=>{if(!abort.signal.aborted)setError(String(e));}).finally(()=>{if(!abort.signal.aborted)setRecovering(false);});return()=>abort.abort();},[key,baseUrl]);
+ async function post(path:string,body:unknown,signal?:AbortSignal){const response=await fetch(baseUrl+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});const result=await response.json();if(!response.ok)throw new Error(typeof result.detail==='string'?result.detail:JSON.stringify(result.detail));return result;}
+ useEffect(()=>{
+  if(!config||!project||running)return;
+  const abort=new AbortController();setPreview(null);setValidating(true);
+  const timer=setTimeout(()=>{void post('/api/training/preview',{...config,project_path:project.manifest_path},abort.signal).then(value=>{if(!abort.signal.aborted){setPreview(value);setPreviewError('');}}).catch(e=>{if(!abort.signal.aborted)setPreviewError(String(e));}).finally(()=>{if(!abort.signal.aborted)setValidating(false);});},200);
+  return()=>{clearTimeout(timer);abort.abort();};
+ },[baseUrl,project?.manifest_path,config,selectionRevision,running]);
+ function change<K extends keyof Config>(k:K,v:Config[K]){if(running)return;setConfig(c=>{if(!c)return c;const next={...c,[k]:v};localStorage.setItem(draftKey,JSON.stringify(next));return next;});}
+ async function start(){
+  if(submission.current||running||recovering||!project||!config?.python_path)return;
+  submission.current=true;setStarting(true);setStartedAt(Date.now());setNow(Date.now());setError('');
+  try{
+   const fresh:Preview=await post('/api/training/preview',{...config,project_path:project.manifest_path});setPreview(fresh);
+   const value=await post('/api/training/runs',{...config,project_path:project.manifest_path,expected_selection_sha256:fresh.expected_selection_sha256,expected_label_manifest_sha256:fresh.expected_label_manifest_sha256});
+   setRunConfig(config);setRunId(value.run_id);setRecovered(value.snapshot);localStorage.setItem(key,value.run_id);onRememberRun(value.run_id);
+  }catch(e){setError(String(e));}finally{submission.current=false;setStarting(false);}
+ }
+ async function cancel(){if(!runId||!state.active||cancelSubmission.current)return;cancelSubmission.current=true;setCancelling(true);try{await post('/api/label-tasks/'+runId+'/cancel',{});}catch(e){cancelSubmission.current=false;setCancelling(false);setError(String(e));}}
+ const elapsed=starting?Math.max(0,now-startedAt)/1000:(snapshot?.elapsed_seconds??0)+(state.active?Math.max(0,now-receivedAt)/1000:0);
+ const actions=<TrainingActions canConfigure={!!project&&!!config} canStart={!!project&&!!config?.python_path&&!running&&!recovering} canCancel={state.active&&!starting} starting={starting} cancelling={state.cancelling} onConfigure={()=>setOpen(true)} onStart={()=>void start()} onCancel={()=>void cancel()}/>;
+ function chooseCheckpoint(path:string){if(!config||running)return;const selected=checkpoints?.checkpoints.find(c=>c.path===path);const next={...config,parent_run_id:selected?runId:null,parent_checkpoint:selected?.path??null,parent_checkpoint_sha256:selected?.sha256??null};setConfig(next);localStorage.setItem(draftKey,JSON.stringify(next));}
+ const runFacts=<div className="training-run-facts" aria-label="Training start behavior"><strong>{config?.parent_run_id?'Start continues learned weights in a new round':'Start creates a new model'}</strong><span>{config?.parent_run_id?`Parent run ${config.parent_run_id.slice(0,8)} · ${config.parent_checkpoint} · optimizer resets for the new round`:'Source: pretrained ResNet-50, fresh object head'}</span><span>Stopping keeps completed checkpoints, curves and images</span></div>;
+ const checkpointControls=!running&&runId?<div className="training-checkpoint-controls"><label>Starting model<select aria-label="Starting model" value={config?.parent_run_id?(config.parent_run_id===runId?config.parent_checkpoint??'':'other-parent'):''} onChange={e=>{if(e.target.value!=='other-parent')chooseCheckpoint(e.target.value);}}><option value="">New model — pretrained ResNet-50</option>{config?.parent_run_id&&config.parent_run_id!==runId&&<option value="other-parent">Selected parent: {config.parent_run_id.slice(0,8)} · {config.parent_checkpoint}</option>}{checkpoints?.checkpoints.map(c=><option key={c.path} value={c.path}>Continue epoch {c.epoch}{c.validation_mean_px!==null?` · ${c.validation_mean_px.toFixed(2)} px validation error`:''}{c.path===checkpoints.recommended_path?' · recommended':''}</option>)}</select></label>{checkpoints?.recommended_path&&<ButtonSm text="Use recommended checkpoint" buttonType="secondary" onClick={()=>chooseCheckpoint(checkpoints.recommended_path!)}/>}<p>Changing the displayed run does not change your selected starting model.</p>{checkpoints?.checkpoints.length===0&&<p>This run has no published checkpoints yet. Select another saved run.</p>}{checkpointError&&<p role="status">{checkpointError}</p>}<p>Continue uses the current reviewed dataset, including accepted additions. Earlier runs remain unchanged.</p></div>:null;
 
- async function selectRun(id:string){if(!project)return;try{const r=await fetch(baseUrl+'/api/training/runs/'+id+'?project_path='+encodeURIComponent(project.manifest_path));if(!r.ok)throw new Error('Saved run unavailable');setRecovered(await r.json());setRunId(id);localStorage.setItem(key,id);onRememberRun(id);setError('');}catch(e){setError(String(e));}}
-
-
-
- useEffect(()=>{const abort=new AbortController();void fetch(baseUrl+'/api/training/configuration',{signal:abort.signal}).then(async r=>{if(!r.ok)throw new Error('Training configuration unavailable');const value=await r.json();setConfiguration(value);setConfig(value.defaults);}).catch(e=>{if(!abort.signal.aborted)setError(String(e));});return()=>abort.abort();},[baseUrl]);
-
- useEffect(()=>{setRunId(null);setRecovered(null);setPreview(null);if(!project)return;const id=rememberedRun??localStorage.getItem(key);if(!id)return;const abort=new AbortController();void fetch(baseUrl+'/api/training/runs/'+id+'?project_path='+encodeURIComponent(project!.manifest_path),{signal:abort.signal}).then(async r=>{if(r.ok){const value=await r.json();setRunId(id);setRecovered(value);if(!rememberedRun)onRememberRun(id);}else if(r.status===404)localStorage.removeItem(key);}).catch(()=>{});return()=>abort.abort();},[key,baseUrl]);
-
- async function post(path:string,body:unknown){const response=await fetch(baseUrl+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw new Error(typeof result.detail==='string'?result.detail:JSON.stringify(result.detail));return result;}
-
- async function inspect(){if(!config||!project)return;setPending(true);setError('');try{setPreview(await post('/api/training/preview',{...config,project_path:project.manifest_path}));}catch(e){setPreview(null);setError(String(e));}finally{setPending(false);}}
-
- function change<K extends keyof Config>(k:K,v:Config[K]){setConfig(c=>c?{...c,[k]:v}:c);setPreview(null);}
-
- async function start(){if(!preview||!project||!config)return;setPending(true);setError('');try{const value=await post('/api/training/runs',{...config,project_path:project.manifest_path,expected_selection_sha256:preview.expected_selection_sha256,expected_label_manifest_sha256:preview.expected_label_manifest_sha256});setRunId(value.run_id);setRecovered(value.snapshot);localStorage.setItem(key,value.run_id);onRememberRun(value.run_id);setOpen(false);}catch(e){setError(String(e));}finally{setPending(false);}}
-
- async function cancel(){if(!runId)return;try{await post('/api/label-tasks/'+runId+'/cancel',{});}catch(e){setError(String(e));}}
-
- const number=(label:string,k:Exclude<keyof Config,'python_path'>,min:number,max:number,unit='')=><SettingRow label={label} info={{title:label,text:"Saved with the run configuration."}} control={<ValueSelector label={label} value={config?.[k]??min} min={min} max={max} step={k==='validation_fraction'?.05:k==='guard_seconds'?.1:1} unit={unit} onChange={v=>change(k,v)}/>}/>;
+ const status=<div className="run-summary" role="status"><strong>{recovering?'Restoring run':state.stage}</strong><span>{Math.round(elapsed)} s elapsed</span>{!starting&&state.epoch&&<span>Epoch {state.epoch.completed} / {state.epoch.total}</span>}{starting?<span>Validating current included images and starting the configured run</span>:state.active&&<span>{snapshot?.operations.find(o=>o.status==='running')?.detail}{!state.epoch&&runConfig?` · ${runConfig.epochs} epochs configured`:''}</span>}{state.cancelling&&<span>Waiting for the worker to stop; saved checkpoints remain</span>}{displayedCounts&&<span>{displayedCounts.training} train / {displayedCounts.validation} validation / {displayedCounts.guard} guard · {displayedKeypoints} keypoints</span>}</div>;
+ const number=(label:string,k:'epochs'|'batch_size'|'save_every'|'seed'|'max_seconds'|'validation_fraction'|'guard_seconds',min:number,max:number,unit='')=><SettingRow label={label} info={{title:label,text:"Saved with the run configuration."}} control={<ValueSelector label={label} value={shownConfig?.[k]??min} min={min} max={max} step={k==='validation_fraction'?.05:k==='guard_seconds'?.1:1} unit={unit} onChange={v=>change(k,v)}/>}/>;
 
  const presentations:Record<string,PipelineStagePresentation>={
 
   freeze_inputs:{label:labels.freeze_inputs,kind:'source',availability:'available',description:'Preserve included images, exact source identities, ordered keypoints, STL and calibration in an immutable dataset. Inclusion is approval.',reason:'Stereo moments stay together; a final time block is validation, with a timestamp-based guard interval.',configuration:<>{number('Validation fraction','validation_fraction',.05,.45)}{number('Temporal guard','guard_seconds',0,60,'s')}<p>{preview?`${preview.image_count} approved images · ${preview.counts.training} train · ${preview.counts.validation} validation · ${preview.counts.guard} guard`:'Preview to read the current included images.'}</p></>},
 
-  prepare_trainer:{label:labels.prepare_trainer,kind:'computation',availability:'available',description:'Create an official DLC project and verify the saved train/validation filenames. Start from the pretrained backbone with a fresh object-specific head.',reason:'Full camera images; authored keypoint order; no old object checkpoint.',configuration:<><SettingRow label="Backend" info={{title:"Backend",text:"Official DLC training with a fresh object model."}} control={<span>DeepLabCut 3.0.2 · ResNet-50</span>}/><SettingRow label="Training Python" info={{title:"Training Python",text:"Isolated environment containing DeepLabCut 3.0.2 and CUDA PyTorch."}} control={<textarea rows={6} className="training-python-input" aria-label="Training Python" value={config?.python_path??''} onChange={e=>change('python_path',e.target.value)}/>}/>{number('Random seed','seed',0,2147483647)}</>},
+  prepare_trainer:{label:labels.prepare_trainer,kind:'computation',availability:'available',description:'Create an official DLC project and verify the saved train/validation filenames. Use the selected starting model and preserve its full object-specific head when continuing.',reason:'Full camera images and verified authored keypoint order; parent checkpoints must match the target.',configuration:<><SettingRow label="Backend" info={{title:"Backend",text:"Official DLC training with the selected starting model."}} control={<span>DeepLabCut 3.0.2 · ResNet-50</span>}/><SettingRow label="Training Python" info={{title:"Training Python",text:"Isolated environment containing DeepLabCut 3.0.2 and CUDA PyTorch."}} control={<textarea rows={6} className="training-python-input" aria-label="Training Python" value={shownConfig?.python_path??''} onChange={e=>change('python_path',e.target.value)}/>}/>{number('Random seed','seed',0,2147483647)}</>},
 
   train_model:{label:labels.train_model,kind:'computation',availability:'available',description:'Run bounded GPU training with actual epoch losses, validation metrics, saved checkpoints and fixed sample predictions.',reason:'Cancellation stops the owned worker; saved inputs and checkpoints remain available.',configuration:<>{number('Epochs','epochs',1,10000)}{number('Batch size','batch_size',1,32)}{number('Evaluate / save every N epochs','save_every',1,1000)}{number('Maximum duration','max_seconds',30,86400,'s')}</>},
 
@@ -80,22 +82,15 @@ export function TrainingDashboard({baseUrl,project,snapshots,rememberedRun,onRem
 
  };
 
- return <div className="training-dashboard"><header><div><h2>Training dashboard</h2><p>{project?.project.project_id??'Open a project to train'} · DeepLabCut</p></div><div className="training-actions">{!!history.length&&<SettingSelectInput label="Saved training run" value={runId??''} options={[{value:'',label:'Select saved run'},...history.map(r=>({value:r.run_id,label:`${r.run_id.slice(0,8)} · ${r.status} · epoch ${r.epoch}`}))]} onChange={id=>{if(id)void selectRun(id);}}/>}<ButtonSm text="Configure training" iconClass="settings-icon" disabled={!project||!config||running} onClick={()=>{setOpen(true);void inspect();}}/>{running&&<ButtonSm text="View progress" iconClass="explainer-icon" onClick={()=>setOpen(true)}/>} {running&&<ButtonSm text="Cancel training" iconClass="stop-icon" disabled={snapshot?.cancel_requested} onClick={()=>void cancel()}/>}</div></header>
-
- {error&&<p role="alert">{error}</p>}
-
- <div className="run-summary" role="status"><strong>{snapshot?.status??'Ready'}</strong>{snapshot&&<><span>{snapshot.operations.find(o=>o.status==='running')?.detail??'Run artifacts retained'}</span><span>{Math.round(snapshot.elapsed_seconds+(['queued','running'].includes(snapshot.status)?Math.max(0,now-receivedAt)/1000:0))} s</span><span>{snapshot.cancel_requested?'Cancellation requested':snapshot.previews.length?`Checkpoint epoch ${snapshot.previews[0].step}`:''}</span></>}{displayedCounts&&<span>{displayedCounts.training} train / {displayedCounts.validation} validation / {displayedCounts.guard} guard · {displayedKeypoints} keypoints</span>}</div>
-
- {snapshot?.error&&<p role="alert">{snapshot.error}</p>}
-
- <div className="metric-grid">{snapshot?.metrics.map(series=><MetricSeriesChart key={series.operation_id+series.id} series={series} height={150} color={series.id.includes("train_")?"var(--color-info)":"#c7a4ff"}/>)}</div>
-
+ return <div className="training-dashboard"><header><div><h2>Training dashboard</h2><p>{project?.project.project_id??'Open a project to train'} · DeepLabCut</p></div></header>
+ <div className="training-command-bar">{actions}</div>{runFacts}{checkpointControls}
+ {!project?<p role="status">Open a project before starting training.</p>:config&&!config.python_path?<p role="status">Set Training Python in Configure training to enable Start training.</p>:recovering?<p role="status">Restoring the saved run before training can start.</p>:null}
+ <div className="training-run-options">{!!history.length&&<SettingSelectInput label="Displayed run" value={runId??''} disabled={running} options={[{value:'',label:'Select saved run'},...history.map(r=>({value:r.run_id,label:`${r.run_id.slice(0,8)} · ${r.status} · ${r.epoch?`epoch ${r.epoch}`:'no epochs yet'}`}))]} onChange={id=>{if(id)void selectRun(id);}}/>}{config&&!running&&<span>Next run: {config.epochs} epochs · maximum {config.max_seconds} seconds{validating?' · Checking included images...':''}</span>}</div>
+ {(error||previewError)&&<p role="alert">{error||previewError}</p>}{status}{snapshot?.error&&!starting&&<p role="alert">{snapshot.error}</p>}
+ {project&&config&&<RefinementPanel baseUrl={baseUrl} projectPath={project.manifest_path} config={config} trainingActive={running} snapshots={snapshots}/>}
+ <div className="metric-grid">{snapshot?.metrics.map(series=><MetricSeriesChart key={series.operation_id+series.id} series={series} height={150} color={series.id.includes('train_')?'var(--color-info)':'#c7a4ff'}/>)}</div>
  {!!snapshot?.previews.length&&<SamplePreviewGrid previews={snapshot.previews} resolveImageUrl={url=>new URL(url,baseUrl).href}/>}
-
  <AnchoredInfo title="Training dashboard" text="Included images are approved for training. Magenta circles show approved labels; cyan crosses show checkpoint predictions. Loss and validation pixel error are separate measurements. Guard images stay in the snapshot but are excluded from optimization and validation."/>
-
- {open&&configuration&&config&&<PipelineWindow title={running?"Training progress":"Configure training"} subtitle={project?.project.project_id} onClose={()=>setOpen(false)}><PipelinePanel graph={snapshot&&running?snapshot.graph:configuration.graph} nodePresentation={presentations} operations={snapshot?.operations??[]} locked={running} view={view} onViewChange={setView} notice={error?<p role="alert">{error}</p>:null} actions={<div className="training-actions"><ButtonSm text="Refresh included images" iconClass="rotate-icon" disabled={running} onClick={()=>void inspect()}/><ButtonSm text="Start training" iconClass="play-icon" disabled={running||!preview||!config.python_path} onClick={()=>void start()}/>{running&&<ButtonSm text="Cancel training" iconClass="stop-icon" disabled={snapshot?.cancel_requested} onClick={()=>void cancel()}/>}<span>{config.epochs} epochs · maximum {config.max_seconds} seconds · {preview?`${preview.image_count} images · ${preview.counts.training} train / ${preview.counts.validation} validation / ${preview.counts.guard} guard`:''}</span></div>}/></PipelineWindow>}
-
+ {open&&configuration&&config&&<PipelineWindow title="Configure training" subtitle={running?'Current run in progress; settings are read-only':project?.project.project_id} onClose={()=>setOpen(false)}><div className="training-configuration"><div className="training-command-bar">{actions}</div>{runFacts}{checkpointControls}{status}<PipelinePanel graphLayout="single-row" graph={snapshot&&running?snapshot.graph:configuration.graph} nodePresentation={presentations} operations={running?snapshot?.operations??[]:[]} locked={running} view={view} onViewChange={setView} notice={error||previewError?<p>{error||previewError}</p>:null} actions={<p>{shownConfig?.epochs} epochs · maximum {shownConfig?.max_seconds} seconds{preview?` · ${preview.image_count} included images`:''}</p>}/></div></PipelineWindow>}
  </div>;
-
 }

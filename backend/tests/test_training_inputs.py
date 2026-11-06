@@ -45,3 +45,33 @@ class TrainingInputsTest(unittest.TestCase):
   (self.result/'frames/000010-left.png').write_bytes(b'changed')
   with self.assertRaises(ValueError):freeze_training_inputs(TrainingInputs(project_path=str(self.manifest),guard_seconds=0))
   self.assertFalse((self.root/'recordings/capture/skellyclicker/training-inputs').exists())
+
+ def test_dataset_removal_persists_and_excludes_image_labels_from_new_inputs(self):
+  from unittest.mock import patch
+  from skellyclicker_app.job_lifecycle import jobs
+  from skellyclicker_app.projects import open_project
+  self.request=self.request.model_copy(update={'step':1});result=run_result(self.run_job())['result']
+  old_selection=selection_view(self.manifest)
+  original=TrainingInputs(project_path=str(self.manifest),guard_seconds=0,expected_selection_sha256=old_selection['sha256'])
+  old=freeze_training_inputs(original);old_folder=self.root/old['path']
+  old_hashes={p.name:file_digest(p) for p in old_folder.glob('*.parquet')}
+  image=result['images'][0];source=self.root/image['path'];source_hash=file_digest(source)
+  # Training reads its immutable snapshot; editing the active dataset is independent.
+  with patch.dict(jobs,{'fixture-training':{'kind':'training','status':{'state':'running'}}}):
+   revised=save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=old_selection['sha256'],moment_id=image['moment_id'],source_frame=image['source_frame'],timestamp_ns=image['timestamp_ns'],camera_id=image['camera_id'],selected=False))
+  self.assertNotIn(image['image_id'],revised['selected_image_ids'])
+  reopened=open_project(self.manifest)
+  persisted=pq.read_table(self.root/reopened['project']['active_review']/'selection.parquet').to_pylist()
+  self.assertNotIn(image['image_id'],[r['image_id'] for r in persisted])
+  self.assertEqual(selection_view(self.manifest),revised)
+  with self.assertRaises(StaleInputs):training_input_preview(original)
+  fresh_request=original.model_copy(update={'expected_selection_sha256':revised['sha256']})
+  preview=training_input_preview(fresh_request);self.assertEqual(preview['image_count'],7)
+  fresh=freeze_training_inputs(fresh_request);folder=self.root/fresh['path']
+  images=pq.read_table(folder/'images.parquet').to_pylist();labels=pq.read_table(folder/'labels.parquet').to_pylist()
+  self.assertEqual(len(images),7);self.assertEqual(len(labels),21)
+  self.assertNotIn(image['image_id'],[r['image_id'] for r in images])
+  self.assertFalse(any(r['moment_id']==image['moment_id'] and r['camera_id']==image['camera_id'] for r in labels))
+  self.assertTrue(any(r['moment_id']==image['moment_id'] and r['camera_id']!=image['camera_id'] for r in images))
+  self.assertEqual(file_digest(source),source_hash)
+  self.assertEqual({p.name:file_digest(p) for p in old_folder.glob('*.parquet')},old_hashes)

@@ -17,6 +17,11 @@ class ProjectsTest(unittest.TestCase):
             request = CreateProject(project_path=str(root), source_svo=str(source), calibration_source=str(cal), source_stl=str(stl), object_id='arbitrary-object')
             created = create_project(request)
             self.assertEqual(created['issues'], [])
+            canonical = 'recordings/capture/skellyclicker/inputs/targets/arbitrary-object/r001/arbitrary-object.stl'
+            self.assertEqual(created['targets'][0]['geometry']['path'], canonical)
+            self.assertEqual((root/canonical).read_bytes(), stl.read_bytes())
+            stl.unlink()  # Reopening must use the copied target, not its original path.
+            self.assertEqual(open_project(root)['issues'], [])
             self.assertEqual(created['recordings'][0]['calibration_state'], 'unqueried')
             self.assertEqual(source.read_bytes(), b'original stereo')
             moved = base / 'renamed-folder'; root.rename(moved)

@@ -1,39 +1,119 @@
-# Training dashboard
+# Training dashboard and iterative rounds
 
 The Viewer remains mounted when switching to Training dashboard. The SDK owns
-pipeline configuration, full retained WebSocket snapshots, scalar plots and
-sample preview rendering. SkellyClicker owns the dataset split and DLC adapter.
+pipeline configuration, retained WebSocket snapshots, scalar plots and sample
+preview rendering. SkellyClicker owns the dataset, split policy, DLC adapter,
+proposal selection and human review.
 
-Include is review and approval. Automatic initial inclusion is a proposal;
-Include/Exclude establishes the selection and Start training freezes it without
-a second gate. The frozen snapshot retains all included images, exact int64
-source timestamps, stereo moment identity, ordered labels, calibration and STL.
-Labels retain pose_projection origin independently of human approval.
+## Actions and current dataset
 
-Validation is the final configured fraction of selected moments. A timestamp
-based guard interval separates it from training; both cameras remain together.
-Guard images remain in the snapshot but do not enter optimization or evaluation.
+Configure training, Start training and Cancel training keep their labels and
+positions in the dashboard and configuration panel. Configure is secondary,
+Start is primary, and Cancel is a separate danger action. Stage, elapsed time
+and actual epoch progress distinguish starting, preparation, training,
+evaluation, saving, cancellation and terminal states. Starting is single-flight.
+The editable next-run configuration survives panel closure and reload; a running
+configuration is read from that run's saved request and is read-only.
+
+Training images are the authoritative persisted dataset members. Removing an
+image writes a new selection revision, including its camera identity; Undo writes
+another revision. The image and its label rows are absent from future snapshots.
+An already-running trainer continues using its immutable frozen inputs. Wider
+sidebars add bounded thumbnail columns, and the catalog fills available height
+with its own scrolling. Card activation seeks the synchronized viewer.
+
+Generated initial membership is a proposal. The human reviews the images and
+removes bad labels; Start training freezes the remaining selection without a
+second gate. The snapshot preserves source timestamps as int64 nanoseconds,
+stereo moment identity, ordered labels, calibration, STL and image hashes.
+Labels retain pose_projection origin independently of human review.
+
+For a new model, validation is the configured temporal tail of selected moments.
+A timestamp guard separates it from training; cameras at the same moment share
+a split. Guard images remain in the snapshot but do not enter optimization or
+evaluation. Continuing from a parent retains its temporal boundary and guard,
+so adding examples cannot move its validation tail into training. Validation
+membership can expand within that reserved tail; this is not a fixed benchmark.
 The small initial fixture verifies plumbing, not generalization quality.
 
-The first adapter is DeepLabCut 3.0.2 / ResNet-50 using an isolated interpreter.
-It uses official dataset creation, verifies saved split filenames, registers a
-BaseLogger for epoch losses, and uses bounded official train API calls with official
-checkpoint continuation. No training loop is patched. At each configured save
-interval it reloads the actual checkpoint for fixed sample previews and native
-pixel errors on the frozen validation set. This adds explicit evaluation time
-between training segments. [@dlcTraining302]
+## Checkpoints and continuation
 
-Run data lives under the SDK recording extension's training-runs/<run-id>.
-Raw JSONL events are durable; the SDK retains a bounded display history. PNG
-previews and checkpoint identity are tied to actual epochs, not current UI time.
-Cancellation writes STOP; the adapter checks it at epoch logger and inference
-boundaries. After 15 seconds the app terminates only its owned worker. Completed
-checkpoints remain; an interrupted partial epoch is not claimed as saved.
+The adapter uses DeepLabCut 3.0.2 / ResNet-50 in an isolated interpreter. Official
+dataset creation receives explicit splits, whose saved filenames are verified.
+A registered BaseLogger reports actual epoch losses; bounded official train API
+calls perform optimization without patching the training loop. Saved checkpoints
+are reloaded for previews and validation pixel errors. [@dlcTraining302]
 
-Set SKELLYCLICKER_TRAINING_PYTHON or edit Training Python to select the environment.
-The existing local environment is discovered as an initial convenience, not an
-object restriction. No old object-specific checkpoint is loaded by default.
+Run data lives under the recording extension's training-runs/<run-id>. Events,
+input snapshots, checkpoints and previews retain their actual run/epoch identity.
+Cancel writes STOP and checks it at logger/inference boundaries. After 15 seconds
+the app terminates its owned worker. Completed checkpoints remain; a partial
+interrupted epoch is not promised as saved.
 
-Choose Configure training, review the included images and configured epoch/time limits,
-then choose Start training to submit the actual run. View progress is available
-only while running; it does not create a second run.
+Select a saved run, then choose Starting model or Use recommended checkpoint.
+The recommendation is the lowest measured validation mean keypoint error within
+that run, not a claim of global generalization. Displayed run and Starting model
+are separate choices. Fresh training remains an explicit option.
+
+A continued round copies and verifies the selected checkpoint, preserves its
+complete model including the object head, and resets optimizer, scheduler and
+round epoch to zero. Exact interrupted optimizer-state resume is not this action.
+The installed DLC runner loads the complete model from the snapshot model entry.
+Parent identity and the frozen dataset are recorded with the new run. Target,
+units, ordered keypoint definition, project identity and checkpoint bytes must
+match. [@dlcTraining302]
+
+Set SKELLYCLICKER_TRAINING_PYTHON or edit Training Python to choose the isolated
+runtime. Local environment discovery is a convenience, not an object restriction.
+
+## Find and review new examples
+
+Improve dataset / Find next examples scans the current recording's complete
+synchronized videos with the selected checkpoint. It retains predictions and
+compares them against available, gate-passing geometry projections. Initial API
+defaults classify near misses above 0.03 projected-target diagonals, and major
+failures at 0.5 diagonals or when fewer than half the reference points meet
+confidence 0.2. These are heuristic proposal criteria, not label certification.
+Temporal spacing defaults to 0.5 seconds per camera. Selection balances groups
+and fills from the available group when the other is sparse. Previously reviewed
+images, including removals, are not proposed again. The parent's validation tail
+and guard are excluded from training additions.
+
+Proposals remain separate from the dataset. Magenta marks show proposed geometry
+labels; cyan crosses show predictions. Remove from batch edits this pending
+review only. Add reviewed images generates labels for exactly the retained
+camera-image identities. Existing labels and members remain; previous removals
+are not silently restored. New bundles record their predecessors; historical
+bundles are immutable. The review and completed analysis restore after reload.
+Keep the chosen Starting model and click Start training for the expanded dataset.
+
+Current scope is one ZED recording per project. Inference scans the full videos,
+but automatic additions require an existing verified prepared pose. Missing or
+rejected geometry is counted separately, never assumed correct. Merging different
+prepared pose/calibration revisions is explicitly blocked. Automatic preparation
+of uncovered proposal frames and multiple-recording aggregation remain unfinished.
+A new analysis changes the displayed proposal, not historical artifacts or the
+dataset. Cancelling analysis does not change training membership.
+
+## Action prerequisites and project defaults
+
+The training-set panel displays blockers outside the zoomable graph. Fresh
+preparation remains a separate control; Open preparation controls leads there.
+Use prepared frames restores a valid prepared range while retaining sampling
+preferences. Preview is read-only and must succeed before Generate candidates is
+enabled. Stale preview responses cannot enable generation for changed settings.
+Server errors remain visible beside the actions.
+
+The project manifest owns the selected STL revision and units. Browser-local
+external draft paths cannot override that default. Creating a project copies the
+chosen STL into recordings/<recording>/skellyclicker/inputs/targets/<object>/<revision>.
+Its original source path is provenance only. New-project fields inherit available
+recording, calibration and target values. Browsing alternate geometry makes a
+temporary validated draft, not a replacement of existing target definitions.
+
+## Log sessions
+
+The backend LogHub identity establishes the viewer session. Closing the panel
+retains and collects messages. Reload restores the bounded 10,000-record history
+and deduplicates replay; a new backend lifetime starts a new viewer history.
+Run logs on disk remain intact. Browser persistence failures are reported.

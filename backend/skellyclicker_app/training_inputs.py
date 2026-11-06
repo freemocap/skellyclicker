@@ -60,7 +60,7 @@ def bind_training_inputs(request):
     roles={mid:('validation' if stamp>=boundary else 'guard' if boundary-stamp<=guard_ns else 'training') for mid,(stamp,frame) in moments}
     images=[{**r,'timestamp_ns':int(r['timestamp_ns']),'split':roles[r['moment_id']]} for r in images]
     counts={role:sum(r['split']==role for r in images) for role in ('training','validation','guard')}
-    if not counts['training']:raise ValueError('Guard interval leaves no training images; reduce it or include more separated moments')
+
     labels=pq.read_table(resolve_relative(root,result['path'])/'labels.parquet').to_pylist()
     labels=[r for r in labels if r['moment_id']+':'+r['camera_id'] in ids]
     by_image={i:[] for i in ids}
@@ -68,16 +68,29 @@ def bind_training_inputs(request):
     expected=list(range(len(authored['names'])))
     if any(sorted(indices)!=expected for indices in by_image.values()):raise ValueError('Incomplete or duplicate ordered keypoint labels')
     for row in images:checked(resolve_relative(root,row['path']),row)
-    return dict(root=root,path=path,project=project,result=result,selection=selection,review=review,images=images,labels=labels,
+    from .training_checkpoints import bind_parent
+    parent=bind_parent(request,{'project_uuid':project.uuid,'stl_sha256':target.geometry.sha256,'stl_units':target.authored_units,'keypoint_names':list(authored['names']),'keypoint_definition_source_sha256':metadata['keypoint_definition_sha256']})
+    if parent:
+        # Keep the parent's temporal boundary fixed: new examples must not move
+        # its evaluation images into optimization. Earlier rounds stay immutable.
+        previous=parent['dataset']['manifest']
+        if previous['source_sha256']!=metadata['source_sha256']:raise ValueError('Continued training currently requires the same recording')
+        boundary=int(previous['validation_start_ns']);guard_ns=round(previous['guard_seconds']*1_000_000_000)
+        roles={mid:('validation' if stamp>=boundary else 'guard' if boundary-stamp<=guard_ns else 'training') for mid,(stamp,frame) in moments}
+        images=[{**r,'split':roles[r['moment_id']]} for r in images]
+        counts={role:sum(r['split']==role for r in images) for role in ('training','validation','guard')}
+        if not counts['training'] or not counts['validation']:raise ValueError('Keep training and validation examples when continuing a model')
+    if not counts['training']:raise ValueError('Guard interval leaves no training images; reduce it or include more separated moments')
+    return dict(guard_seconds=guard_ns/1_000_000_000,validation_fraction=parent['dataset']['manifest']['validation_fraction'] if parent else request.validation_fraction,parent=parent,root=root,path=path,project=project,result=result,selection=selection,review=review,images=images,labels=labels,
                 target=target,authored=authored,pose=pose,counts=counts,validation_start_ns=boundary)
 
 
 def training_input_preview(request):
     bound=bind_training_inputs(request)
     return {'expected_selection_sha256':bound['selection']['sha256'],'expected_label_manifest_sha256':bound['result']['manifest_sha256'],
-            'image_count':len(bound['images']),'moment_count':len({r['moment_id'] for r in bound['images']}),
+            'parent_checkpoint':({k:v for k,v in bound['parent'].items() if k not in ('dataset','source_path')} if bound['parent'] else None),'image_count':len(bound['images']),'moment_count':len({r['moment_id'] for r in bound['images']}),
             'keypoint_count':len(bound['authored']['names']),'counts':bound['counts'],
-            'validation_start_ns':str(bound['validation_start_ns']),'guard_seconds':request.guard_seconds,
+            'validation_start_ns':str(bound['validation_start_ns']),'guard_seconds':bound['guard_seconds'],
             'split_policy':'temporal_tail_with_guard','review_state':'approved',
             'images':[{k:(str(r[k]) if k=='timestamp_ns' else r[k]) for k in ('image_id','moment_id','camera_id','source_frame','timestamp_ns','split')} for r in bound['images']]}
 
@@ -106,7 +119,7 @@ def freeze_training_inputs(request, *, check_cancelled=lambda:None):
         check_cancelled()
         # Every approved image is retained, including guard-band images excluded from optimization/evaluation.
         metadata={'schema_version':1,'dataset_id':revision,'created_at':datetime.now(timezone.utc).isoformat(),
-                  'project_uuid':project.uuid,'recording_id':result['manifest']['recording_id'],
+                  'parent_checkpoint':({k:v for k,v in bound['parent'].items() if k not in ('dataset','source_path')} if bound['parent'] else None),'project_uuid':project.uuid,'recording_id':result['manifest']['recording_id'],
                   'selection_path':project.active_review,'selection_sha256':bound['selection']['sha256'],
                   'label_result':result['path'],'label_manifest_sha256':result['manifest_sha256'],
                   'review_state':'approved','approval_basis':'included_selection_at_training_start',
@@ -118,7 +131,7 @@ def freeze_training_inputs(request, *, check_cancelled=lambda:None):
                   'source_sha256':result['manifest']['source_sha256'],
                   'pixel_convention':'opencv_integer_pixel_centres','timestamp_unit':'ns',
                   'image_count':len(rows),'counts':bound['counts'],'split_policy':'temporal_tail_with_guard',
-                  'validation_fraction':request.validation_fraction,'guard_seconds':request.guard_seconds,
+                  'validation_fraction':bound['validation_fraction'],'guard_seconds':bound['guard_seconds'],
                   'validation_start_ns':str(bound['validation_start_ns']),
                   'files':{k:v.model_dump() for k,v in inventory(staged).items()}}
         for name,identity in metadata['files'].items():checked(staged/name,identity)

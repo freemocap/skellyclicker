@@ -16,11 +16,16 @@ class PreviewLabels(Model):
     end_frame: int = Field(ge=0)
     step: int = Field(default=1, ge=1)
     max_moments: int | None = Field(default=None, ge=1)
+    image_keys: list[str] | None = None
     fit_filter: Literal['all','passed','failed'] = 'all'
 
     @model_validator(mode='after')
     def ordered(self):
         if self.end_frame < self.start_frame: raise ValueError('End frame precedes start frame')
+        if self.image_keys is not None:
+            import re
+            if not self.image_keys or len(set(self.image_keys))!=len(self.image_keys) or any(not re.fullmatch(r'[0-9]+:(left|right)',key) for key in self.image_keys):raise ValueError('Choose distinct source-frame and camera identities')
+            if any(not self.start_frame<=int(key.split(':')[0])<=self.end_frame for key in self.image_keys):raise ValueError('Selected images lie outside the requested range')
         return self
 
 
@@ -91,9 +96,11 @@ def bind_inputs(request: PreviewLabels, *, verify_source=False) -> BoundInputs:
         raise ValueError('Candidate and timing source identities disagree')
     if any(b['timestamp_ns']<=a['timestamp_ns'] for a,b in zip(rows,rows[1:])):
         raise ValueError('Source timestamps must increase strictly')
-    if not set(range(request.start_frame,request.end_frame+1)).issubset(ids):
+    requested={int(key.split(':')[0]) for key in request.image_keys} if request.image_keys else set(range(request.start_frame,request.end_frame+1))
+    if not requested.issubset(ids):
         raise ValueError('Prepared data does not cover every requested source frame')
     selected=[r for r in rows if request.start_frame<=r['source_frame']<=request.end_frame and (request.fit_filter=='all' or bool(r['accepted'])==(request.fit_filter=='passed'))][::request.step]
+    if request.image_keys is not None:selected=[r for r in rows if r['source_frame'] in requested]
     if request.max_moments is not None: selected=selected[:request.max_moments]
     if not selected: raise ValueError('No paired moments match this configuration')
     return BoundInputs(manifest,project,recording,target,authored,result,authority,rows,selected,pose_hash,target_hash,target_path)
@@ -101,9 +108,10 @@ def bind_inputs(request: PreviewLabels, *, verify_source=False) -> BoundInputs:
 
 def preview(request: PreviewLabels) -> dict:
     bound=bind_inputs(request)
+    image_count=len(request.image_keys) if request.image_keys is not None else len(bound.selected)*2
     return {'expected_pose_manifest_sha256':bound.pose_hash,'expected_target_manifest_sha256':bound.target_hash,
-            'moment_count':len(bound.selected),'image_count':len(bound.selected)*2,
-            'label_count':len(bound.selected)*2*len(bound.authored['names']),
+            'moment_count':len(bound.selected),'image_count':image_count,
+            'label_count':image_count*len(bound.authored['names']),
             'source_frames':[r['source_frame'] for r in bound.selected],
             'timestamps_ns':[str(r['timestamp_ns']) for r in bound.selected],
             'keypoint_names':list(bound.authored['names']), 'review_state':'unreviewed'}

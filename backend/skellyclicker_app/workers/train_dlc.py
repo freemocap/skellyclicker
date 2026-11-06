@@ -116,6 +116,78 @@ def preview_checkpoint(request,checkpoint,epoch):
     del runner;gc.collect();torch.cuda.empty_cache()
     emit('checkpoint',path=checkpoint.relative_to(WORK).as_posix(),sha256=checkpoint_hash,epoch=epoch)
 
+def select_refinement_examples(candidates, limit, spacing_ns):
+    """Balance error groups and spread samples in source time within each camera."""
+    groups={name:sorted((r for r in candidates if r['group']==name),key=lambda r:(-r['score'],r['source_frame'],r['camera_id'])) for name in ('near_miss','major_failure')}
+    selected=[]
+    def take(group):
+        while groups[group]:
+            row=groups[group].pop(0)
+            if all(row['camera_id']!=other['camera_id'] or abs(int(row['timestamp_ns'])-int(other['timestamp_ns']))>=spacing_ns for other in selected):
+                selected.append(row);return True
+        return False
+    while len(selected)<limit:
+        counts={g:sum(r['group']==g for r in selected) for g in groups}
+        order=sorted(groups,key=lambda g:counts[g])
+        if not any(take(g) for g in order):break
+    return selected
+
+
+def mine(request):
+    import cv2,numpy as np,torch,gc
+    from deeplabcut.pose_estimation_pytorch.apis.utils import get_pose_inference_runner
+    if digest(request['checkpoint'])!=request['checkpoint_sha256']:raise ValueError('Mining checkpoint changed')
+    runner=get_pose_inference_runner(model_config=Path(request['pose_config']),snapshot_path=Path(request['checkpoint']),batch_size=1,device='cuda:0',max_individuals=1)
+    references=request['references'];candidates=[];counts={'scanned':0,'needs_geometry':0,'already_reviewed':0,'reserved':0,'near_miss':0,'major_failure':0,'agreement':0};total=len(request['source_frames'])*len(request['videos'])
+    def finite_list(array):return [[float(v) if math.isfinite(float(v)) else None for v in row] for row in array]
+    with (WORK/'predictions.jsonl').open('w',encoding='utf-8') as output:
+        for camera,video in request['videos'].items():
+            capture=cv2.VideoCapture(video)
+            try:
+                for local,(frame,stamp) in enumerate(zip(request['source_frames'],request['timestamps_ns'])):
+                    check_stop();ok,image=capture.read()
+                    if not ok:raise ValueError('Synchronized video ended before its source timing index')
+                    pred=runner.inference([cv2.cvtColor(image,cv2.COLOR_BGR2RGB)])[0]['bodyparts'][0]
+                    if pred.shape!=(request['keypoint_count'],3):raise ValueError('Prediction keypoint definition mismatch')
+                    key=f'{frame}:{camera}';reference=references.get(key);group='needs_geometry';score=0.0;reason='No verified prepared pose for this image';normalized_error=None
+                    if key in request['reviewed_keys']:group='already_reviewed';reason='Already reviewed in the current dataset'
+                    elif int(stamp)>=int(request['training_cutoff_ns']):group='reserved';reason='Reserved validation or temporal guard interval'
+                    elif reference:
+                        truth=np.asarray(reference['xy'],dtype=float);valid=np.isfinite(truth).all(axis=1)&(truth[:,0]>=0)&(truth[:,0]<image.shape[1])&(truth[:,1]>=0)&(truth[:,1]<image.shape[0])
+                        finite=np.isfinite(pred[:,:2]).all(axis=1);confident=finite&(pred[:,2]>=request['confidence_threshold'])
+                        if valid.any():
+                            scale=max(float(np.linalg.norm(np.ptp(truth[valid],axis=0))),1.0)
+                            comparable=valid&finite
+                            normalized_error=float(np.median(np.linalg.norm(pred[comparable,:2]-truth[comparable],axis=1))/scale) if comparable.any() else None
+                            fraction=float(confident[valid].mean())
+                            if fraction<.5 or normalized_error is None or normalized_error>=request['major_error_threshold']:
+                                group='major_failure';score=max(normalized_error or 0,1-fraction);reason=f'Major disagreement or missing prediction; {fraction:.0%} of reference points confidently detected'
+                            elif normalized_error>=request['near_error_threshold']:
+                                group='near_miss';score=normalized_error;reason=f'Median point error is {normalized_error:.1%} of projected target size'
+                            else:group='agreement';reason='Prediction agrees with the prepared pose within the configured threshold'
+                    row={'source_frame':frame,'local_frame':local,'camera_id':camera,'timestamp_ns':str(stamp),'key':key,'group':group,'score':score,'reason':reason,'normalized_error':normalized_error,'prediction':finite_list(pred)}
+                    output.write(json.dumps(row,allow_nan=False)+'\n');counts['scanned']+=1;counts[group]+=1
+                    if group in ('near_miss','major_failure'):candidates.append(row)
+                    if counts['scanned']%10==0:emit('scan_progress',completed=counts['scanned'],total=total)
+            finally:capture.release()
+    selected=select_refinement_examples(candidates,request['image_limit'],round(request['spacing_seconds']*1_000_000_000))
+    (WORK/'previews').mkdir(exist_ok=True)
+    for row in selected:
+        check_stop();capture=cv2.VideoCapture(request['videos'][row['camera_id']]);capture.set(cv2.CAP_PROP_POS_FRAMES,row['local_frame']);ok,image=capture.read();capture.release()
+        if not ok:raise ValueError('Unable to decode proposed review image')
+        truth=np.asarray(references[row['key']]['xy'],dtype=float);pred=np.asarray(row['prediction'],dtype=float)
+        for x,y in truth[np.isfinite(truth).all(axis=1)]:cv2.circle(image,(round(x),round(y)),3,(255,70,255),1,cv2.LINE_AA)
+        for x,y,c in pred:
+            if np.isfinite([x,y]).all():cv2.drawMarker(image,(round(x),round(y)),(255,230,60),cv2.MARKER_CROSS,8,1)
+        points=truth[np.isfinite(truth).all(axis=1)];lo=np.maximum(np.floor(points.min(axis=0)-30),0).astype(int);hi=np.minimum(np.ceil(points.max(axis=0)+30),[image.shape[1],image.shape[0]]).astype(int)
+        crop=image[lo[1]:hi[1],lo[0]:hi[0]];full=cv2.resize(image,(640,360))
+        if crop.size:crop=cv2.resize(crop,(max(1,round(crop.shape[1]*360/crop.shape[0])),360));full=np.hstack([full,crop])
+        row['preview']=f"previews/{row['source_frame']:09d}-{row['camera_id']}.png";cv2.imwrite(str(WORK/row['preview']),full)
+    atomic(WORK/'result.json',{'counts':counts,'proposals':selected,'checkpoint_sha256':request['checkpoint_sha256'],'scope':'Full synchronized recording; additions require an existing verified pose reference','settings':{k:request[k] for k in ('image_limit','spacing_seconds','confidence_threshold','near_error_threshold','major_error_threshold')}})
+    emit('scan_progress',completed=total,total=total)
+    del runner;gc.collect();torch.cuda.empty_cache()
+
+
 def train(request):
     import torch,cv2,numpy as np,random,gc
     from deeplabcut.pose_estimation_pytorch.runners.logger import LOGGER,BaseLogger
@@ -136,6 +208,16 @@ def train(request):
             emit('progress',epoch=step,detail='Evaluation' if any(k.startswith('losses/eval') for k in metrics) else 'Training')
     LOGGER.register_module(module=SkellyClickerLogger)
     prepared=json.loads((WORK/'prepared.json').read_text());checkpoint=None;epoch=0
+    if request.get('initial_checkpoint'):
+        source=Path(request['initial_checkpoint'])
+        if digest(source)!=request['initial_checkpoint_sha256']:raise ValueError('Parent checkpoint changed')
+        saved=torch.load(source,map_location='cpu',weights_only=True)
+        # New dataset round: retain backbone AND object head; reset optimizer,
+        # scheduler and epoch. Official DLC loads the complete model [@dlcTraining302].
+        checkpoint=WORK/'initial-weights.pt'
+        torch.save({'model':saved['model'],'metadata':{'epoch':0}},checkpoint)
+        del saved
+        emit('initialization',mode='model_weights_with_fresh_optimizer',parent_sha256=request['initial_checkpoint_sha256'])
     # Bounded official API calls allow immutable checkpoint previews and cooperative stop.
     # DLC resumes optimizer/scheduler and interprets epochs as additional epochs.
     while epoch<request['epochs']:
@@ -163,9 +245,9 @@ def train(request):
     emit('complete',epochs=epoch)
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['prepare','train']);parser.add_argument('work',type=Path);args=parser.parse_args();WORK=args.work.resolve()
+    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['prepare','train','mine']);parser.add_argument('work',type=Path);args=parser.parse_args();WORK=args.work.resolve()
     try:
         request=json.loads((WORK/'worker-request.json').read_text());check_stop()
-        (prepare if args.mode=='prepare' else train)(request)
+        {'prepare':prepare,'train':train,'mine':mine}[args.mode](request)
     except RequestedStop:emit('cancelled');sys.exit(2)
     except Exception as error:emit('error',message=str(error),traceback=traceback.format_exc());raise

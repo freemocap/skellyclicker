@@ -68,6 +68,7 @@ def handlers(request,work,run_id):
             ctx.check_cancelled();frame=row['source_frame'];mid=f'{bound.recording.uuid}:{frame}'
             moment_rows.append({'moment_id':mid,'source_frame':frame,'timestamp_ns':row['timestamp_ns'],'fit_passed':bool(row['accepted']),'fit_status':row['status']})
             for camera in ('left','right'):
+                if request.image_keys is not None and f'{frame}:{camera}' not in request.image_keys:continue
                 projection=projections.get((frame,camera));xy=np.full((n,2),np.nan)
                 if projection and projection['keypoints_xy'] is not None:
                     xy=np.asarray(projection['keypoints_xy'],dtype=float)
@@ -113,11 +114,31 @@ def handlers(request,work,run_id):
             current=bind_inputs(request)
             if current.project.sample_result!=bound.project.sample_result or current.project.target_manifests!=bound.project.target_manifests:raise StaleInputs('Selected inputs changed during generation')
             for name,identity in json.loads((output/'manifest.json').read_text())['files'].items():checked(output/name,identity)
+            # Accumulate candidates without resetting earlier human removals.
+            # Immutable old label bundles remain independently inspectable.
+            from .label_routes import result_view,selection_view
+            previous=result_view(bound.manifest);previous_selection=selection_view(bound.manifest)
+            old_ids=set();kept_ids=set(previous_selection['selected_image_ids'])
+            if previous:
+                metadata=json.loads((output/'manifest.json').read_text())
+                for key in ('pose_manifest_sha256','target_manifest_sha256','keypoint_definition_sha256','calibration_sha256','source_sha256'):
+                    if previous['manifest'][key]!=metadata[key]:raise ValueError('Existing reviewed data uses different prepared inputs; merging those revisions is not supported yet. Existing dataset was preserved.')
+                old_folder=resolve_relative(bound.root,previous['path'])
+                old_ids={r['image_id'] for r in previous['images']}
+                for name,keys in [('moments',('moment_id',)),('images',('moment_id','camera_id')),('labels',('moment_id','camera_id','keypoint_index'))]:
+                    old=pq.read_table(old_folder/(name+'.parquet'));new=pq.read_table(output/(name+'.parquet'))
+                    rows={tuple(r[k] for k in keys):r for r in new.to_pylist()}
+                    rows.update({tuple(r[k] for k in keys):r for r in old.to_pylist()})
+                    pq.write_table(pa.Table.from_pylist(list(rows.values()),schema=new.schema),output/(name+'.parquet'))
+                    metadata[{'moments':'moment_count','images':'image_count','labels':'label_count'}[name]]=len(rows)
+                metadata['previous_label_result']=previous['path'];metadata['previous_label_manifest_sha256']=previous['manifest_sha256']
+                metadata['files']={name:value.model_dump() for name,value in inventory(output).items() if name!='manifest.json'}
+                atomic_json(output/'manifest.json',metadata)
             ctx.check_cancelled()
             publish_directory(staging=output,destination=destination)
             moments={row['moment_id']:row for row in pq.read_table(destination/'moments.parquet').to_pylist()}
             all_images=[{**row,**moments[row['moment_id']],'image_id':row['moment_id']+':'+row['camera_id']} for row in pq.read_table(destination/'images.parquet').to_pylist()]
-            review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),all_images,reason='generated_candidates_included')
+            review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),[r for r in all_images if r['image_id'] not in old_ids or r['image_id'] in kept_ids],previous_selection['sha256'],reason='generated_candidates_included')
             selected=read_model(bound.manifest,Project);selected.label_result=relative;selected.active_review=review
             atomic_json(bound.manifest,selected.model_dump(mode='json'))
         # Publication is committed. Do not convert successful outputs into cancellation here.

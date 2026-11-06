@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import APIRouter,HTTPException
-from pydantic import Field
+from pydantic import Field, model_validator
 from .training_inputs import TrainingInputs,training_input_preview
 from .training_pipeline import GRAPH
 
@@ -13,6 +13,16 @@ class TrainingRequest(TrainingInputs):
     save_every:int=Field(default=1,ge=1,le=1000)
     seed:int=Field(default=20261105,ge=0,le=2147483647)
     max_seconds:int=Field(default=900,ge=30,le=86400)
+    parent_run_id:str|None=None
+    parent_checkpoint:str|None=None
+    parent_checkpoint_sha256:str|None=Field(default=None,pattern='^[a-f0-9]{64}$')
+
+    @model_validator(mode='after')
+    def complete_parent(self):
+        fields=(self.parent_run_id,self.parent_checkpoint,self.parent_checkpoint_sha256)
+        if any(v is not None for v in fields) and not all(v is not None for v in fields):raise ValueError('Select a run and checkpoint together')
+        return self
+
 
 @router.get('/configuration')
 def configuration():
@@ -51,7 +61,7 @@ def start(request:TrainingRequest):
             atomic_json(job['work']/'status.json',snapshot)
         run=PipelineRun(GRAPH,labels={'freeze_inputs':'Freeze included images','prepare_trainer':'Prepare DeepLabCut','train_model':'Train and evaluate','publish_run':'Save run artifacts'},on_snapshot=observe)
         work=recording_structure(manifest.parent,recording.recording_id).application_dir('skellyclicker')/'training-runs'/run.run_id;work.mkdir(parents=True)
-        job.update(root=manifest.parent,manifest=manifest,work=work,request=request.model_dump(mode='json'),status={'state':'queued'},cancel=RunCancellation(run),process=None,run=run,started=time.monotonic())
+        job.update(kind="training",root=manifest.parent,manifest=manifest,work=work,request=request.model_dump(mode='json'),status={'state':'queued'},cancel=RunCancellation(run),process=None,run=run,started=time.monotonic())
         atomic_json(work/'request.json',request.model_dump(mode='json'));registry.add(run)
         thread=threading.Thread(target=lambda:run.execute(handlers(request,job),resource_capacity={'compute':1}),name='skellyclicker-training',daemon=False)
         job['thread']=thread;jobs[run.run_id]=job;thread.start()
@@ -105,3 +115,9 @@ def list_runs(project_path:str):
                         'keypoint_count':len(dataset['keypoint_names']) if dataset else None,
                         'epoch':max((p['step'] for s in snapshot['metrics'] for p in s['points']),default=0)})
     return records
+
+@router.get('/runs/{run_id}/checkpoints')
+def saved_checkpoints(run_id:str,project_path:str):
+    from .training_checkpoints import checkpoints
+    try:return checkpoints(project_path,run_id)
+    except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error

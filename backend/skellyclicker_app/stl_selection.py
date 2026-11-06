@@ -49,6 +49,10 @@ def validate_stl(request: ValidateStl) -> dict:
         raise ValueError("The STL must contain finite, non-empty surface geometry.")
     digest = sha256(contents).hexdigest()
     units = request.authored_units or target.authored_units
+    # Identical external files resolve to the project-owned snapshot, never a
+    # historical source path. Different geometry remains an explicit draft.
+    if digest == target.geometry.sha256 and current.is_file() and sha256(current.read_bytes()).hexdigest() == digest:
+        path = current
     return {"path": str(path), "current_path": str(current), "sha256": digest,
             "bytes": len(contents), "authored_units": units,
             "vertices": len(mesh.vertices), "faces": len(mesh.faces),

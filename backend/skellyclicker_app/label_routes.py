@@ -134,7 +134,7 @@ def save_selection(request:SelectMoment):
     manifest=Path(request.project_path).resolve()
     try:
         with guard:
-            if busy():raise HTTPException(409,'A preparation or label run is active')
+            if busy(ignore_training=True):raise HTTPException(409,'A preparation or label run is active')
             with project_lock(manifest.parent):
                 result=result_view(manifest)
                 if not result or result['manifest_sha256']!=request.expected_label_manifest_sha256:raise HTTPException(409,'Generated labels changed; reload before selecting')

@@ -3,15 +3,15 @@ import {ResizablePanelGroup,ResizablePanel,ResizableHandle} from '@freemocap/ui'
 import logo from './assets/skellyclicker-logo.svg';
 
 /** Product controls compose the SDK's shared pane and playback machinery. */
-export function AppShell({children, sidebar, status, bottom, connection, training, view, onView}: {
-  children: ReactNode; sidebar: ReactNode; status: ReactNode; bottom?: ReactNode; connection?: ReactNode; training?: ReactNode; view: 'viewer'|'training'; onView:(view:'viewer'|'training')=>void;
+export function AppShell({children, sidebar, bottom, connection, training, view, onView}: {
+  children: ReactNode; sidebar: ReactNode; bottom?: ReactNode; connection?: ReactNode; training?: ReactNode; view: 'viewer'|'training'; onView:(view:'viewer'|'training')=>void;
 }) {
   return <div className="skellyclicker-app">
     <ResizablePanelGroup direction="horizontal" autoSaveId="skellyclicker-main-layout" className="skellyclicker-top-panes">
       <ResizablePanel defaultSize={24} minSize={12} maxSize={50}>
         <aside className="skellyclicker-sidebar">
           <header>{connection}<div className="skellyclicker-brand"><img src={logo} alt="SkellyClicker"/><h1>SkellyClicker</h1></div></header>
-          {sidebar}
+          <div className="skellyclicker-sidebar-content">{sidebar}</div>
         </aside>
       </ResizablePanel>
       <ResizableHandle aria-label="Resize project sidebar"/>
@@ -23,6 +23,5 @@ export function AppShell({children, sidebar, status, bottom, connection, trainin
       </ResizablePanel>
     </ResizablePanelGroup>
     {bottom && <div className="skellyclicker-bottom">{bottom}</div>}
-    <footer aria-live="polite">{status}</footer>
   </div>;
 }

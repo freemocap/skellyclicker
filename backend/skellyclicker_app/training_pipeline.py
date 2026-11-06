@@ -29,6 +29,7 @@ def consume_event(event,ctx,job):
         if not asset.is_file():raise ValueError('Worker preview was not published')
         url=f"/api/training/runs/{job['run'].run_id}/artifact?project_path={quote(str(job['manifest']),safe='')}&path={quote(event['path'],safe='')}"
         ctx.preview(event['id'],label=event['label'],image_url=url,step=event['step'],step_label='Epoch',checkpoint_id=event['checkpoint_id'])
+    elif kind=='scan_progress':ctx.progress(event['completed'],event['total'],'images','Analyzing recording images')
     elif kind=='progress':ctx.progress(event['epoch'],job['request']['epochs'],'epochs',f"{event['detail']} · epoch {event['epoch']} / {job['request']['epochs']}")
     elif kind=='checkpoint':
         ctx.artifacts(writes=(resolve_relative(job['work'],event['path']),));log.info('Saved checkpoint at epoch %s',event['epoch'])
@@ -86,6 +87,15 @@ def handlers(request,job):
             ordered=sorted(by_image[row['image_id']],key=lambda r:r['keypoint_index'])
             row['xy']=[[r['x_px'],r['y_px']] for r in ordered];row['valid']=[bool(r['projection_valid'] and r['in_bounds']) for r in ordered]
         worker_request={**request.model_dump(mode='json'),'dataset':str(dataset),'dataset_sha256':snapshot['manifest_sha256'],'images':images}
+        from .training_checkpoints import bind_parent
+        parent=bind_parent(request,snapshot['manifest'])
+        if parent:
+            import shutil
+            shutil.copyfile(parent['source_path'],work/'parent-checkpoint.pt')
+            if file_digest(work/'parent-checkpoint.pt')!=parent['sha256']:raise ValueError('Parent checkpoint changed during copy')
+            worker_request['initial_checkpoint']=str(work/'parent-checkpoint.pt')
+            worker_request['initial_checkpoint_sha256']=parent['sha256']
+            atomic_json(work/'parent.json',{k:v for k,v in parent.items() if k!='dataset'})
         atomic_json(work/'worker-request.json',worker_request);ctx.progress(0,1,'projects','Preparing official DLC project and verifying split')
         run_worker('prepare',job,ctx);ctx.check_cancelled();ctx.progress(1,1,'projects','DLC saved split verified')
         return {'prepared':str(work)}

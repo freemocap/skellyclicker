@@ -31,6 +31,13 @@ class TrainingLifecycleTest(unittest.TestCase):
    response=start(request);run=response['run_id'];jobs[run]['thread'].join(10)
   self.assertEqual(inspect_run(run,str(self.manifest))['status'],'complete')
   self.assertTrue((jobs[run]['work']/'result.json').is_file())
+  first_folder=jobs[run]['work'];first_result=(first_folder/'result.json').read_bytes();first_checkpoint=file_digest(first_folder/'checkpoint.pt')
+  with patch('skellyclicker_app.training_pipeline.run_worker',side_effect=worker):
+   second=start(request)['run_id'];jobs[second]['thread'].join(10)
+  self.assertNotEqual(second,run);self.assertNotEqual(jobs[second]['work'],first_folder)
+  self.assertEqual(inspect_run(second,str(self.manifest))['status'],'complete')
+  self.assertEqual((first_folder/'result.json').read_bytes(),first_result)
+  self.assertEqual(file_digest(first_folder/'checkpoint.pt'),first_checkpoint)
   live=jobs.pop(run)
   try:self.assertEqual(inspect_run(run,str(self.manifest))['metrics'][0]['points'][0]['value'],.25)
   finally:jobs[run]=live

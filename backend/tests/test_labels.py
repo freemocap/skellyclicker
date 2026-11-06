@@ -106,4 +106,19 @@ class LabelsTest(unittest.TestCase):
    registry.get(first).cancel();jobs[first]['thread'].join(5)
   self.assertEqual(registry.get(first).snapshot()['status'],'cancelled');self.assertIsNone(read_model(self.manifest,Project).label_result)
 
+
+ def test_generation_accumulates_and_does_not_restore_removed_images(self):
+  first=self.run_job();result=run_result(first)['result'];initial=selection_view(self.manifest);m=result['moments'][0]
+  removed=m['moment_id']+':left'
+  save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=initial['sha256'],moment_id=m['moment_id'],source_frame=m['source_frame'],timestamp_ns=m['timestamp_ns'],camera_id='left',selected=False))
+  old_bytes=(self.root/result['path']/'labels.parquet').read_bytes()
+  self.request=self.request.model_copy(update={'start_frame':11,'end_frame':13,'step':2})
+  second=self.run_job();updated=run_result(second)['result'];members=selection_view(self.manifest)['selected_image_ids']
+  self.assertEqual(len(updated['images']),8)
+  self.assertEqual(len(members),7)
+  self.assertNotIn(removed,members)
+  self.assertTrue(set(initial['selected_image_ids'])-{removed}<=set(members))
+  self.assertEqual((self.root/result['path']/'labels.parquet').read_bytes(),old_bytes)
+  self.assertEqual(updated['manifest']['previous_label_result'],result['path'])
+
 if __name__=='__main__':unittest.main()

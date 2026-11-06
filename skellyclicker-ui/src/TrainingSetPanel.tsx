@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {SidebarProcessingAction as ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
+import {ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
 import type {ProjectView} from './ProjectPanel';
 import {trainingGraph,defaultConfig,validateConfig,candidateFrames,readConfig,type PreparedSummary,type TrainingConfig} from './training-workflow';
 import './training-set.css';
@@ -8,7 +8,7 @@ import {useLabelRun} from './useLabelRun';
 import {useStlSelection} from './useStlSelection';
 
 /** Core-derived SDK rows and composition; this app supplies only labeling semantics and state. */
-export function TrainingSetPanel({baseUrl,project,snapshots,onClose}:{baseUrl:string;project:ProjectView;snapshots:Record<string,PipelineSnapshot>;onClose:()=>void}) {
+export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onPrepare}:{baseUrl:string;project:ProjectView;snapshots:Record<string,PipelineSnapshot>;onClose:()=>void;onPrepare?:()=>void}) {
   const [showRun,setShowRun]=useState(true);
   const [view,setView]=useState<'graph'|'list'>('graph');
   const [summary,setSummary]=useState<PreparedSummary|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState('');
@@ -29,15 +29,26 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose}:{baseUrl:st
     }).catch(e=>{if(!abort.signal.aborted){setError(String(e));setLoaded(true);}});
     return()=>abort.abort();
   },[baseUrl,project.manifest_path,binding,storageKey]);
-  function change<K extends keyof TrainingConfig>(key:K,value:TrainingConfig[K]) {
-    const next={...config,[key]:value};setConfig(next);
+  function updateConfig(next:TrainingConfig) {
+    setConfig(next);
     try {localStorage.setItem(storageKey,JSON.stringify({version:1,binding,config:next}));setSaveError('');}catch {setSaveError('Configuration is not saved: browser storage is unavailable.');}
   }
+  function change<K extends keyof TrainingConfig>(key:K,value:TrainingConfig[K]) {updateConfig({...config,[key]:value});}
+  function usePrepared() {const defaults=defaultConfig(summary);updateConfig({...config,mode:'reuse',first:defaults.first,count:defaults.count});}
   const run=useLabelRun(baseUrl,project.manifest_path,config,snapshots);
   const problems=validateConfig(config,summary);
   const candidates=useMemo(()=>candidateFrames(config,summary),[config,summary]);
   const sourceValid=project.issues.length===0&&project.recordings.length===1&&project.targets.length===1;
-  const reusable=sourceValid&&stl.compatible&&config.mode==='reuse'&&!!summary&&!problems.length&&!error;
+  const blockers=[
+    ...(loaded&&config.mode==='fresh'?['Fresh preparation is not connected to this panel yet. Preview candidates needs existing prepared images and STL poses. Use prepared frames below, or open preparation controls to process another range.']:[]),
+    ...(!sourceValid?['Open a project with one recording and one target, and resolve its missing or changed files.']:[]),
+    ...(stl.busy?['Checking the project STL. Please wait.']:stl.error?[stl.error]:!stl.validated?['The project STL has not been validated.']:!stl.compatible?['The selected STL or units differ from the prepared target. Restore the project STL and units or prepare new poses.']:[]),
+    ...(loaded&&!summary&&!error?['No prepared images and STL poses are available. Fresh preparation must finish before candidate labels can be generated.']:[]),
+    ...project.issues,...problems,...(error?[error]:[]),
+    ...(run.running?['A candidate preview or generation is in progress. Wait for it to finish, or cancel the active generation.']:[]),
+    ...(config.mode==='reuse'&&summary&&!problems.length&&!candidates.length?['No frames match this selection. Change the fit filter, frame range, or candidate stride.']:[]),
+  ];
+  const reusable=loaded&&blockers.length===0;
   const record=project.recordings[0],target=project.targets[0];
   const range=summary?.frames.length?`${summary.frames[0].source_frame}–${summary.frames.at(-1)!.source_frame}`:'—';
   const row=(label:string,text:ReactNode,control:ReactNode,promoted=false)=><SettingRow label={label} info={{title:label,text}} control={control} promoted={promoted}/>;
@@ -108,11 +119,18 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose}:{baseUrl:st
   const showingRun=!!run.snapshot&&showRun;
   const messages=[...project.issues,...problems,...(error?[error]:[]),...(saveError?[saveError]:[]),...(stl.error?[stl.error]:[]),...(run.error?[run.error]:[]),...(run.snapshot?.error?[run.snapshot.error]:[]),...(stl.validated&&!stl.compatible?['Selected STL or units differ from the current target. Existing poses and target points cannot be reused; prepare this target before generating labels.']:[])];
   return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
+    <div className="training-set-action-status" role="status" aria-live="polite">
+      {run.error&&<p role="alert">{run.error}</p>}{saveError&&<p role="alert">{saveError}</p>}
+      {blockers.length?<><strong>Cannot preview candidates yet</strong><ul>{blockers.map(reason=><li key={reason}>{reason}</li>)}</ul></>:<p>{run.preview?'Ready to add candidate labels. Existing images and earlier removals are preserved. Review new images before training.':'Ready to preview. Preview checks the inputs; Generate candidates then creates the labels.'}</p>}
+      {summary&&summary.frames.length>0&&(config.mode==='fresh'||problems.length>0)&&<ButtonSm text="Use prepared frames" buttonType="secondary" onClick={usePrepared} disabled={run.running}/>}
+      {config.mode==='fresh'&&onPrepare&&<ButtonSm text="Open preparation controls" buttonType="secondary" onClick={onPrepare} disabled={run.running}/>}
+      {!blockers.length&&!run.preview&&<p>Generate candidates becomes available after a successful preview.</p>}
+    </div>
     {!loaded?<p role="status">Loading…</p>:<PipelinePanel locked={run.running} graph={showingRun?run.snapshot!.graph:trainingGraph} nodePresentation={showingRun?executionPresentation:nodePresentation} operations={showingRun?run.snapshot!.operations:[]} view={view} onViewChange={setView}
       notice={messages.length?<ul className="training-errors">{messages.map(message=><li key={message}>{message}</li>)}</ul>:null}
       actions={<>{run.snapshot&&<ButtonSm text={showRun?"Workflow settings":"Run progress"} onClick={()=>setShowRun(v=>!v)}/>}<span role="status">{run.snapshot?`${run.snapshot.status}${run.snapshot.cancel_requested?" (cancellation requested)":""} · ${run.snapshot.operations.find(op=>op.status==='running')?.detail??''}`:run.preview?`${run.preview.moment_count} pairs · ${run.preview.image_count} images · ${run.preview.label_count} labels`:null}</span><AnchoredInfo title="Training-set workflow" text="Preview validates the current prepared inputs without processing. Generate candidates publishes unreviewed projected labels; Include/Exclude records your training selection. Starting training freezes the included images without another approval step."/>
-        <ButtonSm text="Preview candidates" onClick={()=>void run.inspect()} disabled={!reusable||run.running}/>
-        <ButtonSm text="Generate candidates" iconClass="processmocap-icon" onClick={()=>void run.start()} disabled={!reusable||!run.preview||run.running}/>
+        <ButtonSm text="Preview candidates" onClick={()=>void run.inspect()} disabled={!reusable}/>
+        <ButtonSm text="Generate candidates" iconClass="processmocap-icon" onClick={()=>void run.start()} disabled={!reusable||!run.preview}/>
         {run.running&&<ButtonSm text="Cancel run" onClick={()=>void run.cancel()} disabled={!run.snapshot}/>}
         {run.snapshot?.status==='complete'&&<ButtonSm text="Review candidates" onClick={onClose}/>}
       </>}/>

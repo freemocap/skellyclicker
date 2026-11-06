@@ -1,0 +1,13 @@
+import {chromium,expect} from '@playwright/test';
+const b=await chromium.launch({channel:'msedge',headless:true});const p=await b.newPage();let exists=false,accepted=null,acceptedKeys=[];
+const snapshot={status:'complete',operations:[{detail:'Analysis complete',completed:100,total:100}],error:null};
+const result={counts:{scanned:100,near_miss:10,major_failure:8,needs_geometry:20,reserved:10},scope:'fixture',proposals:[{key:'10:left',source_frame:10,camera_id:'left',group:'near_miss',reason:'Near miss fixture'},{key:'20:right',source_frame:20,camera_id:'right',group:'major_failure',reason:'Major failure fixture'}]};
+const round=()=>({run_id:'round',snapshot,result,accepted});
+await p.route('http://refinement-fixture.invalid/**',async route=>{const url=new URL(route.request().url());let value;
+ if(url.pathname.endsWith('/image'))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="100"><text x="10" y="30">Isolated review fixture</text></svg>'});
+ if(url.pathname.endsWith('/latest'))value=exists?round():null;
+ else if(url.pathname.endsWith('/runs')){exists=true;value={run_id:'round'};}
+ else if(url.pathname.endsWith('/accept')){acceptedKeys=route.request().postDataJSON().image_keys;accepted={run_id:'labels',snapshot:{status:'complete'}};value=accepted;}
+ else value=round();await route.fulfill({json:value});});
+await p.route('**/__refinement-test',async route=>{const original=await route.fetch({url:'http://127.0.0.1:5176/'});await route.fulfill({response:original,body:(await original.text()).replace('/src/main.tsx','/tests/refinement-harness.tsx')});});
+try{await p.goto('http://127.0.0.1:5176/__refinement-test');await p.getByRole('button',{name:'Find next examples',exact:true}).click();await expect(p.locator('.refinement-grid article')).toHaveCount(2);await p.locator('.refinement-grid article').first().getByRole('button',{name:'Remove from batch'}).click();await expect(p.locator('.refinement-grid article')).toHaveCount(1);await p.getByRole('button',{name:'Add 1 reviewed images'}).click();expect(acceptedKeys).toEqual(['20:right']);await expect(p.getByRole('status').filter({hasText:'Images added.'})).toBeVisible();await p.reload();await expect(p.getByRole('status').filter({hasText:'Images added.'})).toBeVisible();await expect(p.locator('.refinement-grid article')).toHaveCount(1);console.log('PASS exact reviewed additions, rejected proposals stay out, completed round restores after reload');}finally{await b.close();}

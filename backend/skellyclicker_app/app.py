@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from freemocap_sdk.server import Connection, create_app
 from freemocap_sdk.logs import LogHub
 
@@ -12,14 +12,15 @@ from .playback_adapter import router as playback_router
 from .label_routes import router as label_router, task_router, registry
 from .training_routes import router as training_router
 from .session import router as session_router
+from .refinement_routes import router as refinement_router
 from freemocap_sdk.pipeline import stream_pipeline_snapshots
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger("skellyclicker")
 
 @router.get("/status")
-async def status():
-    return {"application": "skellyclicker", "mode": "playback", "recording": None}
+async def status(request: Request):
+    return {"application": "skellyclicker", "mode": "playback", "recording": None, "log_session_id": request.app.state.log_session_id}
 
 async def state_updates(connection: Connection):
     sequence = 0
@@ -67,10 +68,12 @@ def build_app():
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    return create_app(
+    app = create_app(
         title="SkellyClicker",
-        routers=(router, project_router, preparation_router, playback_router, label_router, task_router, training_router, session_router),
+        routers=(router, project_router, preparation_router, playback_router, label_router, task_router, training_router, session_router, refinement_router),
         lifespan=lifespan,
         allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
         websocket_handler=stream_updates,
     )
+    app.state.log_session_id = hub.session_id
+    return app
