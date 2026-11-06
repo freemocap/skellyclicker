@@ -132,11 +132,11 @@ def calibrated_cameras(cal, optical_to_world):
     return cameras
 
 
-def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
+def build_project_playback(manifest_path: Path, *, cancelled=lambda: False, prepared_project=None):
     def check_cancelled():
         if cancelled(): raise InterruptedError("Playback preparation cancelled")
     check_cancelled()
-    manifest_path=manifest_path.resolve();root=manifest_path.parent;project=read_model(manifest_path,Project)
+    manifest_path=manifest_path.resolve();root=manifest_path.parent;project=prepared_project if prepared_project is not None else read_model(manifest_path,Project)
     if not project.sample_result: raise ValueError('Prepare fresh candidates before building playback')
     result=resolve_relative(root,project.sample_result);target=load_target(root,project.target_manifests[0])
     authority=json.loads((result/'manifest.json').read_text())
@@ -262,10 +262,11 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
     relative=(extension/'playback'/playback_id).relative_to(root).as_posix();destination=resolve_relative(root,relative);destination.parent.mkdir(exist_ok=True)
     with project_lock(root):
         check_cancelled()
-        project=read_model(manifest_path,Project)
-        publish_directory(staging=work,destination=destination);project.playback_result=relative;atomic_json(manifest_path,project.model_dump(mode='json'))
+        if prepared_project is None:project=read_model(manifest_path,Project)
+        publish_directory(staging=work,destination=destination);project.playback_result=relative
+        if prepared_project is None:atomic_json(manifest_path,project.model_dump(mode='json'))
     logger.info('SDK recording ready: %s, actual STL surfaces and %d timed samples',playback_id,n)
-    return register_project(root,project)
+    return relative if prepared_project is not None else register_project(root,project)
 
 if __name__=='__main__':
     import sys

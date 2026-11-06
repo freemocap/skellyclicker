@@ -1,33 +1,23 @@
+// Mutating integration journey: explicitly processes the entire current recording.
+// Run only when real generation is intended and the native backend is idle.
 import {chromium,expect} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
 const browser=await chromium.connectOverCDP('http://127.0.0.1:9224');
-const evidence={requests:[],errors:[],streamFrames:0};
-try {
- const page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('5176'));
- const cdp=await page.context().newCDPSession(page);await cdp.send('Network.enable');cdp.on('Network.webSocketFrameReceived',()=>evidence.streamFrames++);
- page.on('pageerror',e=>evidence.errors.push(String(e)));page.on('request',r=>{if(/api\/(labels|label-tasks|preparation)/.test(r.url()))evidence.requests.push({method:r.method(),url:r.url()});});
- await expect(page.getByRole('button',{name:'Create image training set',exact:true})).toBeEnabled({timeout:30000});
+const evidence={requests:[],errors:[]};
+try{
+ const page=browser.contexts()[0].pages()[0];
+ page.on('pageerror',e=>evidence.errors.push(String(e)));
+ page.on('request',r=>{if(r.method()==='POST'&&/api\/(labels|preparation)/.test(r.url()))evidence.requests.push({url:r.url(),body:r.postDataJSON()});});
+ const close=page.getByRole('button',{name:'Close Create image training set',exact:true});if(await close.count())await close.click();
  await page.getByRole('button',{name:'Create image training set',exact:true}).click();
- const panel=page.getByRole('dialog',{name:'Create image training set',exact:true});
- await expect(panel.locator('.pg-node-title').first()).toBeVisible();evidence.headingPixels=await panel.locator('.pg-node-title').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize));expect(evidence.headingPixels).toBeGreaterThanOrEqual(16);
- await panel.getByRole('button',{name:'List',exact:true}).click();
- const stride=panel.getByRole('spinbutton',{name:'Candidate stride',exact:true});await stride.fill('30');await stride.press('Tab');
- const previewResponse=page.waitForResponse(r=>r.url().endsWith('/api/labels/preview'));
- await panel.getByRole('button',{name:'Preview candidates',exact:true}).click();evidence.preview=await (await previewResponse).json();
- expect(evidence.preview.moment_count).toBe(26);expect(evidence.preview.label_count).toBe(2704);
- const startResponse=page.waitForResponse(r=>r.url().endsWith('/api/labels/runs')&&r.request().method()==='POST');
- await panel.getByRole('button',{name:'Generate candidates',exact:true}).click();evidence.run=await (await startResponse).json();console.log('RUN',JSON.stringify(evidence.run));
- await expect(panel.getByRole('button',{name:'Review candidates',exact:true})).toBeVisible({timeout:180000});
- evidence.completeText=await panel.innerText();await page.screenshot({path:'../.test-artifacts/labels-run-complete.png'});
- await panel.getByRole('button',{name:'Review candidates',exact:true}).click();
- const review=page.getByRole('region',{name:'Generated images',exact:true});
- await expect(review).toContainText('52 generated images');await expect(review.locator('.sdk-image-catalog-counts')).toContainText('52 included');await page.getByRole('button',{name:'Next labeled image',exact:true}).click();
- await page.waitForFunction(()=>[...document.querySelectorAll('.playback-presented-image')].every(c=>c.dataset.presentedFrame==='30'));
- const selectionResponse=page.waitForResponse(r=>r.url().endsWith('/api/labels/selection')&&r.request().method()==='POST');
- await page.locator('.playback-image-controls').first().getByRole('button').click();evidence.selection=await (await selectionResponse).json();expect(evidence.selection.selected_image_ids.length).toBe(51);
- await expect(review.locator('.sdk-image-catalog-counts')).toContainText('51 included');await page.screenshot({path:'../.test-artifacts/labels-selected-moment.png'});
- await page.reload();await expect(page.getByRole('region',{name:'Generated images'}).locator('.sdk-image-catalog-counts')).toContainText('51 included',{timeout:30000});
- evidence.selectionReopened=true;expect(evidence.streamFrames).toBeGreaterThan(0);expect(evidence.errors).toEqual([]);
- expect(evidence.requests.filter(r=>/preparation\/(start|cancel)/.test(r.url))).toEqual([]);
- await writeFile('../.test-artifacts/labels-native.json',JSON.stringify(evidence,null,2));console.log('PASS',JSON.stringify({run:evidence.run,streamFrames:evidence.streamFrames,selectionReopened:true}));
+ const dialog=page.getByRole('dialog',{name:'Create image training set',exact:true});
+ await dialog.getByRole('combobox',{name:'Frames to generate'}).selectOption('all');
+ await dialog.getByRole('button',{name:'Generate all images',exact:true}).click();
+ await expect(dialog.getByRole('button',{name:'Open generated images',exact:true})).toBeEnabled({timeout:3600000});
+ evidence.result=await dialog.getByRole('region',{name:'Run activity',exact:true}).innerText();
+ const label=evidence.requests.find(r=>r.url.endsWith('/api/labels/runs'));
+ expect(label.body.start_frame).toBe(0);expect(label.body.step).toBe(1);expect(label.body.max_moments).toBe(null);expect(label.body.fit_filter).toBe('all');
+ expect(evidence.errors).toEqual([]);await page.screenshot({path:'../.test-artifacts/labels-full-recording-complete.png'});
+ await dialog.getByRole('button',{name:'Open generated images',exact:true}).click();
+ await writeFile('../.test-artifacts/labels-full-recording.json',JSON.stringify(evidence,null,2));console.log('PASS',JSON.stringify(evidence));
 }finally{await browser.close();}

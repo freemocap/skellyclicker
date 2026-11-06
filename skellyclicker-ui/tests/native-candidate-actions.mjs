@@ -1,19 +1,17 @@
 import {chromium,expect} from '@playwright/test';
-const b=await chromium.connectOverCDP('http://127.0.0.1:9224');
+const browser=await chromium.connectOverCDP('http://127.0.0.1:9224');
 try{
- const p=b.contexts()[0].pages()[0];let generations=0;p.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/labels/runs'))generations++;});
- for(const tab of ['Training dashboard','Viewer']){
-  const close=p.getByRole('button',{name:'Close Create image training set',exact:true});if(await close.count())await close.click();
-  await p.getByRole('tab',{name:tab,exact:true}).click();await p.getByRole('button',{name:'Create image training set',exact:true}).click();
-  const d=p.getByRole('dialog',{name:'Create image training set',exact:true});await d.getByRole('button',{name:'List',exact:true}).click();
-  await d.getByRole('combobox',{name:'Input strategy',exact:true}).selectOption('fresh');
-  await expect(d.locator('.training-set-action-status')).toContainText('Fresh preparation is not connected');
-  await expect(d.getByRole('button',{name:'Preview candidates',exact:true})).toBeDisabled();
-  await d.getByRole('button',{name:'Use prepared frames',exact:true}).click();
-  await d.getByRole('button',{name:'Preview candidates',exact:true}).click();
-  await expect(d.getByRole('button',{name:'Generate candidates',exact:true})).toBeEnabled({timeout:15000});
-  await d.getByRole('button',{name:'Close Create image training set',exact:true}).click();
+ const page=browser.contexts()[0].pages()[0];let generations=0;
+ page.on('request',r=>{if(r.method()==='POST'&&(/\/api\/labels\/runs$/.test(r.url())||/\/api\/preparation\/start$/.test(r.url())))generations++;});
+ for(const tab of ['Training','Viewer']){
+  const close=page.getByRole('button',{name:'Close Create image training set',exact:true});if(await close.count())await close.click();
+  await page.getByRole('tab',{name:tab,exact:true}).click();await page.getByRole('button',{name:'Create image training set',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Create image training set',exact:true});
+  await dialog.getByRole('combobox',{name:'Frames to generate'}).selectOption('all');
+  await expect(dialog.getByRole('button',{name:'Generate all images',exact:true})).toBeEnabled({timeout:15000});
+  await expect(dialog.getByRole('region',{name:'Image generation',exact:true})).toContainText('Entire recording · every frame · both cameras');
+  expect(await dialog.getByRole('button',{name:'Generate all images',exact:true}).evaluate(e=>getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  await dialog.getByRole('button',{name:'Close Create image training set',exact:true}).click();
  }
- expect(generations).toBe(0);await p.getByRole('tab',{name:'Training dashboard',exact:true}).click();
- console.log('PASS interactive candidate dialog and explicit blockers from both tabs; no generation');
-}finally{await b.close();}
+ expect(generations).toBe(0);console.log('PASS whole-recording default and styled action from Viewer and Training; no processing started');
+}finally{await browser.close();}

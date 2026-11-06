@@ -5,13 +5,14 @@ const compiled=await build({entryPoints:['src/training-workflow.ts'],bundle:true
 const {defaultConfig,validateConfig,candidateFrames,trainingGraph,readConfig}=await import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 const summary={frames:Array.from({length:7},(_,i)=>({source_frame:100+i,accepted:i%2===0,status:'candidate'})),accepted:4,calibration:{source_frame_count:130,image_width:640,image_height:480}};
 test('defaults and sampling use source identity, retain failed candidates, and filter before stride',()=>{
- const config=defaultConfig(summary);assert.equal(config.first,'100');assert.equal(config.count,'7');
+ const defaults=defaultConfig(summary);assert.equal(defaults.scope,'all');assert.equal(defaults.first,'0');assert.equal(defaults.count,'130');assert.equal(defaults.step,'1');assert.equal(defaults.mode,'fresh');assert.equal(defaults.limit,'');assert.equal(defaults.fit,'all');
+ const config={...defaults,scope:'custom',mode:'reuse',first:'100',count:'7'};
  assert.deepEqual(candidateFrames({...config,step:'2'},summary),[100,102,104,106]);
  assert.deepEqual(candidateFrames({...config,fit:'failed',step:'2'},summary),[101,105]);
  assert.deepEqual(candidateFrames({...config,fit:'passed',limit:'2'},summary),[100,102]);
 });
 test('reuse refuses missing source frames and invalid configuration',()=>{
- const config=defaultConfig(summary);
+ const config={...defaultConfig(summary),scope:'custom',mode:'reuse',first:'100',count:'7'};
  assert.ok(validateConfig({...config,first:'99'},summary).length);
  assert.ok(validateConfig({...config,step:'0'},summary).length);
  assert.ok(validateConfig({...config,count:'901'},summary).length);
@@ -32,3 +33,5 @@ test('workflow binds every input once with matching semantics and retains manual
  assert.equal(nodes.get('review_labels').execution_resource,'human');
  assert.ok(trainingGraph.definition.edges.some(e=>e.source.node==='review_labels'&&e.target.node==='publish_dataset'));
 });
+
+test('whole-recording defaults support unprepared and long recordings',()=>{assert.deepEqual(validateConfig(defaultConfig(null),null),[]);const full={...summary,calibration:{...summary.calibration,source_frame_count:1519}};const config=defaultConfig(full);assert.equal(config.count,'1519');assert.deepEqual(validateConfig(config,full),[]);});

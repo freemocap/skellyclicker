@@ -25,7 +25,7 @@ from .job_lifecycle import jobs as _jobs, guard as _guard, busy
 class PreparationRequest(BaseModel):
     project_path: str
     start_frame: int = Field(default=0, ge=0)
-    frame_count: int = Field(default=30, ge=1, le=900)
+    frame_count: int | None = Field(default=None, ge=1)
 
 
 def runtime_config():
@@ -105,11 +105,16 @@ def publish_result(job):
     import pyarrow as pa
     import pyarrow.parquet as pq
     output=job['output'];request=job['request'];rows=json.loads((output/'candidates.json').read_text())
-    if len(rows)!=request['frame_count'] or [r['source_frame'] for r in rows]!=list(range(request['start_frame'],request['start_frame']+request['frame_count'])):
+    calibration=json.loads((output/'calibration.json').read_text())
+    count=request['frame_count'] if request['frame_count'] is not None else calibration['source_frame_count']-request['start_frame']
+    if len(rows)!=count or [r['source_frame'] for r in rows]!=list(range(request['start_frame'],request['start_frame']+count)):
         raise ValueError('Candidate rows do not match requested source range')
     timestamps=[r['timestamp_ns'] for r in rows]
     if any(b<=a for a,b in zip(timestamps,timestamps[1:])): raise ValueError('Non-increasing source timestamps')
     calibration=json.loads((output/'calibration.json').read_text())
+    from .preparation_retention import retain_labeled_frames
+    baseline=read_model(job['manifest'],Project)
+    rows,retention=retain_labeled_frames(job,rows,calibration)
     descriptor={'schema_version':1,'recording_id':request['recording_id'],'target_sha256':request['target_sha256'],'source_sha256':request['source_sha256'],'calibration':calibration,'geometry':json.loads((output/'geometry.json').read_text()),'mask_preset':request['mask_preset'],'human_review':'unreviewed','pose_units':'m','pose_frame':'original STL to rectified camera (x right, y down, z forward)'}
     fields=sorted(set().union(*(row.keys() for row in rows))-{'camera_ids'})
     table=pa.table({key:pa.array([row.get(key) for row in rows]) for key in fields})
@@ -119,19 +124,22 @@ def publish_result(job):
     pq.write_table(timing.replace_schema_metadata({b'skellyclicker.timing':json.dumps({'clock_id':'zed-image-clock','unit':'ns','recording_id':request['recording_id']}).encode()}),output/'timing.parquet')
     summary={'job_id':job['status']['job_id'],'frames':[{k:v for k,v in r.items() if 'pose' not in k and not k.startswith('T_')} for r in rows],'accepted':sum(r['accepted'] for r in rows),'calibration':calibration,'human_review':'unreviewed','mask_preset':request['mask_preset']}
     atomic_json(output/'summary.json',summary)
-    atomic_json(output/'provenance.json',{'request':request,'worker_sha256':{name:file_digest(job['work']/(name+'.py')) for name in ('zed_replay','fit_pose')},'replay':json.loads((output/'replay-software.json').read_text()),'pose':json.loads((output/'pose-software.json').read_text())})
+    atomic_json(output/'provenance.json',{'request':request,'retained_reference_frames':retention,'worker_sha256':{name:file_digest(job['work']/(name+'.py')) for name in ('zed_replay','fit_pose')},'replay':json.loads((output/'replay-software.json').read_text()),'pose':json.loads((output/'pose-software.json').read_text())})
     atomic_json(output/'manifest.json',{'schema_version':1,'descriptor':descriptor,'numerical_authority':['candidates.parquet','timing.parquet'],'derived_review_index':'summary.json','files':{k:v.model_dump() for k,v in inventory(output).items()}})
     root=job['root'];relative=(recording_structure(root,request["recording_id"]).application_dir("skellyclicker")/"results"/job["status"]["job_id"]/"r001").relative_to(root).as_posix()
     destination=resolve_relative(root,relative);destination.parent.mkdir(parents=True,exist_ok=True)
-    with project_lock(root):
-        if job['cancel'].is_set(): raise InterruptedError('Preparation cancelled before publication')
-        project=read_model(job['manifest'],Project)
-        publish_directory(staging=output,destination=destination)
-        project.sample_result=relative
-        atomic_json(job['manifest'],project.model_dump(mode='json'))
+    if job['cancel'].is_set(): raise InterruptedError('Preparation cancelled before publication')
+    publish_directory(staging=output,destination=destination)
+    staged_project=baseline.model_copy(deep=True);staged_project.sample_result=relative
+    from .preparation_retention import rebase_labels
+    rebase_labels(root,staged_project,relative,retention)
     update(job,stage='encoding playback')
     from .playback_adapter import build_project_playback
-    build_project_playback(job['manifest'], cancelled=job['cancel'].is_set)
+    build_project_playback(job['manifest'], cancelled=job['cancel'].is_set, prepared_project=staged_project)
+    with project_lock(root):
+        if job['cancel'].is_set():raise InterruptedError('Preparation cancelled before activation')
+        if read_model(job['manifest'],Project)!=baseline:raise ValueError('Project changed during preparation; existing dataset was preserved')
+        atomic_json(job['manifest'],staged_project.model_dump(mode='json'))
     update(job,state='complete',stage='complete',completed=len(rows),total=len(rows),accepted=summary['accepted'],result=relative)
     logger.info('Fresh sample result ready: %d frames, %d passed pilot gates (not human approved)',len(rows),summary['accepted'])
 

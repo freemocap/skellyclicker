@@ -27,6 +27,8 @@ if error!=sl.ERROR_CODE.SUCCESS: raise RuntimeError(f'ZED open failed: {error}')
 try:
     info=camera.get_camera_information();config=info.camera_configuration;c=config.calibration_parameters
     total=camera.get_svo_number_of_frames();start=request['start_frame'];count=request['frame_count']
+    if count is None: count=total-start
+    if count<1: raise ValueError(f'First frame must be below {total} source frames')
     if start+count>total: raise ValueError(f'Requested range exceeds {total} source frames')
     K=lambda v:[[v.fx,0,v.cx],[0,v.fy,v.cy],[0,0,1]]
     calibration={'schema_version':1,'recording_id':request['recording_id'],'source_sha256':request['source_sha256'],'serial':info.serial_number,'source_frame_count':total,'nominal_fps':config.fps,'image_width':config.resolution.width,'image_height':config.resolution.height,'clock_id':'zed-image-clock','timestamp_unit':'ns','camera_axes':'x right, y down, z forward','depth_units':'m','depth_method':'ZED NEURAL replay estimate','rectified':True,'left':K(c.left_cam),'right':K(c.right_cam),'T_left_from_right_m':c.stereo_transform.m.tolist(),'zed_sdk_version':sl.Camera.get_sdk_version()}

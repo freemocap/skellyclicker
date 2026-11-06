@@ -57,6 +57,7 @@ function App({backendUrl}: {backendUrl: string}) {
   }
   useEffect(()=>{const abort=new AbortController();void restoreSession(abort.signal);return()=>abort.abort();},[backendUrl]);
   const [trainingOpen,setTrainingOpen]=useState(false);
+  const [sidebarRequest,setSidebarRequest]=useState(0);
   const [toolbarTarget,setToolbarTarget]=useState<HTMLDivElement|null>(null);
   const [resultView,setResultView]=useState<'training'|'checkpoints'>(()=>localStorage.getItem('skellyclicker.results-view')==='checkpoints'?'checkpoints':'training');
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
@@ -102,7 +103,7 @@ function App({backendUrl}: {backendUrl: string}) {
     void checkHttp();
     return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <><AppShell projectName={project?.project.project_id} onCreateTrainingSet={project?()=>setTrainingOpen(true):undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={view=>{if(view!=='viewer'){setResultView(view);localStorage.setItem('skellyclicker.results-view',view);}saveSession({workspace:view==='viewer'?'viewer':'training'});}} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard toolbarTarget={toolbarTarget} surface={resultView} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>setTrainingOpen(true):undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={view=>{if(view!=='viewer'){setResultView(view);localStorage.setItem('skellyclicker.results-view',view);}saveSession({workspace:view==='viewer'?'viewer':'training'});}} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard toolbarTarget={toolbarTarget} surface={resultView} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
     {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
@@ -129,7 +130,7 @@ function App({backendUrl}: {backendUrl: string}) {
     </>}/> }
     <PlaybackWorkspace navigationGroups={review.navigationGroups} renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>
-    {trainingOpen&&project&&<Suspense fallback={null}><TrainingSetPanel key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)} onPrepare={()=>{setTrainingOpen(false);saveSession({sidebar:'project'});}}/></Suspense>}
+    {project&&<Suspense fallback={null}><TrainingSetPanel open={trainingOpen} key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>setTrainingOpen(false)} onReview={async()=>{const response=await fetch(backendUrl+'/api/projects/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_path:project.manifest_path})});if(!response.ok)throw new Error('Could not open generated images. Retry.');acceptProject(await response.json());saveSession({sidebar:'images',workspace:'viewer'});setSidebarRequest(v=>v+1);setTrainingOpen(false);}}/></Suspense>}
   </>;
 }
 

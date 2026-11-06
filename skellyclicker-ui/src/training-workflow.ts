@@ -35,17 +35,19 @@ export interface PreparedSummary {
   calibration:{source_frame_count:number;image_width:number;image_height:number;depth_method?:string;depth_units?:string};
 }
 export interface TrainingConfig {
-  mode:'reuse'|'fresh'; first:string; count:string; step:string; limit:string; fit:'all'|'passed'|'failed';
+  scope:'all'|'custom'; mode:'reuse'|'fresh'; first:string; count:string; step:string; limit:string; fit:'all'|'passed'|'failed';
 }
 export function defaultConfig(summary:PreparedSummary|null):TrainingConfig {
   const frames=summary?.frames??[];
-  return {mode:frames.length?'reuse':'fresh',first:String(frames[0]?.source_frame??0),count:String(frames.length||30),step:'1',limit:'',fit:'all'};
+  const total=summary?.calibration.source_frame_count;
+  const complete=!!total&&new Set(frames.map(f=>f.source_frame)).size===total&&frames.every(f=>f.source_frame>=0&&f.source_frame<total);
+  return {scope:'all',mode:complete?'reuse':'fresh',first:'0',count:total?String(total):'',step:'1',limit:'',fit:'all'};
 }
 const integer=(value:string,min:number,max=Number.MAX_SAFE_INTEGER)=>value.trim()!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
 export function validateConfig(config:TrainingConfig,summary:PreparedSummary|null):string[] {
   const errors:string[]=[];
   if(!integer(config.first,0))errors.push('First source frame must be a non-negative integer.');
-  if(!integer(config.count,1,900))errors.push('Frame count must be an integer from 1 to 900 for the current adapter.');
+  if(!(config.scope==='all'&&config.count==='')&&!integer(config.count,1))errors.push('Frame count must be a positive integer.');
   if(!integer(config.step,1))errors.push('Candidate stride must be a positive integer.');
   if(config.limit!==''&&!integer(config.limit,1))errors.push('Maximum moments must be empty or a positive integer.');
   if(errors.length)return errors;
@@ -70,5 +72,5 @@ export function readConfig(value:unknown):TrainingConfig|null {
   if(!value||typeof value!=='object')return null;
   const v=value as Record<string,unknown>;
   if(!['reuse','fresh'].includes(String(v.mode))||!['all','passed','failed'].includes(String(v.fit))||!['first','count','step','limit'].every(k=>typeof v[k]==='string'))return null;
-  return {mode:v.mode as TrainingConfig['mode'],fit:v.fit as TrainingConfig['fit'],first:v.first as string,count:v.count as string,step:v.step as string,limit:v.limit as string};
+  return {scope:v.scope==='all'?'all':'custom',mode:v.mode as TrainingConfig['mode'],fit:v.fit as TrainingConfig['fit'],first:v.first as string,count:v.count as string,step:v.step as string,limit:v.limit as string};
 }

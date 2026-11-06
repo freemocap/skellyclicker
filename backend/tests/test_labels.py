@@ -121,4 +121,29 @@ class LabelsTest(unittest.TestCase):
   self.assertEqual((self.root/result['path']/'labels.parquet').read_bytes(),old_bytes)
   self.assertEqual(updated['manifest']['previous_label_result'],result['path'])
 
+ def test_expanded_preparation_preserves_labels_references_and_exclusions(self):
+  import shutil
+  from skellyclicker_app.preparation_retention import retain_labeled_frames,rebase_labels
+  first=self.run_job();previous=run_result(first)['result'];selection=selection_view(self.manifest);moment=previous['moments'][0]
+  removed=moment['moment_id']+':left'
+  save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=previous['manifest_sha256'],expected_selection_sha256=selection['sha256'],moment_id=moment['moment_id'],source_frame=moment['source_frame'],timestamp_ns=moment['timestamp_ns'],camera_id='left',selected=False))
+  before=self.manifest.read_bytes();project=read_model(self.manifest,Project)
+  expanded=self.result.parent.parent/'expanded/r001';shutil.copytree(self.result,expanded)
+  original=pq.read_table(self.result/'candidates.parquet').to_pylist();rows=[{**row,'status':'new-fit'} for row in original]
+  metadata=previous['manifest']
+  job={'manifest':self.manifest,'root':self.root,'output':expanded,'request':{'source_sha256':metadata['source_sha256'],'target_sha256':metadata['stl_sha256'],'stl_units':metadata['stl_units']}}
+  rows,retention=retain_labeled_frames(job,rows,json.loads((expanded/'calibration.json').read_text()))
+  self.assertEqual([r['status'] for r in rows],['accepted','new-fit','accepted','new-fit'])
+  pq.write_table(pa.Table.from_pylist(rows),expanded/'candidates.parquet')
+  manifest=json.loads((expanded/'manifest.json').read_text());manifest['files']={k:v.model_dump() for k,v in inventory(expanded).items() if k!='manifest.json'};atomic_json(expanded/'manifest.json',manifest)
+  relative=expanded.relative_to(self.root).as_posix();rebase_labels(self.root,project,relative,retention);project.sample_result=relative
+  self.assertEqual(self.manifest.read_bytes(),before) # No partial activation.
+  atomic_json(self.manifest,project.model_dump())
+  self.assertNotIn(removed,selection_view(self.manifest)['selected_image_ids'])
+  self.request=self.request.model_copy(update={'step':1})
+  second=self.run_job();self.assertEqual(run_result(second)['status'],'complete',registry.get(second).snapshot());updated=run_result(second)['result']
+  self.assertEqual(len(updated['images']),8);self.assertEqual(len(selection_view(self.manifest)['selected_image_ids']),7)
+  self.assertNotIn(removed,selection_view(self.manifest)['selected_image_ids'])
+  self.assertEqual(pq.read_table(self.root/previous['path']/'labels.parquet').to_pylist(),[r for r in pq.read_table(self.root/updated['path']/'labels.parquet').to_pylist() if r['moment_id'] in {m['moment_id'] for m in previous['moments']}])
+
 if __name__=='__main__':unittest.main()
