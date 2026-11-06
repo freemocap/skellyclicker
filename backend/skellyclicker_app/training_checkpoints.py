@@ -18,23 +18,38 @@ def folder_for(project_path, run_id):
     return folder
 
 
-def checkpoints(project_path, run_id):
-    folder=folder_for(project_path,run_id);events=folder/'events.jsonl';published={};errors={};poses={}
+def checkpoints(project_path, run_id, *, metric=None):
+    folder=folder_for(project_path,run_id);events=folder/'events.jsonl';published={};errors={};poses={};tails={};coverage={}
     if events.is_file():
         for line in events.read_text(encoding='utf-8').splitlines():
             try:event=json.loads(line)
             except json.JSONDecodeError:continue  # A live writer may have an unfinished last line.
             if event.get('kind')=='metric' and event.get('id')=='validation_mean_px' and math.isfinite(event['value']):errors[event['step']]=event['value']
+            if event.get('kind')=='metric' and event.get('id')=='validation_p95_px' and math.isfinite(event['value']):tails[event['step']]=event['value']
+            if event.get('kind')=='keypoint_validation':coverage[event['epoch']]=event
             if event.get('kind')=='pose_validation':poses[event['epoch']]=event
             if event.get('kind')=='checkpoint' and re.fullmatch(r'checkpoints/epoch-\d{6}\.pt',event.get('path','')):
                 path=resolve_relative(folder,event['path'])
                 if path.is_file():published[event['epoch']]={'path':event['path'],'sha256':event['sha256'],'epoch':event['epoch'],'bytes':path.stat().st_size}
-    values=[{**v,'validation_mean_px':errors.get(epoch),'pose_validation':poses.get(epoch)} for epoch,v in sorted(published.items())]
-    best,reason=recommend(values)
+    values=[{**v,'validation_mean_px':errors.get(epoch),'pose_validation':poses.get(epoch),'validation_p95_px':tails.get(epoch),'keypoint_validation':coverage.get(epoch)} for epoch,v in sorted(published.items())]
+    saved=json.loads((folder/'request.json').read_text(encoding='utf-8')) if (folder/'request.json').exists() else {}
+    policy=metric or saved.get('checkpoint_metric','pose')
+    best,reason=recommend(values,policy=policy)
     return {'checkpoints':values,'recommended_path':best['path'] if best else None,'recommendation':reason}
 
 
-def recommend(values):
+def recommend(values,policy='pose'):
+    if policy in ('mean_px','p95_px'):
+        key='validation_mean_px' if policy=='mean_px' else 'validation_p95_px'
+        # Never reward dropped predictions with a smaller finite-only mean.
+        complete=[v for v in values if v.get(key) is not None and (v.get('keypoint_validation') is None or v['keypoint_validation']['missing_points']==0)]
+        if not complete:return None,'No checkpoint has a complete finite prediction set for the selected 2D metric; missing predictions are not zero error.'
+        best=min(complete,key=lambda v:(v[key],-v['epoch']))
+        coverage=best.get('keypoint_validation')
+        note=(f"Coverage {coverage['predicted_points']}/{coverage['expected_points']} labeled points." if coverage else 'Legacy run: finite-only metric; missing-prediction coverage was not recorded.')
+        return best,(f"Epoch {best['epoch']}: lowest {'mean' if policy=='mean_px' else '95th percentile'} raw 2D keypoint error ({best[key]:.3f} px). "
+                     'Complete-coverage checkpoints only when coverage is recorded; latest epoch breaks ties. Pose estimates and training loss do not rank this selection. '+note)
+
     measured=[v for v in values if v['validation_mean_px'] is not None]
     pose=[v for v in measured if v.get('pose_validation') and v['pose_validation']['reference_images']>0
           and all(math.isfinite(v['pose_validation']['metrics'].get(k,float('nan'))) for k in

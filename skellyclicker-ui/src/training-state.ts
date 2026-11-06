@@ -7,6 +7,7 @@ export function trainingState(snapshot:PipelineSnapshot|null,starting=false,canc
  if(starting)stage='Starting';
  else if(active&&(cancelling||snapshot?.cancel_requested))stage='Cancelling';
  else if(snapshot?.status==='complete')stage='Finished';
+ else if(snapshot?.status==='failed'&&snapshot.error?.includes('configured maximum duration'))stage='Time limit reached';
  else if(snapshot?.status==='failed')stage='Failed';
  else if(snapshot?.status==='cancelled')stage='Cancelled';
  else if(active){

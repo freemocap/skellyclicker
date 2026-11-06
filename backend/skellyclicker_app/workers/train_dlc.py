@@ -134,17 +134,27 @@ def summarize_poses(rows):
     return {**summary,'metrics':metrics,'policy':POSE_POLICY,'images':rows}
 
 
+def keypoint_measurement(prediction, truth, labeled):
+    import numpy as np
+    pred=np.asarray(prediction,float);truth=np.asarray(truth,float);expected=np.asarray(labeled,bool)&np.isfinite(truth).all(axis=1)
+    finite=np.isfinite(pred[:,:2]).all(axis=1);valid=expected&finite
+    distances=np.linalg.norm(pred[valid,:2]-truth[valid],axis=1).tolist()
+    return {'expected_points':int(expected.sum()),'predicted_points':int(valid.sum()),'missing_points':int((expected&~finite).sum()),'distances_px':distances}
+
+
 def preview_checkpoint(request,checkpoint,epoch):
     import cv2,numpy as np,torch,gc
     from deeplabcut.pose_estimation_pytorch.apis.utils import get_pose_inference_runner
     prepared=json.loads((WORK/'prepared.json').read_text());dataset=Path(request['dataset'])
     runner=get_pose_inference_runner(model_config=Path(prepared['pose']),snapshot_path=checkpoint,batch_size=1,device='cuda:0',max_individuals=1)
-    checkpoint_hash=digest(checkpoint);errors=[];samples=[];used=set();pose_rows=[]
-    reference_file=dataset/'pose-references.json'
-    references=json.loads(reference_file.read_text(encoding='utf-8'))['references'] if reference_file.exists() else {}
-    calibration=json.loads((dataset/'calibration.json').read_text(encoding='utf-8'))
-    definition=json.loads((dataset/'keypoints.json').read_text(encoding='utf-8'))
-    points_mm=[p['xyz_mm'] for p in definition['points']]
+    checkpoint_hash=digest(checkpoint);errors=[];samples=[];used=set();pose_rows=[];evaluations=[]
+    emit('progress',epoch=epoch,detail='Evaluating raw 2D predictions'+(' and optional pose diagnostics' if request.get('pose_validation',False) else ' (pose diagnostics disabled)'))
+    if request.get('pose_validation',False):
+        reference_file=dataset/'pose-references.json'
+        references=json.loads(reference_file.read_text(encoding='utf-8'))['references'] if reference_file.exists() else {}
+        calibration=json.loads((dataset/'calibration.json').read_text(encoding='utf-8'))
+        definition=json.loads((dataset/'keypoints.json').read_text(encoding='utf-8'))
+        points_mm=[p['xyz_mm'] for p in definition['points']]
     output=WORK/'previews'/f'epoch-{epoch:06d}';output.mkdir(parents=True)
     for row in request['images']:
         check_stop()
@@ -153,9 +163,12 @@ def preview_checkpoint(request,checkpoint,epoch):
         im=cv2.imread(str(dataset/row['path']));pred=runner.inference([cv2.cvtColor(im,cv2.COLOR_BGR2RGB)])[0]['bodyparts'][0]
         truth=np.asarray(row['xy'],float);valid=np.asarray(row['valid'],bool)&np.isfinite(pred[:,:2]).all(axis=1)
         if pred.shape!=(len(truth),3):raise ValueError('Checkpoint keypoint count mismatch')
+        measured=keypoint_measurement(pred,truth,row['valid'])
+        evaluations.append({'image_id':row['image_id'],'split':row['split'],'camera_id':row['camera_id'],'source_frame':row['source_frame'],
+            'keypoints':np.where(np.isfinite(pred),pred,None).tolist(),'truth_xy':np.where(np.isfinite(truth),truth,None).tolist(),'labeled':row['valid'],**measured})
         if row['split']=='validation':
-            errors.extend(np.linalg.norm(pred[valid,:2]-truth[valid],axis=1).tolist())
-            pose_rows.append({'image_id':row['image_id'],**evaluate_pose(pred,points_mm,calibration.get(row['camera_id']),references.get(row['image_id']),rectified=calibration.get('rectified',False))})
+            errors.extend(measured['distances_px'])
+            if request.get('pose_validation',False):pose_rows.append({'image_id':row['image_id'],**evaluate_pose(pred,points_mm,calibration.get(row['camera_id']),references.get(row['image_id']),rectified=calibration.get('rectified',False))})
         if sample:
             used.add(sample_key);draw=im.copy()
             for x,y in truth[np.asarray(row['valid'],bool)]:cv2.circle(draw,(round(x),round(y)),3,(255,70,255),1,cv2.LINE_AA)
@@ -168,17 +181,22 @@ def preview_checkpoint(request,checkpoint,epoch):
             name=f"{row['split']}-{row['camera_id']}.png";cv2.imwrite(str(output/name),canvas)
             sample_id=row['split']+'-'+row['camera_id'];relative=(output/name).relative_to(WORK).as_posix()
             emit('preview',id=sample_id,label=f"{row['split']} · {row['camera_id']} · frame {row['source_frame']} · magenta labels / cyan predictions",path=relative,step=epoch,checkpoint_id=checkpoint.name+':'+checkpoint_hash[:12])
-            samples.append({'image_id':row['image_id'],'path':relative,'keypoints':pred.tolist()})
+            samples.append({'image_id':row['image_id'],'path':relative,'keypoints':np.where(np.isfinite(pred),pred,None).tolist()})
     if errors:
         emit('metric',id='validation_mean_px',label='Validation keypoint error',unit='px',step=epoch,value=float(np.mean(errors)))
         emit('metric',id='validation_p95_px',label='Validation 95th percentile error',unit='px',step=epoch,value=float(np.percentile(errors,95)))
-    pose_summary=summarize_poses(pose_rows)
-    for metric,value in pose_summary['metrics'].items():
-        label,unit={'validation_position_mm':('Validation position error','mm'),'validation_orientation_deg':('Validation orientation error','deg'),'validation_pose_failure_pct':('Validation pose failure rate','%')}[metric]
-        emit('metric',id=metric,label=label+(f" ({pose_summary['reference_images']}/{pose_summary['validation_images']} reference images)" if metric=='validation_pose_failure_pct' else ''),unit=unit,step=epoch,value=value)
-    atomic(output/'pose-validation.json',pose_summary)
-    emit('pose_validation',epoch=epoch,**{k:v for k,v in pose_summary.items() if k!='images'})
-    atomic(output/'predictions.json',{'epoch':epoch,'checkpoint':str(checkpoint),'checkpoint_sha256':checkpoint_hash,'samples':samples,'validation_distances_px':errors})
+    validation=[r for r in evaluations if r['split']=='validation']
+    coverage={key:sum(r[key] for r in validation) for key in ('expected_points','predicted_points','missing_points')}
+    emit('keypoint_validation',epoch=epoch,**coverage)
+    if coverage['expected_points']:emit('metric',id='validation_missing_pct',label='Validation missing predictions',unit='%',step=epoch,value=100*coverage['missing_points']/coverage['expected_points'])
+    if request.get('pose_validation',False):
+        pose_summary=summarize_poses(pose_rows)
+        for metric,value in pose_summary['metrics'].items():
+            label,unit={'validation_position_mm':('Validation position error','mm'),'validation_orientation_deg':('Validation orientation error','deg'),'validation_pose_failure_pct':('Validation pose failure rate','%')}[metric]
+            emit('metric',id=metric,label=label+(f" ({pose_summary['reference_images']}/{pose_summary['validation_images']} reference images)" if metric=='validation_pose_failure_pct' else ''),unit=unit,step=epoch,value=value)
+        atomic(output/'pose-validation.json',pose_summary)
+        emit('pose_validation',epoch=epoch,**{k:v for k,v in pose_summary.items() if k!='images'})
+    atomic(output/'predictions.json',{'epoch':epoch,'checkpoint':str(checkpoint),'checkpoint_sha256':checkpoint_hash,'samples':samples,'images':evaluations,'coverage':coverage,'evaluation_policy':{'pose_validation':request.get('pose_validation',False),'checkpoint_metric':request.get('checkpoint_metric','mean_px'),'keypoint_metric':'Euclidean distance in native image pixels; no confidence filter; missing predictions counted separately'},'validation_distances_px':errors})
     del runner;gc.collect();torch.cuda.empty_cache()
     emit('checkpoint',path=checkpoint.relative_to(WORK).as_posix(),sha256=checkpoint_hash,epoch=epoch)
 

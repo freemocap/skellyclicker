@@ -1,3 +1,4 @@
+from typing import Literal
 import os
 from pathlib import Path
 from fastapi import APIRouter,HTTPException
@@ -13,12 +14,15 @@ class TrainingRequest(TrainingInputs):
     save_every:int=Field(default=1,ge=1,le=1000)
     seed:int=Field(default=20261105,ge=0,le=2147483647)
     max_seconds:int=Field(default=900,ge=30,le=86400)
+    pose_validation:bool=False
+    checkpoint_metric:Literal['mean_px','p95_px','pose']='mean_px'
     parent_run_id:str|None=None
     parent_checkpoint:str|None=None
     parent_checkpoint_sha256:str|None=Field(default=None,pattern='^[a-f0-9]{64}$')
 
     @model_validator(mode='after')
     def complete_parent(self):
+        if self.checkpoint_metric=='pose' and not self.pose_validation:raise ValueError('Enable optional pose validation before selecting pose checkpoint ranking')
         fields=(self.parent_run_id,self.parent_checkpoint,self.parent_checkpoint_sha256)
         if any(v is not None for v in fields) and not all(v is not None for v in fields):raise ValueError('Select a run and checkpoint together')
         return self
@@ -117,7 +121,7 @@ def list_runs(project_path:str):
     return records
 
 @router.get('/runs/{run_id}/checkpoints')
-def saved_checkpoints(run_id:str,project_path:str):
+def saved_checkpoints(run_id:str,project_path:str,metric:Literal['mean_px','p95_px','pose']|None=None):
     from .training_checkpoints import checkpoints
-    try:return checkpoints(project_path,run_id)
+    try:return checkpoints(project_path,run_id,metric=metric)
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
