@@ -20,7 +20,7 @@ from skellyforge.core.skeleton.stl_rigid_body import build_stl_rigid_body
 from skellyforge.core.math.geometry.rotation_quaternion import RotationQuaternion
 from skellyforge.core.math.geometry.coordinate_systems import (
     AnatomicalDirection, CoordinateSystemConvention, CoordinateSystemRegistry, CoordinateSystemTransform)
-from .projects import Project, Target, read_model, recording_structure
+from .projects import Project, Target, read_model, recording_structure, load_target
 from .authored_geometry import load_authored_geometry, project_authored_geometry, camera_projections
 
 logger=logging.getLogger('skellyclicker.playback')
@@ -128,7 +128,7 @@ def build_project_playback(manifest_path: Path, *, cancelled=lambda: False):
     check_cancelled()
     manifest_path=manifest_path.resolve();root=manifest_path.parent;project=read_model(manifest_path,Project)
     if not project.sample_result: raise ValueError('Prepare fresh candidates before building playback')
-    result=resolve_relative(root,project.sample_result);target=read_model(resolve_relative(root,project.target_manifests[0]),Target)
+    result=resolve_relative(root,project.sample_result);target=load_target(root,project.target_manifests[0])
     authority=json.loads((result/'manifest.json').read_text())
     for name,identity in authority['files'].items():
         if file_digest(result/name)!=identity['sha256']: raise ValueError(f'Changed prepared artifact: {name}')

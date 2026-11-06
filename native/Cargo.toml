@@ -8,5 +8,6 @@ license = "AGPL-3.0-or-later"
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+tauri-plugin-dialog = "2"
 tauri = { version = "2.11.5", features = [] }
 freemocap-desktop = { path = "../../../project/repos/sdk/packages/desktop" }

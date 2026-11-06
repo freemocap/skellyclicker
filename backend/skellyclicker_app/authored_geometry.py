@@ -15,7 +15,14 @@ def load_authored_geometry(root,target):
         return path
     manifest=checked(target.authored_geometry.model_dump())
     spec=json.loads(manifest.read_text(encoding='utf-8'))
-    points_path=checked(spec['keypoints']);asset=checked(spec['outline'])
+    if spec.get('path_basis') == 'target_directory':
+        def local_checked(value):
+            path = resolve_relative(manifest.parent, value['path'])
+            if file_digest(path) != value['sha256']: raise ValueError('Changed authored geometry artifact')
+            return path
+        points_path=local_checked(spec['keypoints']);asset=local_checked(spec['outline'])
+    else:
+        points_path=checked(spec['keypoints']);asset=checked(spec['outline'])
     definition=json.loads(points_path.read_text(encoding='utf-8'))
     if definition['units']!='mm' or definition['source_stl_sha256']!=target.geometry.sha256 or spec['source_stl_sha256']!=target.geometry.sha256:
         raise ValueError('Authored definition does not match target STL/units')

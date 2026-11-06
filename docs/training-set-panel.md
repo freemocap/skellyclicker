@@ -21,13 +21,15 @@ All controls below are public `@freemocap/ui` imports. Core was read only.
 | `layout/content/SidePanelContent.tsx` → `components/control-panels/recording-info-panel/ProcessMocapPanel.tsx` → `ButtonSm` + `styles/button-sm.css` | `SidebarProcessingAction` with Core primary/accent classes and processing icon | `main.tsx` sidebar |
 | `components/mocap-setup/mocap-setup-modal.tsx`, `mocap-processing.css` | `PipelineWindow`, `PipelinePanel` | `TrainingSetPanel.tsx` |
 | `components/mocap-setup/processing-outline.tsx`, `stage-section.tsx` | Shared left outline and section hierarchy within `PipelinePanel` | App stage metadata and controlled configuration |
-| `components/common/settings-layout/setting-row.tsx`, `setting-select-input.tsx`, `setting-toggle-switch.tsx`, `settings-summary-chip.tsx`, `settings-layout.css` | `SettingRow`, `SettingSelectInput`, `SettingToggleSwitch`, `SettingsSummaryChip` | The same form content in list and focused graph nodes |
+| `components/common/settings-layout/setting-row.tsx`, `setting-select-input.tsx`, `setting-toggle-switch.tsx`, `settings-summary-chip.tsx`, `settings-layout.css` | `SettingRow`, `SettingSelectInput`, `SettingToggleSwitch`, `SettingsSummaryChip` | The same form content in list and graph nodes |
 | `components/ui-components/ValueSelector.tsx`, `AnchoredInfo.tsx` and floating tooltip helpers | `ValueSelector`, `AnchoredInfo` | Numeric controls and explanations hidden behind info buttons |
 | `components/processing-graph/ProcessingGraphView.tsx`, layout and explanation machinery | SDK graph renderer | Typed artifact ports/edges from `training-workflow.ts` |
 
 The graph opens in two rows at a readable scale; explicit Fit all is an overview.
-The outline focuses a stage, and its shared settings expand there. The list uses
-the same settings and left outline. Explanatory prose, hashes and provenance are
+All settings start expanded. Each stage has an independent chevron disclosure;
+toggling it preserves the camera transform exactly. Stage titles and control text
+wrap fully. The outline and magnifier focus a stage independently of disclosure.
+The list uses the same settings, open state and left outline. Explanatory prose, hashes and provenance are
 in info surfaces; only labels, values, concise status and actual errors remain
 visible by default. SDK provenance records extraction and adaptations.
 
@@ -58,5 +60,17 @@ From `skellyclicker-ui/`:
   checks both views, info/keyboard, pan/zoom, range errors and reopening, and leaves
   the panel open. Screenshots/report go to ignored `.test-artifacts/`.
 
+`node tests/native-training-disclosure.mjs` checks initially open settings, full
+wrapped titles, pointer/keyboard disclosure without camera movement, state across
+views/focus, measured port anchors and two-row separation in the existing window.
+
 Native testing uses the fixture's source 90–840 range and restores valid settings
 with stride 30, no cap and all fit statuses. This is test setup, not a product default.
+
+## Canonical target inputs
+
+New projects copy the selected STL into `recordings/<recording-id>/skellyclicker/inputs/targets/<object-id>/<revision>/<object-id>.stl`, constructed through the SDK RecordingStructure application extension. The neighboring named target manifest uses `path_basis: target_directory`; its geometry and authored definition references remain relative to that directory. Project catalogs select this manifest. The app normalizes references only in memory for its existing project consumers. Opening a project reads its selected target automatically; Browse is an explicit replacement draft, not an obligatory input step. New-project fields prefill from the open project's actual recording, calibration, target and units; no Benchy source paths are hardcoded.
+
+`target_snapshot.canonicalize_target` explicitly copies and verifies an existing library target into this recording-local location, preserves original/library bytes, and updates the catalog last under the project lock. Authored keypoints and outline bytes retain their hashes; the authored manifest changes only to use local paths. A retained update record contains the previous project manifest and source provenance. Reads never relocate data implicitly.
+
+Validation: `python -B -m unittest discover -s backend/tests` covers new-project placement, automatic selection, explicit correction, same-mesh/unit identity, authored points, unchanged originals and relocation. Native OS Browse/Cancel remains unverified because computer-use access to SkellyClicker was denied.

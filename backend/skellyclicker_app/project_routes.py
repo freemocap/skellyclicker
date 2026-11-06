@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 from fastapi import APIRouter, HTTPException
 from .projects import CreateProject, OpenProject, create_project, open_project
+from .stl_selection import ValidateStl, validate_stl
 
 router = APIRouter(prefix="/api/projects")
 selected: dict | None = None
@@ -36,5 +37,13 @@ def open_existing(request: OpenProject):
         return selected
     except (ValueError, OSError) as error:
         logger.warning("Project operation failed: %s", error)
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/validate-stl")
+def validate_stl_selection(request: ValidateStl):
+    try:
+        return validate_stl(request)
+    except (ValueError, OSError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

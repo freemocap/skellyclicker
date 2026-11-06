@@ -1,1 +1,11 @@
-{"identifier":"main-window","description":"Local playback window","windows":["main"],"permissions":["core:default"]}
+{
+  "identifier": "main-window",
+  "description": "Local playback window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open"
+  ]
+}

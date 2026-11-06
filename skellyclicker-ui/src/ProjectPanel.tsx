@@ -1,16 +1,16 @@
+import {open as openFile} from '@tauri-apps/plugin-dialog';
 import {useEffect, useRef, useState} from 'react';
-import {RecordingBrowser, type BrowserEntry} from '@freemocap/ui';
+import {RecordingBrowser, SettingFilePath, type BrowserEntry} from '@freemocap/ui';
 
 export interface ProjectView {
   root: string; manifest_path: string;
   project: {project_id: string; uuid: string; created_at?: string; sample_result?:string|null; playback_result?:string|null; recording_manifests?:string[]; target_manifests?:string[]};
-  recordings: {recording_id: string; source: {path: string; bytes?: number; sha256?:string}; calibration_state: string; streams: {camera_id: string}[]}[];
+  recordings: {recording_id: string; source: {path: string; bytes?: number; sha256?:string}; calibration_source?:{path:string}; calibration_state: string; streams: {camera_id: string}[]}[];
   targets: {object_id: string; authored_units: string; geometry?:{path:string;sha256:string}; authored_geometry?: {path:string;sha256?:string}|null}[];
   issues: string[]; sample_state: string; playback: {id:string;displayName?:string;pointCloudManifest?:string|null}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}
 const recentKey='skellyclicker.recentProjects';
-const sourceRoot='C:/Users/jonma/AppData/Local/ZEDBenchy';
 function loadRecent(): RecentProject[] {
   try {
     const value=JSON.parse(localStorage.getItem(recentKey) ?? '[]');
@@ -26,10 +26,10 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
   const [busyId,setBusyId]=useState<string|null>(null);
   const [error,setError]=useState('');
   const [recordingId,setRecordingId]=useState<string|null>(null);
-  const [svo,setSvo]=useState(sourceRoot+'/recordings/benchy-20261104-232220-208509/stereo.svo2');
-  const [calibration,setCalibration]=useState(sourceRoot+'/recordings/benchy-20261104-232220-208509/SN23364999.conf');
-  const [stl,setStl]=useState(sourceRoot+'/3DBenchy.stl');
-  const [objectId,setObjectId]=useState('benchy');
+  const [svo,setSvo]=useState('');
+  const [calibration,setCalibration]=useState('');
+  const [stl,setStl]=useState('');
+  const [objectId,setObjectId]=useState('object');
   const [units,setUnits]=useState('mm');
   useEffect(()=>{
     if(!project)return;
@@ -40,10 +40,16 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
   },[project]);
   useEffect(()=>{if(mode&&!dialog.current?.open)dialog.current?.showModal();else if(!mode&&dialog.current?.open)dialog.current.close();},[mode]);
   function show(next:'open'|'create') {
+    if(next==='create'&&project){
+      const recording=project.recordings[0],target=project.targets[0];
+      setSvo(recording?.source.path??'');setCalibration(recording?.calibration_source?.path??'');
+      setStl(target?.geometry?project.root.replace(/[\\/]+$/,'')+'/'+target.geometry.path:'');
+      setObjectId(target?.object_id??'object');setUnits(target?.authored_units??'mm');
+    }
     setError('');setPath(next==='open' ? project?.manifest_path ?? localStorage.getItem('skellyclicker.projectPath') ?? '' : project ? project.root.replace(/[^/\\]+$/,'new-project') : '');setMode(next);
   }
   async function submit(action:'open'|'create',projectPath:string,id:string|null=null) {
-    if(busy)return;setBusy(true);setBusyId(id);setError('');
+    if(busy)return;if(action==='create'&&!stl){setError('Select an STL target.');return;}setBusy(true);setBusyId(id);setError('');
     try {
       const body=action==='create'?{project_path:projectPath,source_svo:svo,calibration_source:calibration,source_stl:stl,object_id:objectId,authored_units:units}:{project_path:projectPath};
       const response=await fetch(baseUrl+'/api/projects/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -61,12 +67,12 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
       <form onSubmit={event=>{event.preventDefault();if(mode)void submit(mode,path);}}>
         <header><h2 id="project-dialog-title">{mode==='create'?'New project':'Open project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>×</button></header>
         <div className="project-dialog-fields">
-          <p>{mode==='create'?'Choose a new project folder. Original media stays linked; the STL is copied into the project.':'Choose a project folder or its named project manifest.'}</p>
+          <p>{mode==='create'?'Choose a new project folder. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a project folder or its named project manifest.'}</p>
           <label>{mode==='create'?'New project folder':'Project folder or manifest'}<input aria-label="Project path" autoFocus required value={path} onChange={event=>setPath(event.target.value)} disabled={busy}/></label>
           {mode==='create'&&<>
             <label>Original stereo SVO<input required value={svo} onChange={event=>setSvo(event.target.value)} disabled={busy}/></label>
             <label>Camera calibration source<input required value={calibration} onChange={event=>setCalibration(event.target.value)} disabled={busy}/></label>
-            <label>Reference STL<input required value={stl} onChange={event=>setStl(event.target.value)} disabled={busy}/></label>
+            <SettingFilePath label="Reference STL" path={stl||null} disabled={busy} onBrowse={()=>{void openFile({multiple:false,directory:false,filters:[{name:'STL geometry',extensions:['stl']}],...(stl?{defaultPath:stl}:{})}).then(selected=>{if(typeof selected==='string')setStl(selected);}).catch(e=>setError(String(e)));}}/>
             <div className="project-dialog-pair"><label>Object ID<input required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}" value={objectId} onChange={event=>setObjectId(event.target.value)} disabled={busy}/></label><label>STL units<select value={units} onChange={event=>setUnits(event.target.value)} disabled={busy}><option value="mm">Millimetres</option><option value="m">Metres</option></select></label></div>
           </>}
           {error&&<p role="alert">{error}</p>}

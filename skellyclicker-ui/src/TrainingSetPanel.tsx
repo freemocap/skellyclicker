@@ -1,15 +1,17 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {ButtonSm,PipelinePanel,PipelineWindow,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
+import {ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
 import type {ProjectView} from './ProjectPanel';
 import {trainingGraph,defaultConfig,validateConfig,candidateFrames,readConfig,type PreparedSummary,type TrainingConfig} from './training-workflow';
 import './training-set.css';
+import {useStlSelection} from './useStlSelection';
 
 /** Core-derived SDK rows and composition; this app supplies only labeling semantics and state. */
 export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;project:ProjectView;onClose:()=>void}) {
   const [view,setView]=useState<'graph'|'list'>('graph');
   const [summary,setSummary]=useState<PreparedSummary|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState('');
   const [config,setConfig]=useState<TrainingConfig>(defaultConfig(null)),[saveError,setSaveError]=useState('');
-  const binding=JSON.stringify([project.project.uuid,project.project.sample_result,project.project.playback_result,project.recordings.map(r=>[r.recording_id,r.source.sha256]),project.targets.map(t=>[t.object_id,t.geometry?.sha256,t.authored_geometry?.sha256])]);
+  const binding=JSON.stringify([project.project.uuid,project.project.sample_result,project.project.playback_result,project.recordings.map(r=>[r.recording_id,r.source.sha256]),project.targets.map(t=>[t.object_id,t.geometry?.sha256,t.geometry?.path,t.authored_units,t.authored_geometry?.sha256])]);
+  const stl=useStlSelection(baseUrl,project,binding);
   const storageKey='skellyclicker.training-config.v1:'+project.project.uuid;
   useEffect(()=>{
     const abort=new AbortController();setLoaded(false);setError('');
@@ -31,7 +33,7 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
   const problems=validateConfig(config,summary);
   const candidates=useMemo(()=>candidateFrames(config,summary),[config,summary]);
   const sourceValid=project.issues.length===0&&project.recordings.length===1&&project.targets.length===1;
-  const reusable=sourceValid&&config.mode==='reuse'&&!!summary&&!problems.length&&!error;
+  const reusable=sourceValid&&stl.compatible&&config.mode==='reuse'&&!!summary&&!problems.length&&!error;
   const record=project.recordings[0],target=project.targets[0];
   const range=summary?.frames.length?`${summary.frames[0].source_frame}–${summary.frames.at(-1)!.source_frame}`:'—';
   const row=(label:string,text:ReactNode,control:ReactNode,promoted=false)=><SettingRow label={label} info={{title:label,text}} control={control} promoted={promoted}/>;
@@ -43,8 +45,8 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
       summary:<SettingsSummaryChip>{target?.object_id}</SettingsSummaryChip>,
       configuration:<>
         {row('Recording',<>Linked original; source SHA {record?.source.sha256??'unavailable'}.</>,value(record?.recording_id??'—'))}
-        {row('STL target',<>Source STL SHA {target?.geometry?.sha256??'unavailable'}. Automatic initialization must work for arbitrary STL geometry.</>,value(target?.object_id??'—'))}
-        {row('STL units','Units of the original target geometry; fixed by its manifest.',<SettingSelectInput label="STL units" value={target?.authored_units??'mm'} options={[{value:'mm',label:'Millimetres'},{value:'m',label:'Metres'}]} onChange={()=>{}} disabled/>)}
+        {row('STL target',<>Source STL SHA {target?.geometry?.sha256??'unavailable'}. Automatic initialization must work for arbitrary STL geometry.</>,<SettingFilePath label="STL target" path={stl.path} onBrowse={()=>void stl.browse()} disabled={stl.busy}/>)}
+        {row('STL units','Declared units of this STL draft. Changing units invalidates reuse of existing poses and target points.',<SettingSelectInput label="STL units" value={stl.units} options={[{value:'mm',label:'Millimetres'},{value:'m',label:'Metres'}]} onChange={stl.changeUnits} disabled={stl.busy}/>)}
         {row('Source frames','Full recording frame count. Preparing a range does not truncate or replace the original recording.',value(summary?.calibration.source_frame_count??'—'))}
       </>},
     extract_images:{label:'Extract synchronized images',kind:'computation',availability:reusable?'reusable':sourceValid?'available':'unavailable',reason:reusable?'Existing images cover the selected range; input hashes must be verified before reuse.':'Fresh extraction exists in the separate preparation adapter. This panel does not start it.',description:'Extract paired native-resolution images, exact source timestamps and rectified calibration from the linked recording.',
@@ -80,7 +82,7 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
         {row('Limit moments','Cap the number of paired moments. Both camera images remain grouped.',<SettingToggleSwitch label="Limit moments" isToggled={config.limit!==''} onToggle={enabled=>change('limit',enabled?'30':'')}/>)}
         {config.limit!==''&&row('Maximum moments','Maximum paired moments after range/filter/stride.',numeric('Maximum moments','limit',1,900))}
         {row('Candidate pairs',<>Configuration preview only. Source frames: {candidates.slice(0,10).join(', ')}{candidates.length>10?' …':''}. No labels have been generated or approved.</>,value(reusable?candidates.length:'—'))}
-        {row('Target points','Use the target’s exact ordered definition; retain invalid and out-of-bounds rows. Self-visibility differs from unknown external occlusion. Automatic point construction for a new STL is upstream work.',value(target?.authored_geometry?'Target definition':'Not configured'))}
+        {row('Target points','Use the target’s exact ordered definition; retain invalid and out-of-bounds rows. Self-visibility differs from unknown external occlusion. Automatic point construction for a new STL is upstream work.',value(stl.compatible&&target?.authored_geometry?'Target definition':'Not configured'))}
       </>},
     review_labels:{label:'Select, review and correct',kind:'review',availability:'manual',reason:'Required human gate. Selection saving and correction tools are not yet implemented.',description:'Inspect synchronized images and STL placement together. Correct rigid pose first, then individual keypoints. Previous/next generated and selected moments preserve exact source identity. Save versioned reviews; selection is not approval.',
       configuration:<>
@@ -93,7 +95,7 @@ export function TrainingSetPanel({baseUrl,project,onClose}:{baseUrl:string;proje
         {row('Image source','Use original native images, never annotated overlays.',value('Original images'))}
       </>},
   };
-  const messages=[...project.issues,...problems,...(error?[error]:[]),...(saveError?[saveError]:[])];
+  const messages=[...project.issues,...problems,...(error?[error]:[]),...(saveError?[saveError]:[]),...(stl.error?[stl.error]:[]),...(stl.validated&&!stl.compatible?['Selected STL or units differ from the current target. Existing poses and target points cannot be reused; prepare this target before generating labels.']:[])];
   return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
     {!loaded?<p role="status">Loading…</p>:<PipelinePanel graph={trainingGraph} nodePresentation={nodePresentation} view={view} onViewChange={setView}
       notice={messages.length?<ul className="training-errors">{messages.map(message=><li key={message}>{message}</li>)}</ul>:null}

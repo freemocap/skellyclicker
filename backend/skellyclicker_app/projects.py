@@ -44,6 +44,7 @@ class Target(Model):
     uuid: str = Field(default_factory=lambda: str(uuid4()))
     revision: str = "r001"
     type: Literal["rigid_stl"] = "rigid_stl"
+    path_basis: Literal["project", "target_directory"] = "project"
     geometry: Artifact
     authored_units: Literal["mm", "m"]
     authored_frame: str = "original STL coordinates"
@@ -77,6 +78,25 @@ def recording_structure(root: Path, recording_id: str) -> RecordingStructure:
     return RecordingStructure(base_directory=root/'recordings', recording_name=recording_id)
 
 
+def target_directory(root: Path, recording_id: str, object_id: str, revision: str) -> Path:
+    from freemocap_sdk.recording_structure import path_component
+    return recording_structure(root, recording_id).application_dir('skellyclicker') / 'inputs' / 'targets' / path_component(object_id) / path_component(revision)
+
+
+def load_target(root: Path, relative: str) -> Target:
+    """Resolve local snapshot references for existing project-level consumers."""
+    manifest = resolve_relative(root, relative)
+    target = read_model(manifest, Target)
+    if target.path_basis == 'project':
+        return target
+    def normalized(value):
+        if value is None: return None
+        path = resolve_relative(manifest.parent, value.path)
+        return value.model_copy(update={'path': path.relative_to(root).as_posix()})
+    return target.model_copy(update={'path_basis': 'project', 'geometry': normalized(target.geometry),
+                                     'authored_geometry': normalized(target.authored_geometry)})
+
+
 def artifact(path: Path, stored_path: str | None = None) -> Artifact:
     if not path.is_file():
         raise ValueError(f"File does not exist: {path}")
@@ -98,16 +118,16 @@ def create_project(request: CreateProject) -> dict:
     recording = Recording(recording_id=recording_id, source=artifact(source),
         calibration_source=artifact(Path(request.calibration_source).resolve()),
         streams=[Stream(camera_id="left", source_view="left"), Stream(camera_id="right", source_view="right")])
-    target_folder = f"targets/{request.object_id}/r001"
+    target_folder = target_directory(root, recording_id, request.object_id, "r001").relative_to(root).as_posix()
     target = Target(object_id=request.object_id, authored_units=request.authored_units,
-        source_path=str(stl), geometry=artifact(stl, f"{target_folder}/{request.object_id}.stl"))
+        source_path=str(stl), path_basis="target_directory", geometry=artifact(stl, f"{request.object_id}.stl"))
     project = Project(project_id=root.name,
         recording_manifests=[recording_structure(root,recording_id).stereo_manifest_path.relative_to(root).as_posix()],
         target_manifests=[f"{target_folder}/{request.object_id}_target.json"])
     root.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{root.name}-pending-", dir=root.parent))
     try:
-        geometry = resolve_relative(staging, target.geometry.path)
+        geometry = resolve_relative(staging, f"{target_folder}/{target.geometry.path}")
         geometry.parent.mkdir(parents=True)
         shutil.copyfile(stl, geometry)
         if file_digest(geometry) != target.geometry.sha256:
@@ -145,7 +165,7 @@ def open_project(path: Path) -> dict:
     if manifest.name != f"{project.project_id}_project.json":
         raise ValueError("Project manifest filename must match its stored project ID.")
     recordings = [read_model(resolve_relative(root, name), Recording) for name in project.recording_manifests]
-    targets = [read_model(resolve_relative(root, name), Target) for name in project.target_manifests]
+    targets = [load_target(root, name) for name in project.target_manifests]
     issues = []
     for recording in recordings:
         for kind, value in [("source", recording.source), ("calibration source", recording.calibration_source)]:

@@ -14,7 +14,9 @@ fn backend_url(state: tauri::State<'_, DesktopState>) -> Result<String, String> 
 }
 
 fn main() {
+    // Native file selection follows the official dialog plugin contract [@tauriDialog2026].
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![backend_url])
         .setup(|app| {
             let executable = app
