@@ -1,0 +1,29 @@
+import {chromium,expect} from '@playwright/test';
+import {writeFile} from 'node:fs/promises';
+const browser=await chromium.connectOverCDP('http://127.0.0.1:9224');const evidence={errors:[],checks:[]};
+try{
+ const page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('5176'));page.on('pageerror',e=>evidence.errors.push(String(e)));await page.reload();
+ const catalog=page.getByRole('region',{name:'Generated images',exact:true});await expect(catalog).toContainText('52 generated images',{timeout:30000});await expect(catalog.locator('.sdk-image-card')).toHaveCount(52);
+ async function seek(frame){await page.locator('.playback-timeline-input').fill(String(frame));await page.locator('.playback-timeline-input').dispatchEvent('pointerup');await page.waitForFunction(f=>[...document.querySelectorAll('.playback-presented-image')].every(c=>c.dataset.presentedFrame===String(f)),frame,{timeout:15000});}
+ const overlays=page.locator('.playback-image-controls');await expect(overlays).toHaveCount(2);
+ async function toggle(index){const response=page.waitForResponse(r=>r.url().endsWith('/api/labels/selection')&&r.request().method()==='POST');await overlays.nth(index).getByRole('button').click();const r=await response;expect(r.status()).toBe(200);return r.json();}
+ await seek(60);if(await overlays.nth(0).getByRole('button').getAttribute('aria-pressed')==='true')await toggle(0);
+ await seek(30);if(await overlays.nth(0).getByRole('button').getAttribute('aria-pressed')==='false')await toggle(0);
+ await expect(overlays.nth(0).getByRole('button')).toHaveAttribute('aria-pressed','true');await expect(overlays.nth(1).getByRole('button')).toHaveAttribute('aria-pressed','true');
+ const one=await toggle(0);expect(one.selected_image_ids).toHaveLength(1);expect(one.selected_image_ids[0]).toMatch(/:120:right$/);await expect(overlays.nth(1).getByRole('button')).toHaveAttribute('aria-pressed','true');evidence.checks.push('independentLeftExclusion');
+ await seek(60);const two=await toggle(0);expect(two.selected_image_ids).toHaveLength(2);expect(two.selected_moment_ids).toHaveLength(2);
+ await catalog.getByRole('group',{name:'Camera filter'}).getByRole('button',{name:'left',exact:true}).click();await seek(0);await catalog.getByRole('button',{name:'Next included frame (G)',exact:true}).click();await expect(page.locator('.playback-timeline-input')).toHaveValue('60');await expect(catalog.getByRole('button',{name:'Previous included frame (F)',exact:true})).toBeDisabled();
+ await catalog.getByRole('group',{name:'Camera filter'}).getByRole('button',{name:'Both cameras',exact:true}).click();evidence.checks.push('cameraFilteredIncludedStepping');
+ await seek(0);await catalog.getByRole('button',{name:'Next included frame (G)',exact:true}).click();await expect(page.locator('.playback-timeline-input')).toHaveValue('30');
+ await expect(catalog.getByRole('button',{name:'Next included frame (G)',exact:true})).toBeEnabled();await catalog.focus();await page.keyboard.press('g');await expect(page.locator('.playback-timeline-input')).toHaveValue('60');await expect(catalog.getByRole('button',{name:'Previous included frame (F)',exact:true})).toBeEnabled();await catalog.getByRole('button',{name:'Previous included frame (F)',exact:true}).click();await expect(page.locator('.playback-timeline-input')).toHaveValue('30');evidence.checks.push('includedOnlySteppingAndKeyboard');
+ await page.getByRole('button',{name:'Raw',exact:true}).click();await expect(overlays.nth(0).getByRole('button')).toHaveAttribute('aria-pressed','false');await expect(overlays.nth(1).getByRole('button')).toHaveAttribute('aria-pressed','true');
+ await page.reload();await expect(catalog).toContainText('52 generated images',{timeout:30000});await seek(30);await expect(overlays.nth(0).getByRole('button')).toHaveAttribute('aria-pressed','false');await expect(overlays.nth(1).getByRole('button')).toHaveAttribute('aria-pressed','true');evidence.checks.push('savedMembershipReopened');
+ await seek(31);await expect(overlays.nth(0)).toContainText('No generated labels');await expect(overlays.nth(0).getByRole('button')).toBeDisabled();evidence.checks.push('noncandidateDisabled');
+ await catalog.getByRole('group',{name:'Image inclusion filter'}).getByRole('button',{name:'Included',exact:true}).click();await expect(catalog.locator('.sdk-image-card')).toHaveCount(2);
+ await catalog.locator('.sdk-image-card').filter({has:page.locator('[aria-label="Show Left camera"]')}).getByRole('button',{name:'Show Left camera'}).click();await expect(page.locator('.playback-timeline-input')).toHaveValue('60');evidence.checks.push('filteredThumbnailNavigation');
+ await toggle(0);await seek(30);await toggle(0);
+ await catalog.getByRole('group',{name:'Image inclusion filter'}).getByRole('button',{name:'All',exact:true}).click();await expect(catalog.locator('.sdk-image-card')).toHaveCount(52);
+ await page.route('**/api/labels/selection',async route=>{if(route.request().method()==='POST')await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({detail:'Selection changed; reload before selecting'})});else await route.continue();});
+ await overlays.nth(0).getByRole('button').click();await expect(catalog.getByRole('alert')).toContainText('Selection changed');await expect(overlays.nth(0).getByRole('button')).toHaveAttribute('aria-pressed','true');await page.unroute('**/api/labels/selection');await toggle(0);await toggle(0);evidence.checks.push('failedSavePreservesMembership');
+ await page.getByRole('button',{name:'Frame the subject',exact:true}).click();await catalog.scrollIntoViewIfNeeded();await page.screenshot({path:'../.test-artifacts/image-selection-native.png'});expect(evidence.errors).toEqual([]);await writeFile('../.test-artifacts/image-selection-native.json',JSON.stringify(evidence,null,2));console.log('PASS',evidence.checks);
+}finally{await browser.close();}

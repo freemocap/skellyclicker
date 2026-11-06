@@ -104,8 +104,18 @@ Verification: backend/tests/test_labels.py covers success, failure, cancellation
 
 ## Synchronized target close-ups
 
-Playback opens on annotated media when available; Raw remains a session choice. The SDK owns the outlined selector and the close-up canvas, which draws from the same committed bitmap as the full camera view. A bottom band keeps the full image unobscured. There is no second player, decoder, clock, or per-frame request.
+Playback opens on annotated media when available; Raw remains a session choice. The SDK owns the outlined selector and the close-up canvas, which draws from the same committed bitmap as the full camera view. The larger floating inset can be moved and resized within its camera view; a protected top strip keeps image controls accessible. There is no second player, decoder, clock, or per-frame request.
 
 The APP supplies `PlaybackWorkspace.getTargetCrop` through `useTargetCrop`. It loads compact metadata once from the registered playback's target-crops endpoint. Bounds derive from the existing hash-verified dense projected outline and ordered points, with 20% padding (at least 16 pixels) and image clipping. Missing, nonfinite, behind-camera and wholly off-image projections are unavailable; they never reuse a prior frame's crop. The provider checks recording identity, exact media filename, published source frame and image dimensions. Raw and Annotated use the same geometry bounds. The backend streams the dense cache into a bounded four-entry compact cache; no fitting or media generation is performed.
 
 `backend/tests/test_target_crops.py` tests edge clipping and unavailable projections. `tests/native-target-crops.mjs` checks native Annotated default, source 90/120 and other seeks, mode changes, zoom, playback and loop frame/epoch equality. Evidence lives under ignored `.test-artifacts/target-closeups-native.*`.
+
+## Image inclusion and included-frame navigation
+
+The Images sidebar is now the default when generated results exist. Project switches back to source/project controls. The SDK ImageCatalog displays every generated image in stereo-moment groups, with lazy thumbnails, camera/time identity, selected state, All/Included/Excluded and camera filters. On-image ImageSelectionToggle controls use the actual camera-specific committed presentation and verify its epoch again at the action boundary. A noncandidate playback frame shows No generated labels. No frame polling is introduced.
+
+Included frames navigation uses saved per-camera membership. Both cameras deduplicates moments with at least one included image; a camera filter scopes membership to that camera. Previous/Next pause and await the confirmed paired presentation. F/G work only with focus inside the browser, and boundaries do not wrap. All generated explicitly switches to candidate navigation.
+
+Selection schema version 2 stores image_id, camera_id, moment_id, source_frame and exact int64 timestamp_ns. Existing version 1 pair selections expand to both published images on read; the next edit publishes a new versioned review without modifying the old one. Each write uses the existing result and selection hash checks. Inclusion is a draft choice, not human approval or a published training dataset.
+
+The SDK close-up is now a larger floating 640-pixel canvas with independent drag and resize handles, pointer capture, keyboard arrows, per-camera layout retention and parent bounds. A protected top control strip prevents overlap with image inclusion. Both full view and close-up use the same committed bitmap. tests/native-target-crop-interactions.mjs verifies paused/live interaction, source switching and parent resizing; tests/native-image-selection.mjs verifies independent membership, included/camera-filtered navigation, focused shortcuts, persistence, noncandidate handling and save failures.

@@ -5,3 +5,7 @@
 .candidate-review h3 { font-size: 16px; margin: 0 0 8px; }
 .candidate-review p { overflow-wrap: anywhere; }
 .candidate-review > div { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+
+.review-sidebar-tabs{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--color-border,#465454)}
+.review-sidebar-tabs>button{flex:1;justify-content:center;padding:8px;border:1px solid #526367;color:#e7f0f0}
+.review-sidebar-tabs>button[aria-pressed="true"]{background:#28636b;border-color:#59c7ce}

@@ -56,6 +56,27 @@ class LabelsTest(unittest.TestCase):
   self.assertEqual(stale.exception.status_code,409)
   second=self.run_job();self.assertEqual(run_result(first)['result']['path'],result['path']);self.assertNotEqual(run_result(second)['result']['path'],result['path'])
   self.assertEqual(registry.get(first).snapshot()['status'],'complete')
+ def test_independent_camera_selection_retains_group_identity(self):
+  run=self.run_job();result=run_result(run)['result'];m=result['moments'][0]
+  request=SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],moment_id=m['moment_id'],source_frame=m['source_frame'],timestamp_ns=m['timestamp_ns'],selected=True)
+  pair=save_selection(request);self.assertEqual(len(pair['selected_image_ids']),2)
+  left_out=save_selection(request.model_copy(update={'camera_id':'left','selected':False,'expected_selection_sha256':pair['sha256']}))
+  self.assertEqual(left_out['selected_image_ids'],[m['moment_id']+':right']);self.assertEqual(left_out['selected_moment_ids'],[m['moment_id']])
+  self.assertEqual(selection_view(self.manifest),left_out)
+  with self.assertRaises(HTTPException):save_selection(request.model_copy(update={'camera_id':'wrong','expected_selection_sha256':left_out['sha256']}))
+  folder=self.root/read_model(self.manifest,Project).active_review
+  self.assertEqual(json.loads((folder/'manifest.json').read_text())['schema_version'],2)
+
+ def test_legacy_pair_selection_expands_without_mutating_old_review(self):
+  run=self.run_job();result=run_result(run)['result'];m=result['moments'][0]
+  request=SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],moment_id=m['moment_id'],source_frame=m['source_frame'],timestamp_ns=m['timestamp_ns'],selected=True)
+  save_selection(request);folder=self.root/read_model(self.manifest,Project).active_review
+  pq.write_table(pa.Table.from_pylist([{'moment_id':m['moment_id'],'source_frame':m['source_frame'],'timestamp_ns':int(m['timestamp_ns'])}]),folder/'selection.parquet')
+  metadata=json.loads((folder/'manifest.json').read_text());metadata['schema_version']=1;metadata['files']['selection.parquet']=artifact(folder/'selection.parquet','selection.parquet').model_dump();atomic_json(folder/'manifest.json',metadata)
+  old=(folder/'manifest.json').read_bytes();expanded=selection_view(self.manifest);self.assertEqual(len(expanded['selected_image_ids']),2)
+  saved=save_selection(request.model_copy(update={'camera_id':'left','selected':False,'expected_selection_sha256':expanded['sha256']}))
+  self.assertEqual(saved['selected_image_ids'],[m['moment_id']+':right']);self.assertEqual((folder/'manifest.json').read_bytes(),old)
+
  def test_stale_and_changed_image_fail_without_publication(self):
   request=self.generate().model_copy(update={'expected_pose_manifest_sha256':'0'*64})
   with self.assertRaises(HTTPException) as stale:start_labels(request)

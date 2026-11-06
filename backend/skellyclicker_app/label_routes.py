@@ -66,7 +66,10 @@ def result_view(manifest:Path, result_path=None):
     poses=pq.read_table(resolve_relative(manifest.parent,metadata['pose_result'])/'timing.parquet',columns=['source_frame']).column('source_frame').to_pylist()
     indices={frame:i for i,frame in enumerate(poses)}
     for moment in moments:moment['playback_frame']=indices.get(moment['source_frame'])
-    return {'path':selected,'manifest_sha256':file_digest(folder/'manifest.json'),'manifest':metadata,'moments':moments,
+    by_moment={row['moment_id']:row for row in moments}
+    images=[{**row,**{k:by_moment[row['moment_id']][k] for k in ('source_frame','timestamp_ns','playback_frame')},
+             'image_id':row['moment_id']+':'+row['camera_id']} for row in pq.read_table(folder/'images.parquet').to_pylist()]
+    return {'images':images,'path':selected,'manifest_sha256':file_digest(folder/'manifest.json'),'manifest':metadata,'moments':moments,
             'playback_id':Path(project.playback_result).name if project.playback_result else None}
 
 
@@ -99,15 +102,22 @@ class SelectMoment(Model):
     source_frame:int=Field(ge=0)
     timestamp_ns:str=Field(pattern='^[0-9]+$')
     selected:bool
+    camera_id:str|None=None
 
 
 def selection_view(manifest):
     project=read_model(manifest,Project)
-    if not project.active_review:return {'sha256':None,'selected_moment_ids':[],'review_state':'unreviewed'}
+    if not project.active_review:return {'sha256':None,'selected_moment_ids':[],'selected_image_ids':[],'review_state':'unreviewed'}
     folder=resolve_relative(manifest.parent,project.active_review)
     metadata=json.loads((folder/'manifest.json').read_text())
     checked(folder/'selection.parquet',metadata['files']['selection.parquet'])
-    return {'sha256':file_digest(folder/'manifest.json'),'selected_moment_ids':pq.read_table(folder/'selection.parquet').column('moment_id').to_pylist(),'review_state':'unreviewed'}
+    rows=pq.read_table(folder/'selection.parquet').to_pylist()
+    if metadata.get('schema_version',1)==1:
+        result=result_view(manifest)
+        if not result or result['manifest_sha256']!=metadata['label_manifest_sha256']:raise ValueError('Selection belongs to another label result')
+        ids={r['moment_id'] for r in rows};rows=[r for r in result['images'] if r['moment_id'] in ids]
+    return {'sha256':file_digest(folder/'manifest.json'),'selected_moment_ids':list(dict.fromkeys(r['moment_id'] for r in rows)),
+            'selected_image_ids':[r['image_id'] for r in rows],'review_state':'unreviewed'}
 
 
 @router.get('/selection')
@@ -132,23 +142,52 @@ def save_selection(request:SelectMoment):
                 if current['sha256']!=request.expected_selection_sha256:raise HTTPException(409,'Selection changed; reload before selecting')
                 moment=next((row for row in result['moments'] if row['moment_id']==request.moment_id),None)
                 if not moment or moment['source_frame']!=request.source_frame or moment['timestamp_ns']!=request.timestamp_ns:raise HTTPException(422,'Presented source identity does not match a generated moment')
-                selected=set(current['selected_moment_ids'])
-                if request.selected:selected.add(request.moment_id)
-                else:selected.discard(request.moment_id)
-                rows=[r for r in result['moments'] if r['moment_id'] in selected]
+                chosen=[r for r in result['images'] if r['moment_id']==request.moment_id and (request.camera_id is None or r['camera_id']==request.camera_id)]
+                if not chosen:raise HTTPException(422,'No generated image for this camera and moment')
+                selected=set(current['selected_image_ids']);ids={r['image_id'] for r in chosen}
+                if request.selected:selected.update(ids)
+                else:selected.difference_update(ids)
+                rows=[r for r in result['images'] if r['image_id'] in selected]
                 revision='selection-'+uuid4().hex[:12]
                 extension=recording_structure(manifest.parent,result['manifest']['recording_id']).application_dir('skellyclicker')
                 staged=extension/'working'/'reviews'/revision;staged.mkdir(parents=True)
-                schema=pa.schema([('moment_id',pa.string()),('source_frame',pa.int64()),('timestamp_ns',pa.int64())])
-                table=pa.Table.from_pylist([{'moment_id':r['moment_id'],'source_frame':r['source_frame'],'timestamp_ns':int(r['timestamp_ns'])} for r in rows],schema=schema)
+                schema=pa.schema([('image_id',pa.string()),('camera_id',pa.string()),('moment_id',pa.string()),('source_frame',pa.int64()),('timestamp_ns',pa.int64())])
+                table=pa.Table.from_pylist([{'image_id':r['image_id'],'camera_id':r['camera_id'],'moment_id':r['moment_id'],'source_frame':r['source_frame'],'timestamp_ns':int(r['timestamp_ns'])} for r in rows],schema=schema)
                 pq.write_table(table,staged/'selection.parquet')
-                atomic_json(staged/'manifest.json',{'schema_version':1,'label_result':result['path'],'label_manifest_sha256':result['manifest_sha256'],
-                    'previous_selection_sha256':current['sha256'],'review_state':'unreviewed','meaning':'Selected for review; not approved labels',
+                atomic_json(staged/'manifest.json',{'schema_version':2,'label_result':result['path'],'label_manifest_sha256':result['manifest_sha256'],
+                    'previous_selection_sha256':current['sha256'],'review_state':'unreviewed','meaning':'Image inclusion draft; not approved labels; moment_id preserves stereo grouping',
                     'files':{'selection.parquet':{'sha256':file_digest(staged/'selection.parquet'),'bytes':(staged/'selection.parquet').stat().st_size}}})
                 destination=extension/'reviews'/revision;destination.parent.mkdir(parents=True,exist_ok=True)
                 publish_directory(staging=staged,destination=destination)
                 project=read_model(manifest,Project);project.active_review=destination.relative_to(manifest.parent).as_posix()
                 atomic_json(manifest,project.model_dump(mode='json'))
                 return selection_view(manifest)
+    except HTTPException:raise
+    except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+
+from functools import lru_cache
+from io import BytesIO
+from fastapi.responses import Response
+from PIL import Image
+
+@lru_cache(maxsize=128)
+def image_thumbnail(path,sha256,size,modified_ns):
+    checked(path,{'sha256':sha256,'bytes':size})
+    with Image.open(path) as original:
+        image=original.convert('RGB');image.thumbnail((320,180))
+        output=BytesIO();image.save(output,format='JPEG',quality=85)
+    return output.getvalue()
+
+@router.get('/thumbnail')
+def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str):
+    try:
+        manifest=Path(project_path).resolve();result=result_view(manifest)
+        if not result or result['manifest_sha256']!=label_manifest_sha256:raise HTTPException(409,'Generated labels changed')
+        row=next((r for r in result['images'] if r['image_id']==image_id),None)
+        if not row:raise HTTPException(404,'Unknown generated image')
+        path=resolve_relative(manifest.parent,row['path'])
+        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns)
+        return Response(data,media_type='image/jpeg',headers={'Cache-Control':'private, max-age=3600'})
     except HTTPException:raise
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error

@@ -8,10 +8,10 @@ import {AppShell} from './AppShell';
 import {resolveBackendUrl} from './config';
 import './shell.css';
 import {useTargetCrop} from './useTargetCrop';
-import {CandidateReviewPanel} from './CandidateReviewPanel';
+import {useCandidateReview} from './CandidateReviewPanel';
 import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
-import {SidebarProcessingAction} from '@freemocap/ui';
+import {SidebarProcessingAction,ButtonSm} from '@freemocap/ui';
 import './training-set.css';
 
 const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => ({default: module.TrainingSetPanel})));
@@ -23,6 +23,8 @@ function App({backendUrl}: {backendUrl: string}) {
   const getTargetCrop=useTargetCrop(backendUrl,project?.playback?.targetCropUrl);
   const playbackControls=useRef<PlaybackWorkspaceHandle|null>(null);
   const [presented,setPresented]=useState<PresentedFrame|null>(null);
+  const review=useCandidateReview({baseUrl:backendUrl,project,controls:playbackControls,presented,refreshKey:Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')});
+  const [sidebarMode,setSidebarMode]=useState<'images'|'project'>('images');
   const [trainingOpen,setTrainingOpen]=useState(false);
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
@@ -68,7 +70,14 @@ function App({backendUrl}: {backendUrl: string}) {
     stream.connect();
     return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell sidebar={<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<><div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div><PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/><CandidateReviewPanel baseUrl={backendUrl} project={project} controls={playbackControls} presented={presented} refreshKey={Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')}/></>}</>}
+  return <AppShell sidebar={<>
+    {review.catalog&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
+      <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>setSidebarMode('images')}/>
+      <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>setSidebarMode('project')}/>
+    </div>}
+    {project&&<div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div>}
+    {review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/>}</>}
+  </>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     status={<><span>{connectionError??(connectionState===ConnectionState.CONNECTED?'Backend connected':`Backend ${connectionState.toLowerCase()}`)}</span><span>Stream updates: {messages}</span></>}>
@@ -85,7 +94,7 @@ function App({backendUrl}: {backendUrl: string}) {
       <p>Points show target geometry projected through the fitted pose, not detector predictions or approved labels.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
-    <PlaybackWorkspace getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
+    <PlaybackWorkspace renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
   </AppShell>;
 }
 
