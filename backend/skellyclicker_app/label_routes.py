@@ -2,7 +2,8 @@
 import json
 from pathlib import Path
 import threading
-from fastapi import APIRouter,HTTPException
+from typing import Annotated
+from fastapi import APIRouter,HTTPException,Query
 import pyarrow.parquet as pq
 from freemocap_sdk.pipeline import PipelineRun,PipelineRegistry,pipeline_router
 from freemocap_sdk.storage import atomic_json,resolve_relative,file_digest
@@ -165,23 +166,27 @@ def save_selection(request:SelectMoment):
 
 from functools import lru_cache
 from io import BytesIO
-from fastapi.responses import Response
+from fastapi.responses import Response,FileResponse
 from PIL import Image,ImageDraw
 from .target_crops import target_crop_metadata,projection_offset
 
 @lru_cache(maxsize=128)
-def image_thumbnail(path,sha256,size,modified_ns,bounds,points,projection_path,offset,projection_digest):
+def image_thumbnail(path,sha256,size,modified_ns,bounds,points,projection_path,offset,projection_digest,annotated=True,max_size=320):
     checked(path,{'sha256':sha256,'bytes':size})
     with Image.open(path) as original:
-        image=original.convert('RGB');draw=ImageDraw.Draw(image)
-        with projection_path.open('rb') as stream:
-            stream.seek(offset);projection=json.loads(stream.readline())['projection']
-        for segment in projection.get('mesh_wireframe_segments_xy',[]):
-            draw.line([tuple(point) for point in segment],fill='#37eaff',width=1)
-        for x,y,visible in points:
-            draw.ellipse((x-2,y-2,x+2,y+2),fill='#ff45e6' if visible else None,outline='#ff45e6',width=1)
-        x,y,width,height=bounds
-        image=image.crop((int(x),int(y),int(x+width+.999),int(y+height+.999)));image.thumbnail((320,320))
+        image=original.convert('RGB')
+        if annotated:
+            draw=ImageDraw.Draw(image)
+            with projection_path.open('rb') as stream:
+                stream.seek(offset);projection=json.loads(stream.readline())['projection']
+            for segment in (projection or {}).get('mesh_wireframe_segments_xy',[]):
+                draw.line([tuple(point) for point in segment],fill='#37eaff',width=1)
+            for x,y,visible in points:
+                draw.ellipse((x-2,y-2,x+2,y+2),fill='#ff45e6' if visible else None,outline='#ff45e6',width=1)
+        if bounds is not None:
+            x,y,width,height=bounds
+            image=image.crop((int(x),int(y),int(x+width+.999),int(y+height+.999)))
+        if max_size:image.thumbnail((max_size,max_size))
         output=BytesIO();image.save(output,format='PNG',compress_level=3)
     return output.getvalue()
 
@@ -203,8 +208,7 @@ def thumbnail_context(manifest,label_path,pose_path,playback_path,fingerprint):
         if r['projection_valid']:points.setdefault((r['moment_id'],r['camera_id']),[]).append((r['x_px'],r['y_px'],bool(r['self_visible'])))
     return result['manifest_sha256'],{r['image_id']:r for r in result['images']},{k:tuple(v) for k,v in points.items()},crops
 
-@router.get('/thumbnail')
-def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str):
+def image_response(project_path,label_manifest_sha256,image_id,*,crop,annotated,max_size,full_resolution=False):
     try:
         manifest=Path(project_path).resolve();project=read_model(manifest,Project)
         if not project.label_result or not project.playback_result:raise HTTPException(404,'No generated labels')
@@ -215,10 +219,25 @@ def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str):
         row=images.get(image_id)
         if not row:raise HTTPException(404,'Unknown generated image')
         path=resolve_relative(manifest.parent,row['path'])
-        bounds=crops['cameras'].get(row['camera_id'],{}).get(str(row['source_frame']))
-        if not bounds:return Response(status_code=204,headers={'X-Target-Crop':'unavailable'})
+        headers={'Cache-Control':'private, max-age=3600','X-Image-Id':image_id,'X-Label-Manifest':digest,'X-Annotations':'true' if annotated else 'false'}
+        if full_resolution and not annotated:
+            checked(path,{'sha256':row['sha256'],'bytes':row['bytes']})
+            return FileResponse(path,media_type='image/png',headers=headers)
+        bounds=None
+        if crop:
+            box=crops['cameras'].get(row['camera_id'],{}).get(str(row['source_frame']))
+            if not box:return Response(status_code=204,headers={'X-Target-Crop':'unavailable',**headers})
+            bounds=tuple(box[k] for k in ('x','y','width','height'))
         projection_path,offset,projection_digest=projection_offset(manifest.parent,project,row['camera_id'],row['source_frame'],crops['width'],crops['height'])
-        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns,tuple(bounds[k] for k in ('x','y','width','height')),points.get((row['moment_id'],row['camera_id']),()),projection_path,offset,projection_digest)
-        return Response(data,media_type='image/png',headers={'Cache-Control':'private, max-age=3600'})
+        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns,bounds,points.get((row['moment_id'],row['camera_id']),()),projection_path,offset,projection_digest,annotated,max_size)
+        return Response(data,media_type='image/png',headers=headers)
     except HTTPException:raise
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+@router.get('/thumbnail')
+def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str,crop:bool=True,annotated:bool=True,max_size:Annotated[int,Query(ge=64,le=1024)]=320):
+    return image_response(project_path,label_manifest_sha256,image_id,crop=crop,annotated=annotated,max_size=max_size)
+
+@router.get('/image')
+def full_image(project_path:str,label_manifest_sha256:str,image_id:str,annotated:bool=True):
+    return image_response(project_path,label_manifest_sha256,image_id,crop=False,annotated=annotated,max_size=0,full_resolution=True)
