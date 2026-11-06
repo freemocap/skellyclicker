@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import {WorkspaceTabs, PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
+import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
 import {createHttpClient, TransportService, ConnectionState, pipelineSnapshotKind, type PipelineSnapshot} from '@freemocap/client';
 import {stateKind} from './state-message';
@@ -10,6 +10,7 @@ import {resolveBackendUrl} from './config';
 import './shell.css';
 import {useTargetCrop} from './useTargetCrop';
 import {useCandidateReview} from './CandidateReviewPanel';
+import {DatasetQualityPanel,type GenerationMode} from './DatasetQualityPanel';
 import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
 import {SidebarProcessingAction,ButtonSm} from '@freemocap/ui';
@@ -58,7 +59,7 @@ function App({backendUrl}: {backendUrl: string}) {
   }
   useEffect(()=>{const abort=new AbortController();void restoreSession(abort.signal);return()=>abort.abort();},[backendUrl]);
   const [generationTarget,setGenerationTarget]=useState<HTMLDivElement|null>(null);
-  const [generationMode,setGenerationMode]=useState<'recording'|'model'>(()=>localStorage.getItem('skellyclicker.generation-view')==='model'?'model':'recording');
+  const [generationMode,setGenerationMode]=useState<GenerationMode>(()=>{const saved=localStorage.getItem('skellyclicker.generation-view');return saved==='model'||saved==='recording'?saved:'selection';});
   const [sidebarRequest,setSidebarRequest]=useState(0);
   const [toolbarTarget,setToolbarTarget]=useState<HTMLDivElement|null>(null);
   const [resultView,setResultView]=useState<'generation'|'training'|'checkpoints'>(()=>{const saved=localStorage.getItem('skellyclicker.results-view');return saved==='checkpoints'||saved==='generation'?saved:'training';});
@@ -97,7 +98,7 @@ function App({backendUrl}: {backendUrl: string}) {
         if(identity.application!=='skellyclicker')throw new Error('The endpoint is not a SkellyClicker backend.');
         if(typeof identity.log_session_id!=='string')throw new Error('Restart SkellyClicker to activate the updated backend and log session.');
         if(!active)return;
-        logs.beginSession(identity.log_session_id);logs.start();
+        await logs.beginSession(identity.log_session_id);if(!active)return;logs.start();
         unsubscribeLogs();unsubscribeLogs=stream.subscribeToLog(record=>logs.add(record));
         stream.connect();
         if(active)setHttpStatus('available');
@@ -107,7 +108,7 @@ function App({backendUrl}: {backendUrl: string}) {
     void checkHttp();
     return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>{setGenerationMode('recording');localStorage.setItem('skellyclicker.generation-view','recording');goTo('generation');}:undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={goTo} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard generationTarget={generationTarget} onGoTraining={()=>goTo('training')} onDatasetChanged={(revision)=>setDatasetRefreshRevision(revision)} toolbarTarget={toolbarTarget} surface={resultView==='checkpoints'?'checkpoints':'training'} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>{setGenerationMode('recording');localStorage.setItem('skellyclicker.generation-view','recording');goTo('generation');}:undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={goTo} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard validateInputs={session.workspace!=='viewer'&&resultView==='training'} includedImageCount={review.result?review.selection.selected_image_ids.length:undefined} generationTarget={generationTarget} onGoTraining={()=>goTo('training')} onDatasetChanged={(revision)=>setDatasetRefreshRevision(revision)} toolbarTarget={toolbarTarget} surface={resultView==='checkpoints'?'checkpoints':'training'} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
     {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
@@ -117,15 +118,9 @@ function App({backendUrl}: {backendUrl: string}) {
     </div>}
     {!restoring&&(review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
   </>}
-    generation={<div className="generation-page">
-      <WorkspaceTabs label="Generation method" value={generationMode} onChange={value=>{const mode=value as 'recording'|'model';setGenerationMode(mode);localStorage.setItem('skellyclicker.generation-view',mode);}} tabs={[{id:'recording',label:'Recording images',panelId:'generation-recording'},{id:'model',label:'Find more examples',panelId:'generation-model'}]}/>
-      <div className="generation-body">
-        <section id="generation-recording" role="tabpanel" aria-label="Recording images" hidden={generationMode!=='recording'}>
-          {project?<Suspense fallback={<p role="status">Loading recording…</p>}><TrainingSetPanel embedded key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>goTo('viewer')} onReview={openGeneratedImages}/></Suspense>:<p role="status">No project selected</p>}
-        </section>
-        <section id="generation-model" role="tabpanel" aria-label="Find more examples" hidden={generationMode!=='model'}><div ref={setGenerationTarget} className="generation-refinement-target"/></section>
-      </div>
-    </div>}
+    generation={<DatasetQualityPanel onRefresh={()=>setDatasetRefreshRevision('refresh:'+Date.now())} baseUrl={backendUrl} projectPath={project?.manifest_path} result={review.result} selection={review.selection} onSelection={value=>{review.applySelection(value);setDatasetRefreshRevision(value.sha256??'');}} onNavigate={id=>{void review.navigate(id);goTo('viewer');}} mode={generationMode} onMode={mode=>{setGenerationMode(mode);localStorage.setItem('skellyclicker.generation-view',mode);}}
+      recording={project?<Suspense fallback={<p role="status">Loading recording…</p>}><TrainingSetPanel embedded key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>goTo('viewer')} onReview={openGeneratedImages}/></Suspense>:<p role="status">No project selected</p>}
+      model={<div ref={setGenerationTarget} className="generation-refinement-target"/>}/>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}
     >
