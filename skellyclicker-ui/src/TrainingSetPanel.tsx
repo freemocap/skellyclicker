@@ -64,12 +64,12 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
     extract_images:{label:'Extract synchronized images',kind:'computation',availability:reusable?'reusable':sourceValid?'available':'unavailable',reason:reusable?'Existing images cover the selected range; input hashes must be verified before reuse.':'Generate images automatically prepares the requested recording frames.',description:'Extract paired native-resolution images, exact source timestamps and rectified calibration from the linked recording.',
       summary:<SettingsSummaryChip>{range}</SettingsSummaryChip>,
       configuration:<>
-        {row('Input strategy','Matching prepared frames are reused. Missing coverage is prepared automatically when you generate images.',<SettingSelectInput label="Input strategy" value={config.mode} options={[{value:'reuse',label:'Reuse prepared'},{value:'fresh',label:'Fresh preparation'}]} onChange={v=>change('mode',v)}/>,true)}
+        {row('Input strategy','Matching prepared frames are reused. Missing coverage is prepared automatically when you generate images.',value(config.mode==='reuse'?'Reuse prepared frames':'Prepare requested frames'),true)}
         {row('First source frame','Zero-based source frame, not the clip index. Reuse requires every frame in the range.',numeric('First source frame','first',0,Math.max(0,(summary?.calibration.source_frame_count??1000000)-1)))}
         {row('Frame count','The current preparation adapter supports 1–900 consecutive source frames.',numeric('Frame count','count',1,summary?.calibration.source_frame_count??Number.MAX_SAFE_INTEGER))}
         {row('Image size','Native rectified image resolution. No resizing is introduced by this workflow.',value(summary?`${summary.calibration.image_width} × ${summary.calibration.image_height}`:'—'))}
       </>},
-    stereo_3d:{label:'Reconstruct stereo 3D',kind:'computation',availability:reusable?'reusable':'unavailable',reason:reusable?'Existing depth/cloud artifacts can be reused after provenance validation.':'Depth is currently coupled to ZED replay; an independent stage runner is not implemented.',description:'Estimate stereo depth and project finite samples into colored 3D points. Optical coordinates use metres; display world coordinates use millimetres.',
+    stereo_3d:{label:'Reconstruct stereo 3D',kind:'computation',availability:reusable?'reusable':'available',reason:reusable?'Existing depth/cloud artifacts can be reused after provenance validation.':'Generation reconstructs depth and point clouds for the requested recording frames.',description:'Estimate stereo depth and project finite samples into colored 3D points. Optical coordinates use metres; display world coordinates use millimetres.',
       summary:<SettingsSummaryChip>ZED NEURAL</SettingsSummaryChip>,
       configuration:<>
         {row('Depth method','Current fixed adapter: ZED NEURAL replay. Stereo reconstruction is not an editable model choice yet.',<SettingSelectInput label="Depth method" value="neural" options={[{value:'neural',label:'ZED NEURAL'}]} onChange={()=>{}} disabled/>,true)}
@@ -77,7 +77,7 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
         {row('Near depth','Fixed lower bound for the current cloud artifact; not the fitting depth gate.',fixedNumber('Near depth',.17,'m'))}
         {row('Far depth','Fixed upper bound for the current cloud artifact.',fixedNumber('Far depth',3,'m'))}
       </>},
-    fit_stl:{label:'Fit STL poses',kind:'computation',availability:reusable?'reusable':'unimplemented',reason:reusable?'Prepared poses are reusable. Passing pilot gates is not human approval.':'General arbitrary-STL initialization is not connected. The existing demonstration adapter is recording-specific.',description:'Fit the original STL against stereo images and depth. Retain original-STL transforms for each camera, rejected fits and diagnostic measurements.',
+    fit_stl:{label:'Fit STL poses',kind:'computation',availability:reusable?'reusable':'available',reason:reusable?'Prepared poses are reusable. Passing pilot gates is not human approval.':'Generation fits the STL using the current recording-specific initialization preset.',description:'Fit the original STL against stereo images and depth. Retain original-STL transforms for each camera, rejected fits and diagnostic measurements.',
       summary:<SettingsSummaryChip>FoundationPose</SettingsSummaryChip>,
       configuration:<>
         {row('Pose estimator','The existing adapter runs FoundationPose registration and tracking.',<SettingSelectInput label="Pose estimator" value="foundationpose" options={[{value:'foundationpose',label:'FoundationPose'}]} onChange={()=>{}} disabled/>,true)}
@@ -90,9 +90,9 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
       summary:reusable?<SettingsSummaryChip>{candidates.length} pairs · {candidates.length*2} images</SettingsSummaryChip>:null,
       configuration:<>
         {row('Fit filter','Apply range, then fit filter, stride and optional cap. Failed fits remain available for review; selection never implies approval.',<SettingSelectInput label="Fit filter" value={config.fit} options={[{value:'all',label:'All candidates'},{value:'passed',label:'Passed gates'},{value:'failed',label:'Failed gates'}]} onChange={v=>change('fit',v)}/>,true)}
-        {row('Candidate stride','Select every Nth eligible paired moment after the fit filter.',numeric('Candidate stride','step',1,900))}
+        {row('Candidate stride','Select every Nth eligible paired moment after the fit filter.',numeric('Candidate stride','step',1,summary?.calibration.source_frame_count??Number.MAX_SAFE_INTEGER))}
         {row('Limit moments','Cap the number of paired moments. Both camera images remain grouped.',<SettingToggleSwitch label="Limit moments" isToggled={config.limit!==''} onToggle={enabled=>change('limit',enabled?'30':'')}/>)}
-        {config.limit!==''&&row('Maximum moments','Maximum paired moments after range/filter/stride.',numeric('Maximum moments','limit',1,900))}
+        {config.limit!==''&&row('Maximum moments','Maximum paired moments after range/filter/stride.',numeric('Maximum moments','limit',1,summary?.calibration.source_frame_count??Number.MAX_SAFE_INTEGER))}
         {row('Candidate pairs',<>Configuration preview only. Source frames: {candidates.slice(0,10).join(', ')}{candidates.length>10?' …':''}. No labels have been generated or approved.</>,value(reusable?candidates.length:'—'))}
         {row('Target points','Use the target’s exact ordered definition; retain invalid and out-of-bounds rows. Self-visibility differs from unknown external occlusion. Automatic point construction for a new STL is upstream work.',value(stl.compatible&&target?.authored_geometry?'Target definition':'Not configured'))}
       </>},
