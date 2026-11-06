@@ -14,6 +14,7 @@ import {PreparationPanel} from './PreparationPanel';
 import {ProjectPanel, type ProjectView} from './ProjectPanel';
 import {SidebarProcessingAction,ButtonSm} from '@freemocap/ui';
 import './training-set.css';
+import {emptySession,type SessionState} from './session';
 
 const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => ({default: module.TrainingSetPanel})));
 
@@ -25,7 +26,35 @@ function App({backendUrl}: {backendUrl: string}) {
   const playbackControls=useRef<PlaybackWorkspaceHandle|null>(null);
   const [presented,setPresented]=useState<PresentedFrame|null>(null);
   const review=useCandidateReview({baseUrl:backendUrl,project,controls:playbackControls,presented,refreshKey:Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')});
-  const [sidebarMode,setSidebarMode]=useState<'images'|'project'>('images');
+  const [session,setSession]=useState<SessionState>(emptySession);
+  const [restoring,setRestoring]=useState(true),[sessionError,setSessionError]=useState('');
+  const saveQueue=useRef(Promise.resolve());
+  const sidebarMode=session.sidebar;
+  function saveSession(changes:Partial<SessionState>){
+    const projectPath=project?.manifest_path;
+    setSession(previous=>({...previous,...changes}));
+    if(!projectPath)return;
+    saveQueue.current=saveQueue.current.catch(()=>{}).then(async()=>{
+      const response=await fetch(backendUrl+'/api/session',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...changes,project_path:projectPath})});
+      if(!response.ok)throw new Error((await response.json()).detail??'Session save failed');
+    }).catch(error=>setSessionError(String(error)));
+  }
+  function acceptProject(value:ProjectView){setProject(value);setSessionError('');if(value.session_state)setSession(value.session_state);}
+  async function restoreSession(signal?:AbortSignal){
+    setRestoring(true);setSessionError('');
+    try{
+      const ready=await fetch(backendUrl+'/api/status',{signal});if(!ready.ok)throw new Error('Backend unavailable. Retry when connected.');
+      const response=await fetch(backendUrl+'/api/session',{signal});if(!response.ok)throw new Error('Saved session unavailable. Retry when connected.');
+      const saved=await response.json();if(signal?.aborted)return;
+      if(saved.state)setSession(saved.state);
+      if(saved.error){setSessionError(saved.error);return;}
+      if(saved.project){setProject(saved.project);return;}
+      const legacy=localStorage.getItem('skellyclicker.projectPath');
+      if(legacy){const opened=await fetch(backendUrl+'/api/projects/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_path:legacy}),signal});const value=await opened.json();if(!opened.ok)throw new Error(`Could not reopen ${legacy}: ${value.detail}. Open its current location or retry.`);if(!signal?.aborted)acceptProject(value);}
+    }catch(error){if(!signal?.aborted)setSessionError(String(error));}
+    finally{if(!signal?.aborted)setRestoring(false);}
+  }
+  useEffect(()=>{const abort=new AbortController();void restoreSession(abort.signal);return()=>abort.abort();},[backendUrl]);
   const [trainingOpen,setTrainingOpen]=useState(false);
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
@@ -64,20 +93,18 @@ function App({backendUrl}: {backendUrl: string}) {
     }
     actions.current={reconnect:()=>{stream.disconnect();stream.connect();void checkHttp();},disconnect:()=>stream.disconnect()};
     void checkHttp();
-    const remembered=localStorage.getItem('skellyclicker.projectPath');
-    if(remembered)void fetch(backendUrl+'/api/projects/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_path:remembered}),signal:abort.signal}).then(async response=>{
-      if(response.ok&&active)setProject(await response.json());
-    }).catch(()=>{/* Backend logs retain project errors; connection monitor owns transport errors. */});
     stream.connect();
     return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell training={<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots}/>} sidebar={<>
+  return <AppShell view={session.workspace} onView={workspace=>saveSession({workspace})} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+    {restoring&&<p role="status">Restoring your last project...</p>}
+    {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
     {review.catalog&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
-      <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>setSidebarMode('images')}/>
-      <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>setSidebarMode('project')}/>
+      <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>saveSession({sidebar:'images'})}/>
+      <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>saveSession({sidebar:'project'})}/>
     </div>}
-    {project&&<div className="training-entry"><SidebarProcessingAction text="Create image training set" onClick={()=>setTrainingOpen(true)}/></div>}
-    {review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={setProject}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={setProject}/>}</>}
+    {project&&<div className="training-entry"><SidebarProcessingAction text="Create image training set" iconClass="importVideos-icon" onClick={()=>setTrainingOpen(true)}/></div>}
+    {!restoring&&(review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
   </>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}
     bottom={<BottomLogPanel store={logs} title="Backend logs" initialHeight={230} showHeader={false}/>}

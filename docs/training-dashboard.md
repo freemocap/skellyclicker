@@ -33,3 +33,7 @@ checkpoints remain; an interrupted partial epoch is not claimed as saved.
 Set SKELLYCLICKER_TRAINING_PYTHON or edit Training Python to select the environment.
 The existing local environment is discovered as an initial convenience, not an
 object restriction. No old object-specific checkpoint is loaded by default.
+
+Choose Configure training, review the included images and configured epoch/time limits,
+then choose Start training to submit the actual run. View progress is available
+only while running; it does not create a second run.

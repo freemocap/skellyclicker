@@ -1,9 +1,10 @@
+import type {SessionState} from './session';
 import {open as openFile} from '@tauri-apps/plugin-dialog';
 import {useEffect, useRef, useState} from 'react';
 import {RecordingBrowser, SettingFilePath, type BrowserEntry} from '@freemocap/ui';
 
 export interface ProjectView {
-  root: string; manifest_path: string;
+  root: string; manifest_path: string; session_state?:SessionState;
   project: {project_id: string; uuid: string; created_at?: string; sample_result?:string|null; playback_result?:string|null; recording_manifests?:string[]; target_manifests?:string[]};
   recordings: {recording_id: string; source: {path: string; bytes?: number; sha256?:string}; calibration_source?:{path:string}; calibration_state: string; streams: {camera_id: string}[]}[];
   targets: {object_id: string; authored_units: string; geometry?:{path:string;sha256:string}; authored_geometry?: {path:string;sha256?:string}|null}[];
@@ -17,7 +18,7 @@ function loadRecent(): RecentProject[] {
     return Array.isArray(value) ? value.filter((v):v is RecentProject=>v && typeof v.id==='string' && typeof v.name==='string' && typeof v.path==='string' && typeof v.recordings==='number' && typeof v.targets==='number').slice(0,30) : [];
   } catch {return [];}
 }
-export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project:ProjectView|null;onProject:(p:ProjectView)=>void}) {
+export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}:{baseUrl:string;project:ProjectView|null;onProject:(p:ProjectView)=>void;recordingId:string|null;onRecording:(id:string)=>void}) {
   const [recent,setRecent]=useState(loadRecent);
   const [mode,setMode]=useState<'open'|'create'|null>(null);
   const dialog=useRef<HTMLDialogElement>(null);
@@ -25,7 +26,6 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
   const [busy,setBusy]=useState(false);
   const [busyId,setBusyId]=useState<string|null>(null);
   const [error,setError]=useState('');
-  const [recordingId,setRecordingId]=useState<string|null>(null);
   const [svo,setSvo]=useState('');
   const [calibration,setCalibration]=useState('');
   const [stl,setStl]=useState('');
@@ -36,7 +36,6 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
     const timestamp=project.project.created_at ? Date.parse(project.project.created_at) : undefined;
     const entry:RecentProject={id:project.project.uuid,name:project.project.project_id,path:project.manifest_path,recordings:project.recordings.length,targets:project.targets.length,...(timestamp!==undefined&&Number.isFinite(timestamp)?{timestamp}:{})};
     setRecent(previous=>{const next=[entry,...previous.filter(p=>p.id!==entry.id)].slice(0,30);localStorage.setItem(recentKey,JSON.stringify(next));return next;});
-    setRecordingId(project.recordings[0]?.recording_id ?? null);
   },[project]);
   useEffect(()=>{if(mode&&!dialog.current?.open)dialog.current?.showModal();else if(!mode&&dialog.current?.open)dialog.current.close();},[mode]);
   function show(next:'open'|'create') {
@@ -62,7 +61,7 @@ export function ProjectPanel({baseUrl,project,onProject}:{baseUrl:string;project
   const recordings:BrowserEntry[]=(project?.recordings ?? []).map(recording=>({id:recording.recording_id,name:recording.recording_id,path:recording.source.path,cameraCount:recording.streams.length,sizeBytes:recording.source.bytes,subtitle:recording.streams.map(stream=>stream.camera_id).join(' + '),status:{label:'Linked original',tone:'neutral'},details:[{label:'Original',value:recording.source.path},{label:'Calibration',value:project?.playback?'Fresh replay calibration loaded':recording.calibration_state==='ready'?'Ready':'Awaiting fresh replay'},{label:'Reference',value:project!.targets.map(t=>`${t.object_id} (${t.authored_units})`).join(', ')}]}));
   return <div className="project-browser-stack">
     <RecordingBrowser title="Projects" entries={projects} selectedId={project?.project.uuid} busyId={busyId} loading={busy} error={!mode?error:null} onSelect={id=>{const entry=recent.find(p=>p.id===id);if(entry)void submit('open',entry.path,id);}} onBrowse={()=>show('open')} browseLabel="Open project" onCreate={()=>show('create')} createLabel="New project" emptyMessage="Open a project or create a new one to begin."/>
-    {project&&<div className="project-child-recordings"><RecordingBrowser title="Recordings" entries={recordings} selectedId={recordingId} onSelect={setRecordingId} error={project.issues.join('\n')||null} emptyMessage="No recordings in this project."/></div>}
+    {project&&<div className="project-child-recordings"><RecordingBrowser title="Recordings" entries={recordings} selectedId={recordingId} onSelect={onRecording} error={project.issues.join('\n')||null} emptyMessage="No recordings in this project."/></div>}
     <dialog ref={dialog} className="project-dialog" aria-labelledby="project-dialog-title" onCancel={event=>{event.preventDefault();if(!busy)setMode(null);}}>
       <form onSubmit={event=>{event.preventDefault();if(mode)void submit(mode,path);}}>
         <header><h2 id="project-dialog-title">{mode==='create'?'New project':'Open project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>×</button></header>

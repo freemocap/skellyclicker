@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 from fastapi import APIRouter, HTTPException
 from .projects import CreateProject, OpenProject, create_project, open_project
+from .session import remember_project
 from .stl_selection import ValidateStl, validate_stl
 
 router = APIRouter(prefix="/api/projects")
@@ -19,6 +20,7 @@ def create(request: CreateProject):
     try:
         logger.info("Creating fresh project at %s", request.project_path)
         selected = create_project(request)
+        selected["session_state"] = remember_project(selected)
         logger.info("Created project %s with linked original media and target snapshot", selected["project"]["project_id"])
         return selected
     except (ValueError, OSError) as error:
@@ -31,6 +33,7 @@ def open_existing(request: OpenProject):
     try:
         logger.info("Opening project %s", request.project_path)
         selected = open_project(Path(request.project_path))
+        selected["session_state"] = remember_project(selected)
         logger.info("Opened project %s: %d recording(s), %d target(s)", selected["project"]["project_id"], len(selected["recordings"]), len(selected["targets"]))
         for issue in selected["issues"]:
             logger.warning("Project input unavailable: %s", issue)
