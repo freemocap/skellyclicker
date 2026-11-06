@@ -185,23 +185,40 @@ def image_thumbnail(path,sha256,size,modified_ns,bounds,points,projection_path,o
         output=BytesIO();image.save(output,format='PNG',compress_level=3)
     return output.getvalue()
 
+def thumbnail_fingerprint(manifest,project):
+    # Only immutable label/geometry inputs affect thumbnails; membership does not.
+    root=manifest.parent;label=resolve_relative(root,project.label_result);pose=resolve_relative(root,project.sample_result);playback=resolve_relative(root,project.playback_result)
+    files=[label/'manifest.json',label/'images.parquet',label/'moments.parquet',label/'labels.parquet',pose/'manifest.json',pose/'timing.parquet',pose/'calibration.json',playback/'inventory.json',playback/'provenance.json',playback/'playback.json',playback/'outline-projections.jsonl']
+    from .projects import load_target
+    target=load_target(root,project.target_manifests[0]);target_path=resolve_relative(root,project.target_manifests[0]);files.extend(p for p in target_path.parent.rglob('*') if p.is_file());files.append(resolve_relative(root,target.geometry.path))
+    return tuple((str(p),p.stat().st_size,p.stat().st_mtime_ns,p.stat().st_ctime_ns) for p in sorted(set(files)))
+
+_thumbnail_context_lock=threading.Lock()
+@lru_cache(maxsize=2)
+def thumbnail_context(manifest,label_path,pose_path,playback_path,fingerprint):
+    project=read_model(manifest,Project);result=result_view(manifest,label_path)
+    if project.sample_result!=pose_path or project.playback_result!=playback_path or result['manifest']['pose_result']!=pose_path:raise ValueError('Playback differs from these labels')
+    crops=target_crop_metadata(manifest.parent,project,result['playback_id']);points={}
+    for r in pq.read_table(resolve_relative(manifest.parent,result['path'])/'labels.parquet').to_pylist():
+        if r['projection_valid']:points.setdefault((r['moment_id'],r['camera_id']),[]).append((r['x_px'],r['y_px'],bool(r['self_visible'])))
+    return result['manifest_sha256'],{r['image_id']:r for r in result['images']},{k:tuple(v) for k,v in points.items()},crops
+
 @router.get('/thumbnail')
 def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str):
     try:
-        manifest=Path(project_path).resolve();result=result_view(manifest)
-        if not result or result['manifest_sha256']!=label_manifest_sha256:raise HTTPException(409,'Generated labels changed')
-        row=next((r for r in result['images'] if r['image_id']==image_id),None)
+        manifest=Path(project_path).resolve();project=read_model(manifest,Project)
+        if not project.label_result or not project.playback_result:raise HTTPException(404,'No generated labels')
+        fingerprint=thumbnail_fingerprint(manifest,project)
+        with _thumbnail_context_lock:
+            digest,images,points,crops=thumbnail_context(manifest,project.label_result,project.sample_result,project.playback_result,fingerprint)
+        if digest!=label_manifest_sha256:raise HTTPException(409,'Generated labels changed')
+        row=images.get(image_id)
         if not row:raise HTTPException(404,'Unknown generated image')
         path=resolve_relative(manifest.parent,row['path'])
-        project=read_model(manifest,Project)
-        if project.sample_result!=result['manifest']['pose_result']:raise HTTPException(409,'Playback differs from these labels')
-        crops=target_crop_metadata(manifest.parent,project,result['playback_id'])
         bounds=crops['cameras'].get(row['camera_id'],{}).get(str(row['source_frame']))
         if not bounds:return Response(status_code=204,headers={'X-Target-Crop':'unavailable'})
-        labels=pq.read_table(resolve_relative(manifest.parent,result['path'])/'labels.parquet').to_pylist()
-        points=tuple((r['x_px'],r['y_px'],bool(r['self_visible'])) for r in labels if r['moment_id']==row['moment_id'] and r['camera_id']==row['camera_id'] and r['projection_valid'])
-        projection_path,offset,digest=projection_offset(manifest.parent,project,row['camera_id'],row['source_frame'],crops['width'],crops['height'])
-        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns,tuple(bounds[k] for k in ('x','y','width','height')),points,projection_path,offset,digest)
+        projection_path,offset,projection_digest=projection_offset(manifest.parent,project,row['camera_id'],row['source_frame'],crops['width'],crops['height'])
+        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns,tuple(bounds[k] for k in ('x','y','width','height')),points.get((row['moment_id'],row['camera_id']),()),projection_path,offset,projection_digest)
         return Response(data,media_type='image/png',headers={'Cache-Control':'private, max-age=3600'})
     except HTTPException:raise
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
