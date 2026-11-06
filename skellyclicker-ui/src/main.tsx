@@ -5,6 +5,7 @@ import '@freemocap/ui/styles.css';
 import {createHttpClient, TransportService, ConnectionState, pipelineSnapshotKind, type PipelineSnapshot} from '@freemocap/client';
 import {stateKind} from './state-message';
 import {AppShell} from './AppShell';
+import {TrainingDashboard} from './TrainingDashboard';
 import {resolveBackendUrl} from './config';
 import './shell.css';
 import {useTargetCrop} from './useTargetCrop';
@@ -70,7 +71,7 @@ function App({backendUrl}: {backendUrl: string}) {
     stream.connect();
     return () => {active=false;actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribe();unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <AppShell sidebar={<>
+  return <AppShell training={<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots}/>} sidebar={<>
     {review.catalog&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
       <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>setSidebarMode('images')}/>
       <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>setSidebarMode('project')}/>
@@ -90,8 +91,8 @@ function App({backendUrl}: {backendUrl: string}) {
         {label:'Keypoints',color:'#ff45e6',description:'Authored points projected through the fitted pose; hollow image points are mesh-self-occluded'},
         {label:'Mesh outline',color:'#37eaff',description:'Thin visible mesh crease and silhouette edges in annotated images'},
       ]:[]),
-    ]} note="All unreviewed" details={<>
-      <p>Points show target geometry projected through the fitted pose, not detector predictions or approved labels.</p>
+    ]} note="Include images to approve them for training" details={<>
+      <p>Points show target geometry projected through the fitted pose, not detector predictions. Inclusion records your approval for training.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
     <PlaybackWorkspace navigationGroups={review.navigationGroups} renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>

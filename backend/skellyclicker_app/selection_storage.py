@@ -13,8 +13,9 @@ def write_selection(root,recording_id,label_result,label_hash,rows,previous=None
     values=[{**{key:r[key] for key in ('image_id','camera_id','moment_id','source_frame')},'timestamp_ns':int(r['timestamp_ns'])} for r in rows]
     pq.write_table(pa.Table.from_pylist(values,schema=schema),staged/'selection.parquet')
     atomic_json(staged/'manifest.json',{'schema_version':2,'label_result':label_result,'label_manifest_sha256':label_hash,
-        'previous_selection_sha256':previous,'review_state':'unreviewed','initialization':reason,
-        'meaning':'Image inclusion draft; not approved labels; moment_id preserves stereo grouping',
+        'previous_selection_sha256':previous,'review_state':'proposed' if reason=='generated_candidates_included' else 'approved','initialization':reason,
+        'actor':'automatic' if reason=='generated_candidates_included' else 'human',
+        'meaning':'Included images are the training selection; human inclusion is approval; moment_id preserves stereo grouping',
         'files':{'selection.parquet':{'sha256':file_digest(staged/'selection.parquet'),'bytes':(staged/'selection.parquet').stat().st_size}}})
     destination=extension/'reviews'/revision;destination.parent.mkdir(parents=True,exist_ok=True)
     publish_directory(staging=staged,destination=destination)

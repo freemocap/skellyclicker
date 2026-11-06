@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
+import {SidebarProcessingAction as ButtonSm,PipelinePanel,PipelineWindow,SettingFilePath,SettingRow,SettingSelectInput,SettingToggleSwitch,ValueSelector,AnchoredInfo,SettingsSummaryChip,type PipelineStagePresentation} from '@freemocap/ui';
 import type {ProjectView} from './ProjectPanel';
 import {trainingGraph,defaultConfig,validateConfig,candidateFrames,readConfig,type PreparedSummary,type TrainingConfig} from './training-workflow';
 import './training-set.css';
@@ -110,9 +110,9 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose}:{baseUrl:st
   return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
     {!loaded?<p role="status">Loading…</p>:<PipelinePanel locked={run.running} graph={showingRun?run.snapshot!.graph:trainingGraph} nodePresentation={showingRun?executionPresentation:nodePresentation} operations={showingRun?run.snapshot!.operations:[]} view={view} onViewChange={setView}
       notice={messages.length?<ul className="training-errors">{messages.map(message=><li key={message}>{message}</li>)}</ul>:null}
-      actions={<>{run.snapshot&&<ButtonSm text={showRun?"Workflow settings":"Run progress"} onClick={()=>setShowRun(v=>!v)}/>}<span role="status">{run.snapshot?`${run.snapshot.status}${run.snapshot.cancel_requested?" (cancellation requested)":""} · ${run.snapshot.operations.find(op=>op.status==='running')?.detail??''}`:run.preview?`${run.preview.moment_count} pairs · ${run.preview.image_count} images · ${run.preview.label_count} labels`:null}</span><AnchoredInfo title="Training-set workflow" text="Preview validates the current prepared inputs without processing. Generate candidates publishes unreviewed projected labels; selection for review is separate from human approval and dataset publication."/>
+      actions={<>{run.snapshot&&<ButtonSm text={showRun?"Workflow settings":"Run progress"} onClick={()=>setShowRun(v=>!v)}/>}<span role="status">{run.snapshot?`${run.snapshot.status}${run.snapshot.cancel_requested?" (cancellation requested)":""} · ${run.snapshot.operations.find(op=>op.status==='running')?.detail??''}`:run.preview?`${run.preview.moment_count} pairs · ${run.preview.image_count} images · ${run.preview.label_count} labels`:null}</span><AnchoredInfo title="Training-set workflow" text="Preview validates the current prepared inputs without processing. Generate candidates publishes unreviewed projected labels; Include/Exclude records your training selection. Starting training freezes the included images without another approval step."/>
         <ButtonSm text="Preview candidates" onClick={()=>void run.inspect()} disabled={!reusable||run.running}/>
-        <ButtonSm text="Generate candidates" iconClass="processmocap-icon" className="primary accent mp-process" textColor="text-white" onClick={()=>void run.start()} disabled={!reusable||!run.preview||run.running}/>
+        <ButtonSm text="Generate candidates" iconClass="processmocap-icon" onClick={()=>void run.start()} disabled={!reusable||!run.preview||run.running}/>
         {run.running&&<ButtonSm text="Cancel run" onClick={()=>void run.cancel()} disabled={!run.snapshot}/>}
         {run.snapshot?.status==='complete'&&<ButtonSm text="Review candidates" onClick={onClose}/>}
       </>}/>

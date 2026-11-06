@@ -56,3 +56,16 @@ html, body, #root {height:100%; margin:0;}
 .project-child-recordings .sdk-browser {background:transparent;}
 .skellyclicker-top-panes {flex:1;min-height:0;}
 .skellyclicker-top-panes .skellyclicker-sidebar,.skellyclicker-top-panes .skellyclicker-main {height:100%;box-sizing:border-box;}
+
+.workspace-panels {position:relative;flex:1;min-height:0;}
+.workspace-panels > .skellyclicker-workspace {position:absolute;inset:0;}
+.training-dashboard {padding:20px;overflow:auto;display:flex;flex-direction:column;gap:16px;height:100%;box-sizing:border-box;}
+.training-dashboard header {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.training-dashboard h2 {margin:0;font-size:20px;}
+.training-dashboard > p, .training-dashboard header > div > p {color:var(--gray-300);line-height:1.5;margin:0;}
+.training-dashboard .run-summary {padding:12px;border:1px solid var(--gray-600);border-radius:8px;display:flex;gap:16px;flex-wrap:wrap;}
+.training-dashboard .metric-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+.training-python-input {width:100%;box-sizing:border-box;background:var(--gray-900);color:inherit;border:1px solid var(--gray-600);border-radius:4px;padding:8px;}
+
+.training-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.training-actions > .sdk-sidebar-processing-action {width:auto;min-width:150px;}

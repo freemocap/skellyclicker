@@ -1,11 +1,12 @@
-import type {ReactNode} from 'react';
+import {useState,type ReactNode} from 'react';
 import {ResizablePanelGroup,ResizablePanel,ResizableHandle} from '@freemocap/ui';
 import logo from './assets/skellyclicker-logo.svg';
 
 /** Product controls compose the SDK's shared pane and playback machinery. */
-export function AppShell({children, sidebar, status, bottom, connection}: {
-  children: ReactNode; sidebar: ReactNode; status: ReactNode; bottom?: ReactNode; connection?: ReactNode;
+export function AppShell({children, sidebar, status, bottom, connection, training}: {
+  children: ReactNode; sidebar: ReactNode; status: ReactNode; bottom?: ReactNode; connection?: ReactNode; training?: ReactNode;
 }) {
+  const [view,setView]=useState<'viewer'|'training'>('viewer');
   return <div className="skellyclicker-app">
     <ResizablePanelGroup direction="horizontal" autoSaveId="skellyclicker-main-layout" className="skellyclicker-top-panes">
       <ResizablePanel defaultSize={24} minSize={12} maxSize={50}>
@@ -17,8 +18,8 @@ export function AppShell({children, sidebar, status, bottom, connection}: {
       <ResizableHandle aria-label="Resize project sidebar"/>
       <ResizablePanel defaultSize={76} minSize={35}>
         <main className="skellyclicker-main">
-          <nav className="skellyclicker-tabs" role="tablist" aria-label="Workspace views"><button id="project-tab" type="button" role="tab" aria-selected="true" aria-controls="project-view">Project</button></nav>
-          <section id="project-view" role="tabpanel" aria-labelledby="project-tab" className="skellyclicker-workspace">{children}</section>
+          <nav className="skellyclicker-tabs" role="tablist" aria-label="Workspace views">{(['viewer','training'] as const).map(tab=><button key={tab} id={tab+'-tab'} type="button" role="tab" aria-selected={view===tab} aria-controls={tab+'-view'} onClick={()=>setView(tab)}>{tab==='viewer'?'Viewer':'Training dashboard'}</button>)}</nav>
+          <div className="workspace-panels"><section id="viewer-view" role="tabpanel" aria-labelledby="viewer-tab" aria-hidden={view!=='viewer'} className="skellyclicker-workspace" inert={view!=='viewer'} style={{visibility:view==='viewer'?'visible':'hidden',opacity:view==='viewer'?1:0,pointerEvents:view==='viewer'?'auto':'none'}}>{children}</section><section id="training-view" role="tabpanel" aria-labelledby="training-tab" aria-hidden={view!=='training'} className="skellyclicker-workspace" inert={view!=='training'} style={{visibility:view==='training'?'visible':'hidden',opacity:view==='training'?1:0,pointerEvents:view==='training'?'auto':'none'}}>{training}</section></div>
         </main>
       </ResizablePanel>
     </ResizablePanelGroup>

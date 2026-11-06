@@ -6,6 +6,7 @@ const backend = resolve(root, 'backend');
 for (const args of [
   ['sync', '--locked', '--project', backend],
   ['run', '--project', backend, 'python', '-m', 'freemocap_sdk.bundle',
+    '--add-data', resolve(backend, 'skellyclicker_app/workers/train_dlc.py') + ':skellyclicker_app/workers',
     '--collect-data', 'skellyclicker_app', '--collect-data', 'skellyforge', '--collect-data', 'freemocap_sdk', '--entrypoint', resolve(backend, 'desktop_entry.py'), '--name', 'skellyclicker-backend',
     '--output', resolve(root, 'native/binaries'), '--work', resolve(root, '.test-artifacts/desktop-bundle')],
 ]) {

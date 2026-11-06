@@ -87,7 +87,7 @@ def run_result(run_id:str):
     if snapshot['status']!='complete':return {'status':snapshot['status'],'result':None}
     return {'status':'complete','result':result_view(jobs[run_id]['manifest'],run.result.outputs['publish_candidates']['result']['path'])}
 
-# Selection is a retained human browsing decision, never label approval.
+# Human inclusion is review and approval; generated initial inclusion is a proposal.
 from pydantic import Field
 from uuid import uuid4
 import pyarrow as pa
@@ -119,7 +119,8 @@ def selection_view(manifest):
         if not result or result['manifest_sha256']!=metadata['label_manifest_sha256']:raise ValueError('Selection belongs to another label result')
         ids={r['moment_id'] for r in rows};rows=[r for r in result['images'] if r['moment_id'] in ids]
     return {'sha256':file_digest(folder/'manifest.json'),'selected_moment_ids':list(dict.fromkeys(r['moment_id'] for r in rows)),
-            'selected_image_ids':[r['image_id'] for r in rows],'review_state':'unreviewed'}
+            'selected_image_ids':[r['image_id'] for r in rows],
+            'review_state':'proposed' if metadata.get('initialization')=='generated_candidates_included' else 'approved'}
 
 
 @router.get('/selection')
