@@ -48,3 +48,12 @@ The SDK gallery mounts a bounded set of cards instead of thousands. APP thumbnai
 UI verification: `quality-review.mjs` uses 3,038 synthetic images to test bounded rendering, preview without writes, policy invalidation, exact Apply, preserved exclusions, stable bulk removal, failed publication responses, orbit-driven histogram changes and narrow layout. `coverage-projection.test.mjs` verifies signed directions, projection-axis unknowns and count conservation under rotation. `generation-workspace.mjs` checks the integrated tab/controller layout and absence of background training validation. `quality-live-preview.mjs` uses an isolated browser and read-only backend proxy, blocks all selection/job mutations, renders the actual STL and coverage, and verifies exact membership before/after. It does not apply the proposed set.
 
 Undo last selection change restores only the exact IDs removed by the most recent successful operation, under that operation's resulting selection revision. It never restores older exclusions. Failed restoration retains the undo action; successful restoration, a project change or Refresh clears it. The isolated UI fixture checks failed and successful undo while preserving earlier exclusions.
+
+
+## Image display controls
+
+Drag the vertical divider to resize controls and gallery independently; the horizontal divider resizes coverage and filters. Both layouts persist locally. Image size, Target crop / Full image, and Annotations also persist locally. Hover temporarily shows the matching raw image. Clicking a thumbnail opens the full-resolution source frame in an SDK dialog; Escape closes it and returns focus. Checkboxes and removal buttons remain separate actions.
+
+Image variants share project, manifest and image identity. Thumbnail framing and annotation options affect presentation only. Full-resolution images always show the complete source frame. The SDK measures natural image aspect and caption height for compact, virtualized rows; changing size or pane width preserves a surviving image as the scroll anchor. Uncomputed scores read Not scored, active initial scoring reads Scoring, and missing computed scores read Score unknown.
+
+The generation default remains Entire recording (every frame): first frame zero, stride one, all fit candidates and no cap. Custom range / sampling is an explicit opt-in. Generate all images prepares missing frames, validates inputs and generates labels without a separate manual preview gate.

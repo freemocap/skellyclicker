@@ -25,6 +25,17 @@ try{
  await page.screenshot({path:'../.test-artifacts/quality-real-preview.png'});
  await page.getByRole('tab',{name:'Current',exact:true}).click();await expect(page.locator('.coverage-counts')).toContainText(String(before.selected_image_ids.length)+' images');
  await page.getByRole('tab',{name:'Proposed',exact:true}).click();
+
+ const width=page.getByRole('slider',{name:'Image size',exact:true});
+ for(const [view,size,viewport] of [['crop',128,1440],['full',320,1440],['crop',128,960],['full',320,960]]){
+  await page.setViewportSize({width:viewport,height:1000});await width.fill(String(size));await page.getByRole('combobox',{name:'Image framing'}).selectOption(view);
+  await expect.poll(()=>page.locator('.quality-gallery .sdk-image-thumbnail img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0)),{timeout:60000}).toBe(true);const id=await page.locator('.quality-gallery [data-image-id]').first().getAttribute('data-image-id');const first=page.locator('.quality-gallery [data-image-id='+JSON.stringify(id)+'] .sdk-image-thumbnail');await expect(first.locator('img').first()).toHaveJSProperty('complete',true);await expect.poll(()=>first.locator('img').first().evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
+  await page.locator('.quality-gallery-heading').hover();await expect(first.locator('img').first()).toBeVisible();await first.locator('.sdk-annotation-image').hover();await expect(first.locator('img').last()).toBeVisible();
+  expect(await page.locator('.quality-gallery [data-image-id]').count()).toBeLessThan(100);
+  await expect.poll(()=>page.locator('.quality-gallery [data-image-id]').first().evaluate(card=>card.getBoundingClientRect().bottom-card.querySelector('.sdk-image-card-body').getBoundingClientRect().bottom)).toBeLessThanOrEqual(3);
+  await page.screenshot({path:`../.test-artifacts/quality-images-${view}-${size}-${viewport}.png`});
+ }
+ await page.locator('.quality-gallery .sdk-image-thumbnail').first().click();await expect(page.getByRole('dialog')).toBeVisible();const full=page.locator('.sdk-image-preview-surface img').first();await expect.poll(()=>full.evaluate(img=>img.naturalWidth)).toBeGreaterThan(640);await page.screenshot({path:'../.test-artifacts/quality-full-image-modal.png'});await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
  const after=await(await api.get(backend+'/api/labels/selection?project_path='+q)).json();expect(after).toEqual(before);expect(writes).toEqual([]);expect(previewRequests).toBe(1);expect(meshRequests).toBe(1);expect(errors).toEqual([]);
  console.log(JSON.stringify({pass:true,membersUnchanged:before.selected_image_ids.length,chosen:quality.image_ids.length,eligible:quality.counts.eligible,viewpointUnknown:quality.counts.viewpoint_unknown,proposedCells:quality.coverage.pools.proposed.occupied_bins,totalCells:quality.coverage.azimuth_bins*quality.coverage.z_bins,mountedCards:await page.locator('.quality-gallery [data-image-id]').count()}));
 }finally{await page.unrouteAll({behavior:'ignoreErrors'});await browser.close();await api.dispose();}
