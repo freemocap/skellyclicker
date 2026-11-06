@@ -57,6 +57,8 @@ function App({backendUrl}: {backendUrl: string}) {
   }
   useEffect(()=>{const abort=new AbortController();void restoreSession(abort.signal);return()=>abort.abort();},[backendUrl]);
   const [trainingOpen,setTrainingOpen]=useState(false);
+  const [toolbarTarget,setToolbarTarget]=useState<HTMLDivElement|null>(null);
+  const [resultView,setResultView]=useState<'training'|'checkpoints'>(()=>localStorage.getItem('skellyclicker.results-view')==='checkpoints'?'checkpoints':'training');
   const [connectionState, setConnectionState] = useState(ConnectionState.DISCONNECTED);
   const [httpStatus, setHttpStatus] = useState<'checking'|'available'|'unavailable'>('checking');
   const [connectionError, setConnectionError] = useState<string|null>(null);
@@ -100,7 +102,7 @@ function App({backendUrl}: {backendUrl: string}) {
     void checkHttp();
     return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <><AppShell view={session.workspace} onView={workspace=>saveSession({workspace})} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+  return <><AppShell projectName={project?.project.project_id} onCreateTrainingSet={project?()=>setTrainingOpen(true):undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={view=>{if(view!=='viewer'){setResultView(view);localStorage.setItem('skellyclicker.results-view',view);}saveSession({workspace:view==='viewer'?'viewer':'training'});}} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard toolbarTarget={toolbarTarget} surface={resultView} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
     {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
@@ -108,7 +110,6 @@ function App({backendUrl}: {backendUrl: string}) {
       <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>saveSession({sidebar:'images'})}/>
       <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>saveSession({sidebar:'project'})}/>
     </div>}
-    {project&&<div className="training-entry"><SidebarProcessingAction text="Create image training set" iconClass="importVideos-icon" onClick={()=>setTrainingOpen(true)}/></div>}
     {!restoring&&(review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
   </>}
     connection={<ServerConnectionStatus state={connectionState} endpoint={backendUrl} httpStatus={httpStatus} error={connectionError} onReconnect={()=>actions.current?.reconnect()} onDisconnect={()=>actions.current?.disconnect()}/>}

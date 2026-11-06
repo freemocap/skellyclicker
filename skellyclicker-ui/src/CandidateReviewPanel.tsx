@@ -1,3 +1,4 @@
+import {trainingNavigation} from './training-navigation';
 import {useCallback,useEffect,useRef,useState,type RefObject} from 'react';
 import {ImageCatalog,ButtonSm,type PlaybackNavigationGroup,type ImageControlContext,type PlaybackWorkspaceHandle,type PresentedFrame} from '@freemocap/ui';
 import type {ProjectView} from './ProjectPanel';
@@ -48,11 +49,12 @@ export function useCandidateReview({baseUrl,project,refreshKey,controls,presente
    void setMembership(image,false);
   }}/>;
  }
- const candidates=(result?.images??[]).filter(r=>selected.has(r.image_id)&&(!camera||r.camera_id===camera));
- const moments=[...new Map(candidates.map(r=>[r.source_frame,r])).values()].sort((a,b)=>a.source_frame-b.source_frame);
- const previous=currentSource===undefined?undefined:[...moments].reverse().find(r=>r.source_frame<currentSource);
- const next=moments.find(r=>currentSource===undefined||r.source_frame>currentSource);
- const navigationGroups:PlaybackNavigationGroup[]=[{id:'training-images',label:'Training images',count:moments.length,pending,previous:previous?()=>void navigate(previous.image_id):undefined,next:next?()=>void navigate(next.image_id):undefined}];
+ const {moments,previous,next}=trainingNavigation(result?.images??[],selected,camera,currentSource);
+ const matchingPlayback=!!result?.playback_id&&result.playback_id===project?.playback?.id;
+ const navigationGroups:PlaybackNavigationGroup[]=[{id:'training-images',label:'Training frames',itemLabel:'training frame',count:moments.length,pending,
+  detail:error||(!loaded?'Loading membership…':!matchingPlayback?'Training playback unavailable':pending?'Seeking…':`${camera?camera+' camera · ':''}${currentSource===undefined?'No frame presented':'Source frame '+currentSource}`),
+  previous:matchingPlayback&&previous?()=>void navigate(previous.image_id):undefined,next:matchingPlayback&&next?()=>void navigate(next.image_id):undefined}];
+
  const start=result?.images[0]?.timestamp_ns;
  const items=(result?.images??[]).filter(r=>selected.has(r.image_id)).map(r=>({id:r.image_id,groupId:r.moment_id,groupLabel:'Frame '+r.source_frame,camera:r.camera_id,
   thumbnailUrl:baseUrl+'/api/labels/thumbnail?'+new URLSearchParams({project_path:projectPath!,label_manifest_sha256:result!.manifest_sha256,image_id:r.image_id,view:'target-outline-v3'}),

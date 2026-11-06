@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {mkdir} from 'node:fs/promises';
+await mkdir('../.test-artifacts/ux-integration',{recursive:true});
+await build({entryPoints:['src/training-navigation.ts'],outfile:'../.test-artifacts/ux-integration/navigation.mjs',bundle:true,platform:'node',format:'esm'});
+const {trainingNavigation}=await import('../../.test-artifacts/ux-integration/navigation.mjs');
+const images=[{image_id:'a-left',camera_id:'left',source_frame:90,playback_frame:0},{image_id:'a-right',camera_id:'right',source_frame:90,playback_frame:0},{image_id:'b',camera_id:'left',source_frame:100,playback_frame:10},{image_id:'c',camera_id:'right',source_frame:150,playback_frame:60},{image_id:'unavailable',camera_id:'left',source_frame:200,playback_frame:null}];
+const selected=new Set(['a-left','a-right','c','unavailable']);
+test('subset skips excluded and unseekable images, deduplicates stereo moments, retains source/playback distinction',()=>{const n=trainingNavigation(images,selected,null,90);assert.deepEqual(n.moments.map(r=>r.source_frame),[90,150]);assert.equal(n.previous,undefined);assert.equal(n.next.source_frame,150);assert.equal(n.next.playback_frame,60);assert.equal(trainingNavigation(images,selected,null,150).next,undefined);});
+test('camera filtering and empty membership do not invent navigation targets',()=>{assert.deepEqual(trainingNavigation(images,selected,'left',90).moments.map(r=>r.source_frame),[90]);assert.equal(trainingNavigation(images,selected,'left',90).next,undefined);assert.equal(trainingNavigation(images,new Set(),null,undefined).next,undefined);assert.equal(trainingNavigation(images,selected,null,undefined).next.source_frame,90);});
+test('removal and undo change navigation from current persisted membership',()=>{const removed=new Set(['c']);assert.equal(trainingNavigation(images,removed,null,150).previous,undefined);removed.add('a-left');assert.equal(trainingNavigation(images,removed,null,150).previous.source_frame,90);});
