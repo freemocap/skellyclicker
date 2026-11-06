@@ -31,4 +31,3 @@ try {
  await page.getByRole('button',{name:'Frame the subject',exact:true}).click();await page.screenshot({path:'../.test-artifacts/target-closeups-native.png'});
  expect(evidence.errors).toEqual([]);await writeFile('../.test-artifacts/target-closeups-native.json',JSON.stringify(evidence,null,2));console.log('PASS',evidence.checks.map(c=>c.name));
 }finally{await browser.close();}
-
