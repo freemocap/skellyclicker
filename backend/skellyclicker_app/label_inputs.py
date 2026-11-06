@@ -30,6 +30,8 @@ class PreviewLabels(Model):
 
 
 class GenerateLabels(PreviewLabels):
+    expected_selection_sha256: str | None = None
+    expected_label_manifest_sha256: str | None = None
     expected_pose_manifest_sha256: str = Field(pattern='^[a-f0-9]{64}$')
     expected_target_manifest_sha256: str = Field(pattern='^[a-f0-9]{64}$')
 

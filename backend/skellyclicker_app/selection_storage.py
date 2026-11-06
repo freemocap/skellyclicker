@@ -5,7 +5,7 @@ import pyarrow.parquet as pq
 from freemocap_sdk.storage import atomic_json,file_digest,publish_directory
 from .projects import recording_structure
 
-def write_selection(root,recording_id,label_result,label_hash,rows,previous=None,reason='manual'):
+def write_selection(root,recording_id,label_result,label_hash,rows,previous=None,reason='manual',membership_change=None):
     revision='selection-'+uuid4().hex[:12]
     extension=recording_structure(root,recording_id).application_dir('skellyclicker')
     staged=extension/'working'/'reviews'/revision;staged.mkdir(parents=True)
@@ -13,7 +13,7 @@ def write_selection(root,recording_id,label_result,label_hash,rows,previous=None
     values=[{**{key:r[key] for key in ('image_id','camera_id','moment_id','source_frame')},'timestamp_ns':int(r['timestamp_ns'])} for r in rows]
     pq.write_table(pa.Table.from_pylist(values,schema=schema),staged/'selection.parquet')
     atomic_json(staged/'manifest.json',{'schema_version':2,'label_result':label_result,'label_manifest_sha256':label_hash,
-        'previous_selection_sha256':previous,'review_state':'proposed' if reason=='generated_candidates_included' else 'approved','initialization':reason,
+        'previous_selection_sha256':previous,'membership_change':membership_change,'review_state':'proposed' if reason=='generated_candidates_included' else 'approved','initialization':reason,
         'actor':'automatic' if reason=='generated_candidates_included' else 'human',
         'meaning':'Included images are the training selection; human inclusion is approval; moment_id preserves stereo grouping',
         'files':{'selection.parquet':{'sha256':file_digest(staged/'selection.parquet'),'bytes':(staged/'selection.parquet').stat().st_size}}})

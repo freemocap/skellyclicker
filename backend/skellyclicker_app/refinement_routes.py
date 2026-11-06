@@ -114,12 +114,50 @@ def inspect(run_id:str,project_path:str):
         if accepted:
             label_work=work.parent.parent/'working'/'labels'/accepted['run_id']
             status_path=label_work/'status.json'
-            if status_path.exists():
-                label_status=json.loads(status_path.read_text())
+            if status_path.exists() or accepted['run_id'] in jobs:
+                label_status=jobs[accepted['run_id']]['run'].snapshot() if accepted['run_id'] in jobs else json.loads(status_path.read_text())
                 if accepted['run_id'] not in jobs and label_status['status'] in ('running','queued'):label_status.update(status='failed',error='Label generation was interrupted. Inspect the retained dataset before retrying.')
                 accepted={**accepted,'snapshot':label_status}
-        return {'run_id':run_id,'snapshot':snapshot,'result':json.loads((work/'result.json').read_text()) if snapshot['status']=='complete' and (work/'result.json').exists() else None,'accepted':accepted}
+        selection=selection_view(Path(project_path).resolve())
+        request=json.loads((work/'request.json').read_text())
+        receipt=committed_receipt(Path(project_path).resolve(),work,accepted) if accepted else None
+        if accepted:accepted={**accepted,'receipt':receipt}
+        result=json.loads((work/'result.json').read_text()) if snapshot['status']=='complete' and (work/'result.json').exists() else None
+        return {'run_id':run_id,'snapshot':snapshot,'result':result,'accepted':accepted,
+                'created_at':work.stat().st_ctime,'source_checkpoint':{'run_id':request.get('parent_run_id'),'path':request.get('parent_checkpoint')},
+                'dataset':{'count':len(selection['selected_image_ids']),'revision':selection['sha256']}}
+
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+
+def committed_receipt(manifest,work,accepted):
+    """Read immutable selection lineage; never equate requested proposals with committed additions."""
+    import pyarrow.parquet as pq
+    extension=work.parent.parent
+    relative=(extension/'labels'/accepted['run_id']/'r001').relative_to(manifest.parent).as_posix()
+    reviews=[]
+    for path in (extension/'reviews').glob('*/manifest.json'):
+        metadata=json.loads(path.read_text())
+        reviews.append((path,metadata))
+    matches=[(p,m) for p,m in reviews if m['label_result']==relative and m.get('initialization')=='generated_candidates_included']
+    if not matches:return None
+    path,metadata=min(matches,key=lambda item:item[0].stat().st_mtime)
+    project=read_model(manifest,Project)
+    if accepted.get('snapshot',{}).get('status')!='complete' and project.active_review!=path.parent.relative_to(manifest.parent).as_posix():return None
+    from .label_inputs import checked
+    checked(path.parent/'selection.parquet',metadata['files']['selection.parquet'])
+    after={r['image_id'] for r in pq.read_table(path.parent/'selection.parquet').to_pylist()}
+    change=metadata.get('membership_change')
+    if change is None:
+        previous=metadata.get('previous_selection_sha256')
+        prior=next(((p,m) for p,m in reviews if file_digest(p)==previous),None)
+        if previous and prior is None:return None
+        if prior:
+            checked(prior[0].parent/'selection.parquet',prior[1]['files']['selection.parquet'])
+            before={r['image_id'] for r in pq.read_table(prior[0].parent/'selection.parquet').to_pylist()}
+        else:before=set()
+        change={'before_count':len(before),'added_count':len(after-before),'after_count':len(after),'added_image_ids':sorted(after-before)}
+    return {**change,'selection_revision':file_digest(path),'label_result':relative,'added_at':path.stat().st_mtime}
 
 
 @router.get('/runs/{run_id}/image')
@@ -137,17 +175,22 @@ class Accept(Model):
 @router.post('/runs/{run_id}/accept',status_code=202)
 def accept(run_id:str,request:Accept):
     try:
-        work=folder(request.project_path,run_id)
-        if (work/'accepted.json').exists():return json.loads((work/'accepted.json').read_text())
-        proposal=inspect(run_id,request.project_path)
-        if not proposal['result']:raise ValueError('Wait for analysis to finish before accepting additions')
-        allowed={r['key'] for r in proposal['result']['proposals']}
-        if not request.image_keys or not set(request.image_keys)<=allowed or len(set(request.image_keys))!=len(request.image_keys):raise ValueError('Choose distinct images from this proposal')
-        manifest=Path(request.project_path).resolve();binding=json.loads((work/'binding.json').read_text())
-        selected=selection_view(manifest);current=result_view(manifest)
-        if selected['sha256']!=binding['selection_sha256'] or (current['manifest_sha256'] if current else None)!=binding['label_manifest_sha256']:raise ValueError('The dataset changed during review. Analyze again before adding these proposals.')
-        frames=[int(k.split(':')[0]) for k in request.image_keys]
-        response=start_labels(GenerateLabels(project_path=request.project_path,start_frame=min(frames),end_frame=max(frames),image_keys=request.image_keys,expected_pose_manifest_sha256=binding['pose_sha256'],expected_target_manifest_sha256=binding['target_sha256']))
-        atomic_json(work/'accepted.json',response);return response
+        with guard:
+            work=folder(request.project_path,run_id)
+            if (work/'accepted.json').exists():
+                existing=json.loads((work/'accepted.json').read_text())
+                if existing.get('image_keys') is not None and set(existing['image_keys'])!=set(request.image_keys):raise HTTPException(409,'This batch already has an accepted selection')
+                return inspect(run_id,request.project_path)['accepted']
+            proposal=inspect(run_id,request.project_path)
+            if not proposal['result']:raise ValueError('Wait for analysis to finish before accepting additions')
+            allowed={r['key'] for r in proposal['result']['proposals']}
+            if not request.image_keys or not set(request.image_keys)<=allowed or len(set(request.image_keys))!=len(request.image_keys):raise ValueError('Choose distinct images from this proposal')
+            manifest=Path(request.project_path).resolve();binding=json.loads((work/'binding.json').read_text())
+            selected=selection_view(manifest);current=result_view(manifest)
+            if selected['sha256']!=binding['selection_sha256'] or (current['manifest_sha256'] if current else None)!=binding['label_manifest_sha256']:raise ValueError('The dataset changed during review. Analyze again before adding these proposals.')
+            frames=[int(k.split(':')[0]) for k in request.image_keys]
+            response=start_labels(GenerateLabels(project_path=request.project_path,start_frame=min(frames),end_frame=max(frames),image_keys=request.image_keys,expected_pose_manifest_sha256=binding['pose_sha256'],expected_target_manifest_sha256=binding['target_sha256'],expected_selection_sha256=binding['selection_sha256'],expected_label_manifest_sha256=binding['label_manifest_sha256']))
+            response={**response,'image_keys':request.image_keys}
+            atomic_json(work/'accepted.json',response);return inspect(run_id,request.project_path)['accepted']
     except HTTPException:raise
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error

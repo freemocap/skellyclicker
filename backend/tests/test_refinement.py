@@ -66,3 +66,72 @@ class RefinementIntegrationTest(ExactAdditionTest):
   self.assertTrue(old<=set(selection_view(self.manifest)['selected_image_ids']))
   self.assertEqual(inspect(run,str(self.manifest))['accepted']['snapshot']['status'],'complete')
   self.assertEqual(accept(run,Accept(project_path=str(self.manifest),image_keys=['11:left']))['run_id'],accepted['run_id'])
+
+
+class ReceiptTest(unittest.TestCase):
+ tearDown=test_labels.LabelsTest.tearDown
+ generate=test_labels.LabelsTest.generate
+ run_job=test_labels.LabelsTest.run_job
+ def setUp(self):
+  test_labels.LabelsTest.setUp(self)
+  self.request=self.request.model_copy(update={'image_keys':['10:left','10:right','12:left','12:right','13:left','13:right']})
+  self.run_job()
+ def batch(self,keys=('11:left','11:right')):
+  import json
+  from uuid import uuid4
+  from freemocap_sdk.storage import atomic_json
+  from skellyclicker_app.refinement_routes import root_for
+  from skellyclicker_app.label_routes import result_view
+  rid=str(uuid4());folder=root_for(str(self.manifest))/rid;folder.mkdir(parents=True)
+  checked=preview(self.request);result=result_view(self.manifest)
+  atomic_json(folder/'request.json',{'parent_run_id':'parent','parent_checkpoint':'checkpoints/epoch-000001.pt'})
+  atomic_json(folder/'status.json',{'run_id':rid,'status':'complete','operations':[]})
+  atomic_json(folder/'binding.json',{'pose_sha256':checked['expected_pose_manifest_sha256'],'target_sha256':checked['expected_target_manifest_sha256'],'selection_sha256':selection_view(self.manifest)['sha256'],'label_manifest_sha256':result['manifest_sha256']})
+  atomic_json(folder/'result.json',{'counts':{'scanned':8},'proposals':[{'key':k,'source_frame':int(k.split(':')[0]),'camera_id':k.split(':')[1],'group':'near_miss'} for k in keys]})
+  return rid
+ def add(self,rid,keys):
+  from unittest.mock import patch
+  from skellyclicker_app.refinement_routes import accept,Accept,inspect
+  from skellyclicker_app.job_lifecycle import jobs
+  with patch('skellyclicker_app.label_pipeline.projection_source',return_value=self.cache):
+   response=accept(rid,Accept(project_path=str(self.manifest),image_keys=keys));jobs[response['run_id']]['thread'].join(10)
+  return inspect(rid,str(self.manifest))
+ def test_receipt_duplicate_and_next_snapshot(self):
+  import pyarrow.parquet as pq
+  from skellyclicker_app.training_inputs import freeze_training_inputs,TrainingInputs
+  from skellyclicker_app.refinement_routes import accept,Accept,latest
+  before=selection_view(self.manifest);old=freeze_training_inputs(TrainingInputs(project_path=str(self.manifest),guard_seconds=0))
+  rid=self.batch();view=self.add(rid,['11:left']);receipt=view['accepted']['receipt']
+  self.assertEqual((receipt['before_count'],receipt['added_count'],receipt['after_count']),(6,1,7))
+  self.assertEqual(receipt['selection_revision'],selection_view(self.manifest)['sha256'])
+  duplicate=accept(rid,Accept(project_path=str(self.manifest),image_keys=['11:left']))
+  self.assertEqual(duplicate['receipt'],receipt);self.assertEqual(selection_view(self.manifest)['sha256'],receipt['selection_revision'])
+  fresh=freeze_training_inputs(TrainingInputs(project_path=str(self.manifest),guard_seconds=0));images=pq.read_table(self.root/fresh['path']/'images.parquet').to_pylist()
+  self.assertEqual({r['image_id'] for r in images},set(before['selected_image_ids'])|set(receipt['added_image_ids']))
+  self.assertEqual(len(pq.read_table(self.root/fresh['path']/'labels.parquet')),21)
+  self.assertEqual(len(pq.read_table(self.root/old['path']/'images.parquet')),6)
+  self.assertEqual(latest(str(self.manifest))['accepted']['receipt'],receipt)
+  newer=self.batch();self.assertEqual(latest(str(self.manifest))['run_id'],newer);self.assertIsNone(latest(str(self.manifest))['accepted'])
+ def test_failed_commit_has_no_receipt_or_membership_change(self):
+  from unittest.mock import patch
+  from freemocap_sdk.storage import atomic_json
+  before=self.manifest.read_bytes();selection=selection_view(self.manifest);rid=self.batch()
+  def fail(path,value):
+   if Path(path)==self.manifest:raise OSError('Fixture project commit failure')
+   return atomic_json(path,value)
+  with patch('skellyclicker_app.label_pipeline.atomic_json',side_effect=fail):view=self.add(rid,['11:left'])
+  self.assertEqual(view['accepted']['snapshot']['status'],'failed');self.assertIsNone(view['accepted']['receipt'])
+  self.assertEqual(self.manifest.read_bytes(),before);self.assertEqual(selection_view(self.manifest),selection)
+ def test_repeated_reviewed_key_does_not_claim_new_addition_or_restore_exclusion(self):
+  from skellyclicker_app.label_routes import result_view,save_selection,SelectMoment
+  result=result_view(self.manifest);image=result['images'][0];selected=selection_view(self.manifest)
+  save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=selected['sha256'],moment_id=image['moment_id'],source_frame=image['source_frame'],timestamp_ns=image['timestamp_ns'],camera_id=image['camera_id'],selected=False))
+  key=str(image['source_frame'])+':'+image['camera_id'];view=self.add(self.batch((key,)),[key]);receipt=view['accepted']['receipt']
+  self.assertEqual((receipt['before_count'],receipt['added_count'],receipt['after_count']),(5,0,5));self.assertNotIn(image['image_id'],selection_view(self.manifest)['selected_image_ids'])
+ def test_stale_batch_rejected_before_job(self):
+  from fastapi import HTTPException
+  from skellyclicker_app.label_routes import result_view,save_selection,SelectMoment
+  from skellyclicker_app.refinement_routes import accept,Accept
+  rid=self.batch();result=result_view(self.manifest);image=result['images'][0];selected=selection_view(self.manifest)
+  save_selection(SelectMoment(project_path=str(self.manifest),expected_label_manifest_sha256=result['manifest_sha256'],expected_selection_sha256=selected['sha256'],moment_id=image['moment_id'],source_frame=image['source_frame'],timestamp_ns=image['timestamp_ns'],camera_id=image['camera_id'],selected=False))
+  with self.assertRaises(HTTPException):accept(rid,Accept(project_path=str(self.manifest),image_keys=['11:left']))

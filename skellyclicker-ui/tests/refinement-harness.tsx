@@ -1,3 +1,4 @@
 import React from 'react';import {createRoot} from 'react-dom/client';import '@freemocap/ui/styles.css';import '../src/shell.css';import {RefinementPanel} from '../src/RefinementPanel';
 (window as any).trainRequests=0;
-createRoot(document.getElementById('root')!).render(<RefinementPanel baseUrl="http://refinement-fixture.invalid" projectPath="/fixture/project.json" config={{python_path:'fixture',parent_run_id:'parent',parent_checkpoint:'checkpoints/epoch-000001.pt',parent_checkpoint_sha256:'hash'}} trainingActive={false} snapshots={{}} canTrain onTrain={()=>{(window as any).trainRequests++;}}/>);
+createRoot(document.getElementById('root')!).render(<RefinementPanel baseUrl="http://refinement-fixture.invalid" projectPath="/fixture/project.json" config={{python_path:'fixture',parent_run_id:'parent',parent_checkpoint:'checkpoints/epoch-000001.pt',parent_checkpoint_sha256:'hash'}} trainingActive={false} snapshots={{}} onGoTraining={()=>{(window as any).trainRequests++;}}/>);
+

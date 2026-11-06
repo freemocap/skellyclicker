@@ -118,6 +118,8 @@ def handlers(request,work,run_id):
             # Immutable old label bundles remain independently inspectable.
             from .label_routes import result_view,selection_view
             previous=result_view(bound.manifest);previous_selection=selection_view(bound.manifest)
+            if request.expected_selection_sha256 is not None and previous_selection['sha256']!=request.expected_selection_sha256:raise StaleInputs('Dataset membership changed while adding images; analyze again')
+            if request.expected_label_manifest_sha256 is not None and (previous['manifest_sha256'] if previous else None)!=request.expected_label_manifest_sha256:raise StaleInputs('Labels changed while adding images; analyze again')
             old_ids=set();kept_ids=set(previous_selection['selected_image_ids'])
             if previous:
                 metadata=json.loads((output/'manifest.json').read_text())
@@ -138,7 +140,10 @@ def handlers(request,work,run_id):
             publish_directory(staging=output,destination=destination)
             moments={row['moment_id']:row for row in pq.read_table(destination/'moments.parquet').to_pylist()}
             all_images=[{**row,**moments[row['moment_id']],'image_id':row['moment_id']+':'+row['camera_id']} for row in pq.read_table(destination/'images.parquet').to_pylist()]
-            review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),[r for r in all_images if r['image_id'] not in old_ids or r['image_id'] in kept_ids],previous_selection['sha256'],reason='generated_candidates_included')
+            included=[r for r in all_images if r['image_id'] not in old_ids or r['image_id'] in kept_ids]
+            after_ids={r['image_id'] for r in included}
+            change={'before_count':len(kept_ids),'added_count':len(after_ids-kept_ids),'after_count':len(after_ids),'added_image_ids':sorted(after_ids-kept_ids)}
+            review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),included,previous_selection['sha256'],reason='generated_candidates_included',membership_change=change)
             selected=read_model(bound.manifest,Project);selected.label_result=relative;selected.active_review=review
             atomic_json(bound.manifest,selected.model_dump(mode='json'))
         # Publication is committed. Do not convert successful outputs into cancellation here.
