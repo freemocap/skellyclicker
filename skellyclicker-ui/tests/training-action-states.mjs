@@ -1,6 +1,8 @@
 import {chromium,expect} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
-const native=await chromium.connectOverCDP('http://127.0.0.1:9224');const nativePage=native.contexts()[0].pages()[0];const backend=await nativePage.evaluate(()=>window.__TAURI_INTERNALS__.invoke('backend_url'));const config=await(await nativePage.request.get(backend+'/api/training/configuration')).json();await native.close();
+let backend=process.env.SKELLYCLICKER_TEST_BACKEND_URL;
+if(!backend){const native=await chromium.connectOverCDP('http://127.0.0.1:9224');backend=await native.contexts()[0].pages()[0].evaluate(()=>window.__TAURI_INTERNALS__.invoke('backend_url'));await native.close();}
+const config=await(await fetch(backend+'/api/training/configuration')).json();
 const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1440,height:960}});
 const fixture={project:{manifest_path:'/fixture/project.json',root:'/fixture',project:{project_id:'State verification',uuid:'fixture'},recordings:[],targets:[],issues:[],sample_state:'prepared',playback:null}};
 let starts=0,previews=0,cancels=0,payload;const errors=[];page.on('pageerror',e=>errors.push(String(e)));
@@ -9,7 +11,8 @@ const prepared=make('running','prepare_trainer','Preparing official DLC project'
 await page.addInitScript(fixture=>{window.fixture=fixture;},fixture);
 await page.route('http://training-fixture.invalid/**',async route=>{
  const url=new URL(route.request().url());let value;
- if(url.pathname.endsWith('/checkpoints'))value={checkpoints:[],recommended_path:null,recommendation:'No checkpoints'};
+ if(url.pathname.endsWith('/preview-images'))value={epochs:[],epoch:null,images:[]};
+ else if(url.pathname.endsWith('/checkpoints'))value={checkpoints:[],recommended_path:null,recommendation:'No checkpoints'};
  else if(url.pathname==='/api/refinement/latest')value=null;
  else if(url.pathname.endsWith('/configuration'))value=config;
  else if(url.pathname.endsWith('/preview')){previews++;value={image_count:31,keypoint_count:52,counts:{training:22,validation:8,guard:1},expected_selection_sha256:'fresh-'+previews,expected_label_manifest_sha256:'labels'};}

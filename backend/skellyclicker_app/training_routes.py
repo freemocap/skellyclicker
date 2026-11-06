@@ -125,3 +125,24 @@ def saved_checkpoints(run_id:str,project_path:str,metric:Literal['mean_px','p95_
     from .training_checkpoints import checkpoints
     try:return checkpoints(project_path,run_id,metric=metric)
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+
+@router.get('/runs/{run_id}/preview-images')
+def preview_images(run_id:str,project_path:str,epoch:int|None=None):
+    from .training_images import epoch_files,preview_rows
+    folder=run_folder(project_path,run_id);epochs=[e for e,p in epoch_files(folder)]
+    selected=epoch if epoch is not None else (epochs[-1] if epochs else None)
+    if selected is not None and selected not in epochs:raise HTTPException(404,'No saved image predictions for this epoch')
+    try:
+        rows=preview_rows(folder,selected) if selected is not None else []
+        return {'epochs':epochs,'epoch':selected,'images':[{'image_id':r['image_id'],'camera_id':r['camera_id'],'source_frame':r['source_frame'],'split':r['split']} for r,s in rows]}
+    except (OSError,ValueError,KeyError) as error:raise HTTPException(422,str(error)) from error
+
+
+@router.get('/runs/{run_id}/preview-image')
+def preview_image(run_id:str,project_path:str,epoch:int,image_id:str,crop:bool=True,annotated:bool=True,max_size:int=640):
+    from fastapi.responses import Response
+    from .training_images import render_preview
+    if epoch<0 or max_size not in (0,) and not 64<=max_size<=2048:raise HTTPException(422,'Invalid epoch or image size')
+    try:return Response(render_preview(run_folder(project_path,run_id),Path(project_path).resolve().parent,epoch,image_id,crop,annotated,max_size),media_type='image/png',headers={'Cache-Control':'private, max-age=3600'})
+    except (OSError,ValueError,KeyError) as error:raise HTTPException(422,str(error)) from error

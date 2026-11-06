@@ -21,7 +21,7 @@ await page.route('http://127.0.0.1:8006/**',async route=>{
 try{
  await page.goto('http://127.0.0.1:5176/');
  const tabs=page.getByRole('tablist',{name:'Workspace views'});
- expect(await tabs.getByRole('tab').allTextContents()).toEqual(['Viewer','Generate training data','Training','Checkpoint images']);
+ expect(await tabs.getByRole('tab').allTextContents()).toEqual(['Viewer','Generate training data','Training']);
  await expect.poll(()=>labelReads).toBeGreaterThanOrEqual(2); // Receipt refresh without a WebSocket snapshot.
  await page.getByRole('button',{name:'Create image training set',exact:true}).click();
  const generation=page.getByRole('tabpanel',{name:'Generate training data',exact:true});await expect(generation).toBeVisible();
@@ -42,6 +42,6 @@ try{
  await tabs.getByRole('tab',{name:'Generate training data',exact:true}).click();await generation.getByRole('tab',{name:'Recording images',exact:true}).click();
  await expect(generation.getByRole('button',{name:'Generate all images',exact:true})).toBeEnabled();
  await page.screenshot({path:'../.test-artifacts/generation-recording-workspace.png'});
- await tabs.getByRole('tab',{name:'Checkpoint images',exact:true}).click();await expect(page.getByRole('tabpanel',{name:'Checkpoint images',exact:true})).toBeVisible();
+ await expect(tabs.getByRole('tab',{name:'Checkpoint images',exact:true})).toHaveCount(0);
  expect(mutations).toEqual([]);expect(errors).toEqual([]);console.log('PASS dedicated generation tabs, embedded pipeline, model portal, receipt refresh without WebSocket, navigation-only Go to Training, persistence, checkpoints; no job mutations');
 }finally{await page.unrouteAll({behavior:'ignoreErrors'});await browser.close();await api.dispose();}
