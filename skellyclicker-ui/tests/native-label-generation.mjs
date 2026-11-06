@@ -21,12 +21,12 @@ try {
  evidence.completeText=await panel.innerText();await page.screenshot({path:'../.test-artifacts/labels-run-complete.png'});
  await panel.getByRole('button',{name:'Review candidates',exact:true}).click();
  const review=page.getByRole('region',{name:'Generated images',exact:true});
- await expect(review).toContainText('52 generated images');await review.getByRole('button',{name:'All generated',exact:true}).click();await review.getByRole('button',{name:'Next generated frame (G)',exact:true}).click();
+ await expect(review).toContainText('52 generated images');await expect(review.locator('.sdk-image-catalog-counts')).toContainText('52 included');await page.getByRole('button',{name:'Next labeled image',exact:true}).click();
  await page.waitForFunction(()=>[...document.querySelectorAll('.playback-presented-image')].every(c=>c.dataset.presentedFrame==='30'));
  const selectionResponse=page.waitForResponse(r=>r.url().endsWith('/api/labels/selection')&&r.request().method()==='POST');
- await page.locator('.playback-image-controls').first().getByRole('button').click();evidence.selection=await (await selectionResponse).json();expect(evidence.selection.selected_image_ids.length).toBe(1);
- await expect(review.locator('.sdk-image-catalog-counts')).toContainText('1 included');await page.screenshot({path:'../.test-artifacts/labels-selected-moment.png'});
- await page.reload();await expect(page.getByRole('region',{name:'Generated images'}).locator('.sdk-image-catalog-counts')).toContainText('1 included',{timeout:30000});
+ await page.locator('.playback-image-controls').first().getByRole('button').click();evidence.selection=await (await selectionResponse).json();expect(evidence.selection.selected_image_ids.length).toBe(51);
+ await expect(review.locator('.sdk-image-catalog-counts')).toContainText('51 included');await page.screenshot({path:'../.test-artifacts/labels-selected-moment.png'});
+ await page.reload();await expect(page.getByRole('region',{name:'Generated images'}).locator('.sdk-image-catalog-counts')).toContainText('51 included',{timeout:30000});
  evidence.selectionReopened=true;expect(evidence.streamFrames).toBeGreaterThan(0);expect(evidence.errors).toEqual([]);
  expect(evidence.requests.filter(r=>/preparation\/(start|cancel)/.test(r.url))).toEqual([]);
  await writeFile('../.test-artifacts/labels-native.json',JSON.stringify(evidence,null,2));console.log('PASS',JSON.stringify({run:evidence.run,streamFrames:evidence.streamFrames,selectionReopened:true}));

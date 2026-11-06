@@ -9,6 +9,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from freemocap_sdk.pipeline import DataContract,DataGranularity,GraphPort,GraphNode,GraphConnection,PortReference,InputBindingRule,GraphDefinition,compile_graph
 from freemocap_sdk.storage import atomic_json,file_digest,inventory,project_lock,publish_directory,resolve_relative
+from .selection_storage import write_selection
 from .projects import read_model,Project,recording_structure
 from .label_inputs import bind_inputs,checked,StaleInputs
 from .authored_geometry import project_authored_geometry
@@ -114,7 +115,10 @@ def handlers(request,work,run_id):
             for name,identity in json.loads((output/'manifest.json').read_text())['files'].items():checked(output/name,identity)
             ctx.check_cancelled()
             publish_directory(staging=output,destination=destination)
-            selected=read_model(bound.manifest,Project);selected.label_result=relative;selected.active_review=None
+            moments={row['moment_id']:row for row in pq.read_table(destination/'moments.parquet').to_pylist()}
+            all_images=[{**row,**moments[row['moment_id']],'image_id':row['moment_id']+':'+row['camera_id']} for row in pq.read_table(destination/'images.parquet').to_pylist()]
+            review=write_selection(bound.root,bound.recording.recording_id,relative,file_digest(destination/'manifest.json'),all_images,reason='generated_candidates_included')
+            selected=read_model(bound.manifest,Project);selected.label_result=relative;selected.active_review=review
             atomic_json(bound.manifest,selected.model_dump(mode='json'))
         # Publication is committed. Do not convert successful outputs into cancellation here.
         return {'result':{'path':relative,'manifest_sha256':file_digest(destination/'manifest.json'),'review_state':'unreviewed'}}

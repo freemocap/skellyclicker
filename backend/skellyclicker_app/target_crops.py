@@ -1,6 +1,8 @@
 """Compact crop metadata derived from the published target projection, never a new fit."""
 import json
 from functools import lru_cache
+from threading import Lock
+_crop_cache_lock=Lock()
 import numpy as np
 from freemocap_sdk.storage import file_digest, resolve_relative
 from .projects import load_target
@@ -19,23 +21,27 @@ def projection_bounds(projection, width, height):
     low=xy.min(axis=0);high=xy.max(axis=0)
     # An off-image object must not turn into a crop of unrelated edge pixels.
     if high[0]<=0 or high[1]<=0 or low[0]>=width or low[1]>=height:return None
-    padding=np.maximum((high-low)*.2,16.)
+    padding=np.maximum((high-low)*.03,3.)
     low=np.maximum(low-padding,0);high=np.minimum(high+padding,[width,height])
     if np.any(high<=low):return None
     return dict(x=float(low[0]),y=float(low[1]),width=float(high[0]-low[0]),height=float(high[1]-low[1]))
 
 
+def compact_projection(*args):
+    with _crop_cache_lock:return _compact_projection(*args)[0]
+
 @lru_cache(maxsize=4)
-def compact_projection(path, digest, size, modified_ns, width, height):
+def _compact_projection(path, digest, size, modified_ns, width, height):
     # The stat identity invalidates cached data; the content identity verifies it.
     if path.stat().st_size!=size or file_digest(path)!=digest:raise ValueError('Changed target projection')
-    cameras={'left':{},'right':{}}
-    with path.open(encoding='utf-8') as stream:
+    cameras={'left':{},'right':{}};offsets={};offset=0
+    with path.open('rb') as stream:
         for line in stream:
             row=json.loads(line);camera=row['camera'];frame=str(row['source_frame'])
             if camera not in cameras or frame in cameras[camera]:raise ValueError('Invalid projection camera/frame identity')
             cameras[camera][frame]=projection_bounds(row['projection'],width,height)
-    return cameras
+            offsets[(camera,frame)]=offset;offset+=len(line)
+    return cameras,offsets
 
 
 def target_crop_metadata(root, project, recording_id):
@@ -63,3 +69,11 @@ def target_crop_metadata(root, project, recording_id):
                if m['video_filename'] in (f'annotated-{camera}.mp4',f'synchronized-{camera}.mp4')}
     return dict(recording_id=recording_id,width=width,height=height,filenames=filenames,cameras=cameras,
                 projection_sha256=identity['sha256'],stl_sha256=target.geometry.sha256)
+
+
+def projection_offset(root,project,camera,frame,width,height):
+    folder=resolve_relative(root,project.playback_result);path=folder/'outline-projections.jsonl'
+    identity=json.loads((folder/'inventory.json').read_text())['outline-projections.jsonl']
+    with _crop_cache_lock:
+        _,offsets=_compact_projection(path,identity['sha256'],identity['bytes'],path.stat().st_mtime_ns,width,height)
+    return path,offsets[(camera,str(frame))],identity['sha256']

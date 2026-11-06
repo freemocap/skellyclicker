@@ -22,7 +22,7 @@ html, body, #root {height:100%; margin:0;}
 .project-summary {margin-top:24px;overflow-wrap:anywhere;}
 .project-summary p {color:var(--gray-300);line-height:1.5;}
 
-.skellyclicker-bottom {grid-column:1 / -1; min-width:0; overflow:hidden;} 
+.skellyclicker-bottom {grid-column:1 / -1; min-width:0; overflow:visible; position:relative; z-index:20;}
 
 .skellyclicker-main .skellyclicker-tabs {display:flex;align-items:end;padding:8px 12px 0;gap:6px;background:var(--gray-900);}
 .skellyclicker-tabs [role=tab] {position:relative;min-width:110px;padding:10px 22px;border:1px solid var(--gray-600);border-bottom:0;border-radius:7px 7px 0 0;background:var(--gray-800);color:var(--gray-100);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}

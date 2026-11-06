@@ -93,16 +93,18 @@ from uuid import uuid4
 import pyarrow as pa
 from freemocap_sdk.storage import project_lock,publish_directory
 from .projects import Model
+from .selection_storage import write_selection
 
 class SelectMoment(Model):
     project_path:str
     expected_label_manifest_sha256:str
     expected_selection_sha256:str|None=None
-    moment_id:str
-    source_frame:int=Field(ge=0)
-    timestamp_ns:str=Field(pattern='^[0-9]+$')
+    moment_id:str|None=None
+    source_frame:int|None=Field(default=None,ge=0)
+    timestamp_ns:str|None=Field(default=None,pattern='^[0-9]+$')
     selected:bool
     camera_id:str|None=None
+    include_all:bool=False
 
 
 def selection_view(manifest):
@@ -140,26 +142,20 @@ def save_selection(request:SelectMoment):
                     raise HTTPException(409,'Current pose or target selection differs from these labels')
                 current=selection_view(manifest)
                 if current['sha256']!=request.expected_selection_sha256:raise HTTPException(409,'Selection changed; reload before selecting')
-                moment=next((row for row in result['moments'] if row['moment_id']==request.moment_id),None)
-                if not moment or moment['source_frame']!=request.source_frame or moment['timestamp_ns']!=request.timestamp_ns:raise HTTPException(422,'Presented source identity does not match a generated moment')
-                chosen=[r for r in result['images'] if r['moment_id']==request.moment_id and (request.camera_id is None or r['camera_id']==request.camera_id)]
-                if not chosen:raise HTTPException(422,'No generated image for this camera and moment')
+                if request.include_all:
+                    if not request.selected:raise HTTPException(422,'Include all requires selected=true')
+                    chosen=result['images']
+                else:
+                    moment=next((row for row in result['moments'] if row['moment_id']==request.moment_id),None)
+                    if not moment or moment['source_frame']!=request.source_frame or moment['timestamp_ns']!=request.timestamp_ns:raise HTTPException(422,'Presented source identity does not match a generated moment')
+                    chosen=[r for r in result['images'] if r['moment_id']==request.moment_id and (request.camera_id is None or r['camera_id']==request.camera_id)]
+                    if not chosen:raise HTTPException(422,'No generated image for this camera and moment')
                 selected=set(current['selected_image_ids']);ids={r['image_id'] for r in chosen}
                 if request.selected:selected.update(ids)
                 else:selected.difference_update(ids)
                 rows=[r for r in result['images'] if r['image_id'] in selected]
-                revision='selection-'+uuid4().hex[:12]
-                extension=recording_structure(manifest.parent,result['manifest']['recording_id']).application_dir('skellyclicker')
-                staged=extension/'working'/'reviews'/revision;staged.mkdir(parents=True)
-                schema=pa.schema([('image_id',pa.string()),('camera_id',pa.string()),('moment_id',pa.string()),('source_frame',pa.int64()),('timestamp_ns',pa.int64())])
-                table=pa.Table.from_pylist([{'image_id':r['image_id'],'camera_id':r['camera_id'],'moment_id':r['moment_id'],'source_frame':r['source_frame'],'timestamp_ns':int(r['timestamp_ns'])} for r in rows],schema=schema)
-                pq.write_table(table,staged/'selection.parquet')
-                atomic_json(staged/'manifest.json',{'schema_version':2,'label_result':result['path'],'label_manifest_sha256':result['manifest_sha256'],
-                    'previous_selection_sha256':current['sha256'],'review_state':'unreviewed','meaning':'Image inclusion draft; not approved labels; moment_id preserves stereo grouping',
-                    'files':{'selection.parquet':{'sha256':file_digest(staged/'selection.parquet'),'bytes':(staged/'selection.parquet').stat().st_size}}})
-                destination=extension/'reviews'/revision;destination.parent.mkdir(parents=True,exist_ok=True)
-                publish_directory(staging=staged,destination=destination)
-                project=read_model(manifest,Project);project.active_review=destination.relative_to(manifest.parent).as_posix()
+                review=write_selection(manifest.parent,result['manifest']['recording_id'],result['path'],result['manifest_sha256'],rows,current['sha256'],reason='include_all' if request.include_all else 'manual')
+                project=read_model(manifest,Project);project.active_review=review
                 atomic_json(manifest,project.model_dump(mode='json'))
                 return selection_view(manifest)
     except HTTPException:raise
@@ -169,14 +165,23 @@ def save_selection(request:SelectMoment):
 from functools import lru_cache
 from io import BytesIO
 from fastapi.responses import Response
-from PIL import Image
+from PIL import Image,ImageDraw
+from .target_crops import target_crop_metadata,projection_offset
 
 @lru_cache(maxsize=128)
-def image_thumbnail(path,sha256,size,modified_ns):
+def image_thumbnail(path,sha256,size,modified_ns,bounds,points,projection_path,offset,projection_digest):
     checked(path,{'sha256':sha256,'bytes':size})
     with Image.open(path) as original:
-        image=original.convert('RGB');image.thumbnail((320,180))
-        output=BytesIO();image.save(output,format='JPEG',quality=85)
+        image=original.convert('RGB');draw=ImageDraw.Draw(image)
+        with projection_path.open('rb') as stream:
+            stream.seek(offset);projection=json.loads(stream.readline())['projection']
+        for segment in projection.get('mesh_wireframe_segments_xy',[]):
+            draw.line([tuple(point) for point in segment],fill='#37eaff',width=1)
+        for x,y,visible in points:
+            draw.ellipse((x-2,y-2,x+2,y+2),fill='#ff45e6' if visible else None,outline='#ff45e6',width=1)
+        x,y,width,height=bounds
+        image=image.crop((int(x),int(y),int(x+width+.999),int(y+height+.999)));image.thumbnail((320,320))
+        output=BytesIO();image.save(output,format='PNG',compress_level=3)
     return output.getvalue()
 
 @router.get('/thumbnail')
@@ -187,7 +192,15 @@ def thumbnail(project_path:str,label_manifest_sha256:str,image_id:str):
         row=next((r for r in result['images'] if r['image_id']==image_id),None)
         if not row:raise HTTPException(404,'Unknown generated image')
         path=resolve_relative(manifest.parent,row['path'])
-        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns)
-        return Response(data,media_type='image/jpeg',headers={'Cache-Control':'private, max-age=3600'})
+        project=read_model(manifest,Project)
+        if project.sample_result!=result['manifest']['pose_result']:raise HTTPException(409,'Playback differs from these labels')
+        crops=target_crop_metadata(manifest.parent,project,result['playback_id'])
+        bounds=crops['cameras'].get(row['camera_id'],{}).get(str(row['source_frame']))
+        if not bounds:return Response(status_code=204,headers={'X-Target-Crop':'unavailable'})
+        labels=pq.read_table(resolve_relative(manifest.parent,result['path'])/'labels.parquet').to_pylist()
+        points=tuple((r['x_px'],r['y_px'],bool(r['self_visible'])) for r in labels if r['moment_id']==row['moment_id'] and r['camera_id']==row['camera_id'] and r['projection_valid'])
+        projection_path,offset,digest=projection_offset(manifest.parent,project,row['camera_id'],row['source_frame'],crops['width'],crops['height'])
+        data=image_thumbnail(path,row['sha256'],row['bytes'],path.stat().st_mtime_ns,tuple(bounds[k] for k in ('x','y','width','height')),points,projection_path,offset,digest)
+        return Response(data,media_type='image/png',headers={'Cache-Control':'private, max-age=3600'})
     except HTTPException:raise
     except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
