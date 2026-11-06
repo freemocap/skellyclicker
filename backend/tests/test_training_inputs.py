@@ -21,6 +21,9 @@ class TrainingInputsTest(unittest.TestCase):
   preview=training_input_preview(request);self.assertEqual(preview['counts'],{'training':6,'validation':2,'guard':0})
   before=self.manifest.read_bytes();snapshot=freeze_training_inputs(request);folder=self.root/snapshot['path']
   self.assertEqual(self.manifest.read_bytes(),before)
+  references=json.loads((folder/'pose-references.json').read_text())
+  self.assertEqual(len(references['references']),8)
+  self.assertIn('pose-references.json',snapshot['manifest']['files'])
   rows=pq.read_table(folder/'images.parquet').to_pylist();self.assertEqual(rows[0]['timestamp_ns'],1000000000333333330)
   self.assertEqual(snapshot['manifest']['review_state'],'approved');self.assertEqual(snapshot['manifest']['label_origin'],'pose_projection')
   for moment in {r['moment_id'] for r in rows}:self.assertEqual(len({r['split'] for r in rows if r['moment_id']==moment}),1)

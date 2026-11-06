@@ -81,12 +81,70 @@ def prepare(request):
     atomic(WORK/'prepared.json',{'config':str(project/'config.yaml'),'pose':str(posepath),'dataset_sha256':request['dataset_sha256'],'train_count':len(train),'validation_count':len(test),'split_verified':True,'software':versions,'python':sys.version,'worker_sha256':digest(__file__)})
     emit('prepared',training=len(train),validation=len(test),software=versions)
 
+# APP validation adapter: OpenCV owns the geometric solver [@opencvPoseValidation].
+POSE_POLICY={'version':1,'confidence_min':0.2,'minimum_points':6,'ransac_px':8.0,'minimum_inlier_fraction':0.5,'iterations':200}
+
+
+def evaluate_pose(prediction, points_mm, camera_matrix, reference, *, rectified=True):
+    """Single-camera pose agreement at the original STL origin, never teacher-initialized."""
+    import cv2,numpy as np
+    result={'status':'reference_unavailable'}
+    if not rectified or not reference or not reference.get('accepted') or reference.get('T_camera_from_stl_m') is None:
+        return {**result,'reason':'Requires a gate-passing pose reference and rectified calibration'}
+    target=np.asarray(reference['T_camera_from_stl_m'],float)
+    K=np.asarray(camera_matrix,float)
+    if target.shape!=(4,4) or not np.isfinite(target).all() or K.shape!=(3,3) or not np.isfinite(K).all():
+        return {**result,'reason':'Invalid reference pose or camera matrix'}
+    if not np.allclose(target[3],[0,0,0,1],atol=1e-5) or not np.allclose(target[:3,:3].T@target[:3,:3],np.eye(3),atol=1e-3) or np.linalg.det(target[:3,:3])<0:
+        return {**result,'reason':'Reference is not a rigid transform'}
+    points=np.asarray(points_mm,float);pred=np.asarray(prediction,float)
+    if pred.shape!=(len(points),3):raise ValueError('Pose validation keypoint order/count mismatch')
+    valid=np.isfinite(pred).all(axis=1)&(pred[:,2]>=POSE_POLICY['confidence_min'])
+    obj=np.ascontiguousarray(points[valid]);xy=np.ascontiguousarray(pred[valid,:2])
+    result={'status':'failed','usable_points':int(valid.sum())}
+    if len(obj)<POSE_POLICY['minimum_points']:return {**result,'reason':'Too few confident finite keypoints'}
+    if np.linalg.matrix_rank(obj-obj.mean(axis=0))<2:return {**result,'reason':'Degenerate object keypoints'}
+    try:
+        cv2.setRNGSeed(0)
+        ok,rvec,tvec,inliers=cv2.solvePnPRansac(obj,xy,K,None,iterationsCount=POSE_POLICY['iterations'],reprojectionError=POSE_POLICY['ransac_px'],confidence=0.999,flags=cv2.SOLVEPNP_EPNP)
+        if not ok or inliers is None or len(inliers)<max(POSE_POLICY['minimum_points'],math.ceil(len(obj)*POSE_POLICY['minimum_inlier_fraction'])):
+            return {**result,'reason':'Insufficient RANSAC consensus'}
+        ids=inliers.ravel();rvec,tvec=cv2.solvePnPRefineLM(obj[ids],xy[ids],K,None,rvec,tvec)
+        R=cv2.Rodrigues(rvec)[0];t=tvec.ravel()
+        if not np.isfinite(R).all() or not np.isfinite(t).all() or np.any((obj@R.T+t)[:,2]<=0):
+            return {**result,'reason':'Nonfinite or behind-camera pose'}
+        residual=np.linalg.norm(cv2.projectPoints(obj[ids],rvec,tvec,K,None)[0].reshape(-1,2)-xy[ids],axis=1)
+        if np.mean(residual<=POSE_POLICY['ransac_px'])<POSE_POLICY['minimum_inlier_fraction']:
+            return {**result,'reason':'Refined pose lost reprojection consensus'}
+    except cv2.error as exc:return {**result,'reason':'Pose solver failed: '+str(exc)}
+    angle=float(np.degrees(np.arccos(np.clip((np.trace(R@target[:3,:3].T)-1)/2,-1,1))))
+    return {'status':'ok','position_mm':float(np.linalg.norm(t-target[:3,3]*1000)), 'orientation_deg':angle,
+            'inliers':len(ids),'usable_points':len(obj),'T_camera_from_stl_m':np.block([[R,t[:,None]/1000],[np.array([[0,0,0,1]])]]).tolist()}
+
+
+def summarize_poses(rows):
+    import numpy as np
+    available=[r for r in rows if r['status']!='reference_unavailable'];good=[r for r in available if r['status']=='ok']
+    summary={'validation_images':len(rows),'reference_images':len(available),'successful_images':len(good),'failed_images':len(available)-len(good),'reference_unavailable':len(rows)-len(available)}
+    metrics={}
+    if available:metrics['validation_pose_failure_pct']=100*(len(available)-len(good))/len(available)
+    if good:
+        metrics['validation_position_mm']=float(np.mean([r['position_mm'] for r in good]))
+        metrics['validation_orientation_deg']=float(np.mean([r['orientation_deg'] for r in good]))
+    return {**summary,'metrics':metrics,'policy':POSE_POLICY,'images':rows}
+
+
 def preview_checkpoint(request,checkpoint,epoch):
     import cv2,numpy as np,torch,gc
     from deeplabcut.pose_estimation_pytorch.apis.utils import get_pose_inference_runner
     prepared=json.loads((WORK/'prepared.json').read_text());dataset=Path(request['dataset'])
     runner=get_pose_inference_runner(model_config=Path(prepared['pose']),snapshot_path=checkpoint,batch_size=1,device='cuda:0',max_individuals=1)
-    checkpoint_hash=digest(checkpoint);errors=[];samples=[];used=set()
+    checkpoint_hash=digest(checkpoint);errors=[];samples=[];used=set();pose_rows=[]
+    reference_file=dataset/'pose-references.json'
+    references=json.loads(reference_file.read_text(encoding='utf-8'))['references'] if reference_file.exists() else {}
+    calibration=json.loads((dataset/'calibration.json').read_text(encoding='utf-8'))
+    definition=json.loads((dataset/'keypoints.json').read_text(encoding='utf-8'))
+    points_mm=[p['xyz_mm'] for p in definition['points']]
     output=WORK/'previews'/f'epoch-{epoch:06d}';output.mkdir(parents=True)
     for row in request['images']:
         check_stop()
@@ -95,7 +153,9 @@ def preview_checkpoint(request,checkpoint,epoch):
         im=cv2.imread(str(dataset/row['path']));pred=runner.inference([cv2.cvtColor(im,cv2.COLOR_BGR2RGB)])[0]['bodyparts'][0]
         truth=np.asarray(row['xy'],float);valid=np.asarray(row['valid'],bool)&np.isfinite(pred[:,:2]).all(axis=1)
         if pred.shape!=(len(truth),3):raise ValueError('Checkpoint keypoint count mismatch')
-        if row['split']=='validation':errors.extend(np.linalg.norm(pred[valid,:2]-truth[valid],axis=1).tolist())
+        if row['split']=='validation':
+            errors.extend(np.linalg.norm(pred[valid,:2]-truth[valid],axis=1).tolist())
+            pose_rows.append({'image_id':row['image_id'],**evaluate_pose(pred,points_mm,calibration.get(row['camera_id']),references.get(row['image_id']),rectified=calibration.get('rectified',False))})
         if sample:
             used.add(sample_key);draw=im.copy()
             for x,y in truth[np.asarray(row['valid'],bool)]:cv2.circle(draw,(round(x),round(y)),3,(255,70,255),1,cv2.LINE_AA)
@@ -112,6 +172,12 @@ def preview_checkpoint(request,checkpoint,epoch):
     if errors:
         emit('metric',id='validation_mean_px',label='Validation keypoint error',unit='px',step=epoch,value=float(np.mean(errors)))
         emit('metric',id='validation_p95_px',label='Validation 95th percentile error',unit='px',step=epoch,value=float(np.percentile(errors,95)))
+    pose_summary=summarize_poses(pose_rows)
+    for metric,value in pose_summary['metrics'].items():
+        label,unit={'validation_position_mm':('Validation position error','mm'),'validation_orientation_deg':('Validation orientation error','deg'),'validation_pose_failure_pct':('Validation pose failure rate','%')}[metric]
+        emit('metric',id=metric,label=label+(f" ({pose_summary['reference_images']}/{pose_summary['validation_images']} reference images)" if metric=='validation_pose_failure_pct' else ''),unit=unit,step=epoch,value=value)
+    atomic(output/'pose-validation.json',pose_summary)
+    emit('pose_validation',epoch=epoch,**{k:v for k,v in pose_summary.items() if k!='images'})
     atomic(output/'predictions.json',{'epoch':epoch,'checkpoint':str(checkpoint),'checkpoint_sha256':checkpoint_hash,'samples':samples,'validation_distances_px':errors})
     del runner;gc.collect();torch.cuda.empty_cache()
     emit('checkpoint',path=checkpoint.relative_to(WORK).as_posix(),sha256=checkpoint_hash,epoch=epoch)

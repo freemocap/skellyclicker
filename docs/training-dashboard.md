@@ -117,3 +117,20 @@ The backend LogHub identity establishes the viewer session. Closing the panel
 retains and collects messages. Reload restores the bounded 10,000-record history
 and deduplicates replay; a new backend lifetime starts a new viewer history.
 Run logs on disk remain intact. Browser persistence failures are reported.
+
+
+## Pose validation and checkpoint recommendations
+
+New training snapshots freeze `pose-references.json` with the label-generating original-STL-to-camera transforms and source pose manifest hash. At each saved checkpoint the isolated DLC worker estimates a separate pose from predicted keypoints and the calibrated rectified camera using OpenCV RANSAC PnP and LM refinement [@opencvPoseValidation]. It never initializes the solver from the reference. Ordered authored points are in millimetres; reference translations are converted from metres once. This is single-camera evaluation for each image, not a joint stereo fit.
+
+The dashboard adds mean position error (mm), mean orientation error (degrees of relative rotation), and pose failure rate (%). Position is measured at the original STL origin. Means include successful solves only; failure rate uses all validation images with an accepted, valid reference. Missing/rejected references are counted separately in each checkpoint's `pose-validation.json` and the recommendation reports reference coverage. These are agreements with the stereo/FoundationPose labels, not independent ground truth. Rotation compares the authored orientation directly; equivalent rotations of symmetric targets are not discounted.
+
+Policy v1 uses confidence >= 0.2, at least six finite points, 200 RANSAC iterations, an 8-pixel inlier threshold, and at least six inliers covering half the usable points. Missing predictions, insufficient consensus, degenerate points, solver failure, nonfinite results and behind-camera estimates count as failures. A confidently wrong but geometrically consistent solve appears as a large position/orientation error, not necessarily a solver failure. Thresholds describe this evaluation policy, not a guarantee of acceptable tracking accuracy. Per-image reasons and estimated transforms are saved.
+
+Recommendation v1 first minimizes pose failure rate. Among tied checkpoints it adds equally weighted ranks for mean position, orientation and keypoint errors; lower is better. Ties use keypoint error, then latest epoch. It compares only checkpoints with complete successful-pose metrics and matching reference counts within the selected run; exclusions and coverage are shown. When such comparison is unavailable, the explanation explicitly falls back to mean keypoint error (or latest checkpoint if no metrics). Historical runs are preserved and are not retroactively pose-evaluated. Training and validation loss computations are unchanged.
+
+## Reviewing the next batch
+
+The pending batch has an Add reviewed images action above its scrollable comparison grid. Remove excludes a proposal from that batch. After publication, the batch collapses and the header says Images added, with Train next round beside it. Inspect added batch reopens the historical comparison; its remove controls are absent because membership now belongs to the Training images catalog. Find next examples creates a new proposal batch with the selected starting model. Analysis details distinguish uncovered frames from reserved evaluation frames. Adding, failure and completion states stay visible above the grid.
+
+Verification: worker pose tests run with the isolated DLC Python because OpenCV intentionally is not an application-backend dependency. Backend discovery skips these five tests; run `python -B backend/tests/test_pose_validation.py` using the configured training interpreter to execute them.

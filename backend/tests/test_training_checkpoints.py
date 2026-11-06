@@ -34,4 +34,17 @@ class CheckpointsTest(unittest.TestCase):
   (folder/selected['path']).write_bytes(b'corrupted')
   with self.assertRaises(ValueError):training_input_preview(continued)
 
+class RecommendationTest(unittest.TestCase):
+ def test_pose_metrics_can_override_best_keypoints_and_failure_has_priority(self):
+  from skellyclicker_app.training_checkpoints import recommend
+  def row(epoch,kp,position,orientation,failure=0):
+   return {'path':str(epoch),'epoch':epoch,'validation_mean_px':kp,'pose_validation':{'reference_images':8,'validation_images':10,'metrics':{'validation_position_mm':position,'validation_orientation_deg':orientation,'validation_pose_failure_pct':failure}}}
+  values=[row(1,1,20,30),row(2,2,2,3),row(3,.1,.1,.1,25)]
+  best,reason=recommend(values);self.assertEqual(best['epoch'],2)
+  self.assertIn('8/10',reason);self.assertIn('equally weighted',reason);self.assertIn('0.0% pose failures',reason)
+ def test_old_runs_and_all_failed_are_explicit(self):
+  from skellyclicker_app.training_checkpoints import recommend
+  best,reason=recommend([{'path':'a','epoch':1,'validation_mean_px':2,'pose_validation':{'reference_images':8,'metrics':{'validation_pose_failure_pct':100}}}])
+  self.assertIn('Pose-based comparison is unavailable',reason)
+
 if __name__=='__main__':unittest.main()

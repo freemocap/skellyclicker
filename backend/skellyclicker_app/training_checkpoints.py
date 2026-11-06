@@ -19,19 +19,50 @@ def folder_for(project_path, run_id):
 
 
 def checkpoints(project_path, run_id):
-    folder=folder_for(project_path,run_id);events=folder/'events.jsonl';published={};errors={}
+    folder=folder_for(project_path,run_id);events=folder/'events.jsonl';published={};errors={};poses={}
     if events.is_file():
         for line in events.read_text(encoding='utf-8').splitlines():
             try:event=json.loads(line)
             except json.JSONDecodeError:continue  # A live writer may have an unfinished last line.
             if event.get('kind')=='metric' and event.get('id')=='validation_mean_px' and math.isfinite(event['value']):errors[event['step']]=event['value']
+            if event.get('kind')=='pose_validation':poses[event['epoch']]=event
             if event.get('kind')=='checkpoint' and re.fullmatch(r'checkpoints/epoch-\d{6}\.pt',event.get('path','')):
                 path=resolve_relative(folder,event['path'])
                 if path.is_file():published[event['epoch']]={'path':event['path'],'sha256':event['sha256'],'epoch':event['epoch'],'bytes':path.stat().st_size}
-    values=[{**v,'validation_mean_px':errors.get(epoch)} for epoch,v in sorted(published.items())]
+    values=[{**v,'validation_mean_px':errors.get(epoch),'pose_validation':poses.get(epoch)} for epoch,v in sorted(published.items())]
+    best,reason=recommend(values)
+    return {'checkpoints':values,'recommended_path':best['path'] if best else None,'recommendation':reason}
+
+
+def recommend(values):
     measured=[v for v in values if v['validation_mean_px'] is not None]
+    pose=[v for v in measured if v.get('pose_validation') and v['pose_validation']['reference_images']>0
+          and all(math.isfinite(v['pose_validation']['metrics'].get(k,float('nan'))) for k in
+                  ('validation_position_mm','validation_orientation_deg','validation_pose_failure_pct'))]
+    # Compare only equal reference coverage within this immutable dataset.
+    if pose and len({v['pose_validation']['reference_images'] for v in pose})==1:
+        failure=min(v['pose_validation']['metrics']['validation_pose_failure_pct'] for v in pose)
+        candidates=[v for v in pose if v['pose_validation']['metrics']['validation_pose_failure_pct']==failure]
+        def measures(v):
+            m=v['pose_validation']['metrics']
+            return (m['validation_position_mm'],m['validation_orientation_deg'],v['validation_mean_px'])
+        def rank(v):return sum(sum(measures(other)[axis]<value for other in candidates) for axis,value in enumerate(measures(v)))
+        best=min(candidates,key=lambda v:(rank(v),v['validation_mean_px'],-v['epoch']))
+        position,orientation,pixel=measures(best);coverage=best['pose_validation']
+        reason=(f"Epoch {best['epoch']}: {failure:.1f}% pose failures, {position:.2f} mm mean position error, "
+                f"{orientation:.2f} deg mean orientation error, {pixel:.2f} px mean keypoint error. "
+                "Policy v1: lowest pose failure rate first; then lowest sum of equally weighted position, orientation and keypoint error ranks. "
+                "Ties use keypoint error, then latest epoch. "
+                f"Pose reference coverage: {coverage['reference_images']}/{coverage['validation_images']} images; errors describe successful estimates. "
+                "Agreement with stereo/pose labels, not independent ground truth. "
+                f"Compared {len(pose)} pose-evaluated checkpoints; {len(values)-len(pose)} without complete pose metrics excluded.")
+        return best,reason
     best=min(measured,key=lambda v:(v['validation_mean_px'],-v['epoch'])) if measured else (values[-1] if values else None)
-    return {'checkpoints':values,'recommended_path':best['path'] if best else None,'recommendation':'Lowest measured validation keypoint error' if measured else 'Latest saved checkpoint; no validation metric available'}
+    if not best:return None,'No published checkpoints are available.'
+    reason=(f"Epoch {best['epoch']}: lowest measured mean validation keypoint error ({best['validation_mean_px']:.2f} px); ties choose the latest epoch. "
+            if measured else f"Epoch {best['epoch']}: latest saved checkpoint; no validation metrics available. ")
+    return best,reason+'Pose-based comparison is unavailable: no comparable successful pose evaluations. Older runs are not retroactively evaluated; new rounds include pose validation. Training loss does not select the checkpoint.'
+
 
 
 def bind_parent(request, current_dataset):

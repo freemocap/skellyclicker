@@ -113,6 +113,17 @@ def freeze_training_inputs(request, *, check_cancelled=lambda:None):
         shutil.copyfile(bound['pose']/'calibration.json',staged/'calibration.json')
         shutil.copyfile(resolve_relative(root,bound['target'].geometry.path),staged/'target.stl')
         atomic_json(staged/'keypoints.json',bound['authored']['definition'])
+        authority=json.loads((bound['pose']/'manifest.json').read_text(encoding='utf-8'))
+        checked(bound['pose']/'candidates.parquet',authority['files']['candidates.parquet'])
+        poses={r['source_frame']:r for r in pq.read_table(bound['pose']/'candidates.parquet').to_pylist()}
+        references={}
+        for image in rows:
+            reference=poses.get(image['source_frame'],{})
+            references[image['image_id']]={'T_camera_from_stl_m':reference.get('T_'+image['camera_id']+'_from_stl_m'),
+                'accepted':bool(reference.get('accepted')), 'reason':reference.get('reason',reference.get('status','Unavailable'))}
+        atomic_json(staged/'pose-references.json',{'schema_version':1,'pose_manifest_sha256':result['manifest']['pose_manifest_sha256'],
+            'frame':'original STL to rectified camera; translations in metres','references':references})
+
         shutil.copyfile(resolve_relative(root,project.active_review)/'manifest.json',staged/'selection-manifest.json')
         shutil.copyfile(resolve_relative(root,project.active_review)/'selection.parquet',staged/'selection.parquet')
         shutil.copyfile(resolve_relative(root,result['path'])/'manifest.json',staged/'label-manifest.json')
