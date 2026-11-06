@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {ButtonSm, ControlSection, NumberField} from '@freemocap/ui';
+import {AnchoredInfo, ButtonSm, ControlSection, NumberField} from '@freemocap/ui';
 import type {ProjectView} from './ProjectPanel';
 type Job={job_id:string;state:string;stage:string;completed:number;total:number;accepted?:number;error?:string};
 /** Preparation controls never own playback; completed resources go to PlaybackWorkspace. */
@@ -21,6 +21,6 @@ export function PreparationPanel({baseUrl,project,onComplete}:{baseUrl:string;pr
   {active&&<ButtonSm buttonType="secondary" text="Cancel preparation" onClick={()=>void request('/api/preparation/cancel/'+job!.job_id,{}).then(setJob).catch(e=>setError(String(e)))}/>}
   {job&&<p className="sdk-control-description" role="status">{job.state} · {job.stage} · {job.completed}/{job.total}</p>}
   {(error||job?.error)&&<p className="sdk-browser-error" role="alert">{error||job?.error}</p>}
-  <details><summary className="sdk-control-description">Preparation details</summary><p className="sdk-control-description">This recording uses its configured color-mask preset. Generated candidates require human review.</p></details>
+  <AnchoredInfo title="Preparation details" text="This recording uses its configured color-mask preset. Generated candidates require human review."/>
  </ControlSection>;
 }

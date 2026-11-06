@@ -120,8 +120,7 @@ export function TrainingSetPanel({baseUrl,project,snapshots,onClose,onReview,ope
   if(!open)return null;
   return <PipelineWindow title="Create image training set" subtitle={project.project.project_id} onClose={onClose}>
     <WorkspaceToolbar label="Image generation" details={<>
-      {config.scope==='all'?<span>Entire recording · every frame · both cameras{count?` · ${count.toLocaleString()} frames / ${(count*2).toLocaleString()} images`:''}</span>:<span>Custom selection · both cameras · {config.mode==='fresh'?'prepares the selected range':'uses prepared images'}</span>}
-      <span>Existing image selections are preserved.</span>
+      <span>{count?`${count.toLocaleString()} frames / ${(count*2).toLocaleString()} images · `:''}Both cameras</span>
     </>}>
       <SettingSelectInput label="Frames to generate" value={config.scope} options={[{value:'all',label:'Entire recording (every frame)'},{value:'custom',label:'Custom range / sampling'}]} onChange={chooseScope} disabled={run.running}/>
       <ButtonSm text={run.running?run.phase:buttonText} buttonType="primary accent" textColor="" iconClass="processmocap-icon" onClick={()=>void run.start()} disabled={!canGenerate}/>

@@ -9,7 +9,7 @@ try{
   const dialog=page.getByRole('dialog',{name:'Create image training set',exact:true});
   await dialog.getByRole('combobox',{name:'Frames to generate'}).selectOption('all');
   await expect(dialog.getByRole('button',{name:'Generate all images',exact:true})).toBeEnabled({timeout:15000});
-  await expect(dialog.getByRole('region',{name:'Image generation',exact:true})).toContainText('Entire recording · every frame · both cameras');
+  await expect(dialog.getByRole('region',{name:'Image generation',exact:true})).toContainText('Both cameras');
   expect(await dialog.getByRole('button',{name:'Generate all images',exact:true}).evaluate(e=>getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   await dialog.getByRole('button',{name:'Close Create image training set',exact:true}).click();
  }

@@ -24,6 +24,10 @@ try{
  const start=page.getByRole('button',{name:'Generate all images',exact:true});await expect(start).toBeEnabled();
  await expect(page.getByRole('region',{name:'Image generation',exact:true})).toContainText('1,519 frames / 3,038 images');
  expect(await start.evaluate(e=>getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+ await expect(page.getByText('Generate prepares missing recording frames', {exact:false})).not.toBeVisible();
+ await page.getByRole('button',{name:'Image generation',exact:true}).click();
+ await expect(page.getByText('Generate prepares missing recording frames', {exact:false})).toBeVisible();
+ await page.keyboard.press('Escape');
  await page.screenshot({path:'../.test-artifacts/image-generation-default.png'});
  await start.click();await expect.poll(()=>prepStarts).toBe(1);expect(prepBody.start_frame).toBe(0);expect(prepBody.frame_count).toBe(null);
  await expect(page.getByLabel('Run activity')).toContainText('250 / 1519');
