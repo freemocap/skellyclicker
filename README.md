@@ -36,10 +36,10 @@ An unsigned installer is also built at `native/target/release/bundle/nsis/Skelly
 Install the repository dependencies and build SDK client/UI packages as described in [PLAYBACK.md](PLAYBACK.md), then run from the repository root:
 
 ```powershell
-node tools/desktop.mjs dev --no-watch
+poe dev
 ```
 
-This prepares the backend bundle, starts the frontend development server, and opens the native window. Users of the packaged application do not run Python or npm separately.
+The first run builds the backend. Later runs reuse the bundle until backend code, editable Python packages, build inputs, or the bundle itself change. React and Rust watching are enabled. Users of the packaged application do not run Python or npm separately.
 
 Build the Windows application and installer:
 
