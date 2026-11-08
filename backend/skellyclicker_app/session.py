@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from threading import RLock
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from fastapi import APIRouter, HTTPException
 from freemocap_sdk.storage import atomic_json
 
@@ -14,6 +14,7 @@ _lock = RLock()
 class Session(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: Literal[1] = 1
+    recent_projects: list[str] = Field(default_factory=list)
     project_path: str | None = None
     recording_id: str | None = None
     workspace: Literal["viewer", "training"] = "viewer"
@@ -44,15 +45,32 @@ def write_session(state):
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_json(path, state.model_dump())
 
+def project_history(*paths):
+    history = {}
+    for path in paths:
+        if path:
+            history.setdefault(os.path.normcase(path), path)
+    return list(history.values())[:30]
+
+
+@router.get("/recent")
+def recent_projects():
+    with _lock:
+        state = read_session()
+        return project_history(state.project_path, *state.recent_projects)
+
+
 def remember_project(project):
     with _lock:
         state = read_session()
         path = project["manifest_path"]
         ids = [r["recording_id"] for r in project["recordings"]]
+        history = project_history(path, state.project_path, *state.recent_projects)
         if state.project_path != path:
             state = Session(project_path=path, workspace=state.workspace, sidebar=state.sidebar)
         if state.recording_id not in ids:
             state = state.model_copy(update={"recording_id": ids[0] if ids else None})
+        state.recent_projects = history
         write_session(state)
         return state.model_dump()
 

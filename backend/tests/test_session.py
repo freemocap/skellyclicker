@@ -41,6 +41,15 @@ class SessionTest(unittest.TestCase):
         self.assertIsNone(restored['project'])
         self.assertIn('Open its current location or retry',restored['error'])
         self.assertEqual(self.path.read_bytes(),saved)
+    def test_recent_projects_survive_restart_and_include_legacy_session(self):
+        self.path.parent.mkdir()
+        self.path.write_text(json.dumps({"version":1,"project_path":"first"}))
+        self.assertEqual(session.recent_projects(), ["first"])
+        for path in ("second","third","second"):
+            session.remember_project({"manifest_path":path,"recordings":[]})
+        self.assertEqual(session.recent_projects(), ["second","third","first"])
+        self.assertEqual(json.loads(self.path.read_text())["recent_projects"], session.recent_projects())
+
     def test_stale_update_cannot_overwrite_new_project(self):
         session.remember_project({'manifest_path':'new-project','recordings':[{'recording_id':'recording'}]})
         with self.assertRaises(HTTPException) as problem:

@@ -20,6 +20,7 @@ function loadRecent(): RecentProject[] {
 }
 export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}:{baseUrl:string;project:ProjectView|null;onProject:(p:ProjectView)=>void;recordingId:string|null;onRecording:(id:string)=>void}) {
   const [recent,setRecent]=useState(loadRecent);
+  const [savedPaths,setSavedPaths]=useState<string[]>([]);
   const [mode,setMode]=useState<'open'|'create'|null>(null);
   const dialog=useRef<HTMLDialogElement>(null);
   const [path,setPath]=useState(()=>localStorage.getItem('skellyclicker.projectPath') ?? '');
@@ -38,6 +39,16 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
     setRecent(previous=>{const next=[entry,...previous.filter(p=>p.id!==entry.id)].slice(0,30);localStorage.setItem(recentKey,JSON.stringify(next));return next;});
   },[project]);
   useEffect(()=>{if(mode&&!dialog.current?.open)dialog.current?.showModal();else if(!mode&&dialog.current?.open)dialog.current.close();},[mode]);
+  useEffect(()=>{
+    if(mode!=='open')return;
+    const abort=new AbortController();
+    fetch(baseUrl+'/api/session/recent',{signal:abort.signal})
+      .then(async response=>{if(!response.ok)throw Error('Could not load recent projects');return response.json();})
+      .then(paths=>{if(!abort.signal.aborted&&Array.isArray(paths))setSavedPaths(paths.filter((p):p is string=>typeof p==='string'));})
+      .catch(()=>{/* Previously remembered projects are available locally. */});
+    return ()=>abort.abort();
+  },[baseUrl,mode]);
+  const recentPaths=[...new Set([...savedPaths,...recent.map(item=>item.path)])].slice(0,30);
   function show(next:'open'|'create') {
     if(next==='create'&&project){
       const recording=project.recordings[0],target=project.targets[0];
@@ -67,6 +78,13 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
         <header><h2 id="project-dialog-title">{mode==='create'?'New project':'Open project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>Ã—</button></header>
         <div className="project-dialog-fields">
           <AnchoredInfo title="Project location" text={mode==='create'?'Choose a new project folder. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a project folder or its named project manifest.'}/>
+          {mode==='open'&&<label>Recent projects
+            <select value={recentPaths.includes(path)?path:''} disabled={busy||!recentPaths.length}
+              onChange={event=>{setPath(event.target.value);setError('');}}>
+              <option value="" disabled>{recentPaths.length?'Choose a recent project':'No recent projects'}</option>
+              {recentPaths.map(value=><option key={value} value={value}>{recent.find(item=>item.path===value)?.name??value.split(/[\\/]/).pop()?.replace(/_project\.json$/i,'')} — {value}</option>)}
+            </select>
+          </label>}
           <label>{mode==='create'?'New project folder':'Project folder or manifest'}<input aria-label="Project path" autoFocus required value={path} onChange={event=>setPath(event.target.value)} disabled={busy}/></label>
           {mode==='create'&&<>
             <label>Original stereo SVO<input required value={svo} onChange={event=>setSvo(event.target.value)} disabled={busy}/></label>
