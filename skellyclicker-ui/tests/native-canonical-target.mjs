@@ -23,7 +23,7 @@ try {
  await p.getByRole('button',{name:'New project',exact:true}).click();
  const create=p.getByRole('dialog',{name:'New project',exact:true});
  const prefill=await create.locator('[aria-label="Reference STL path"]').innerText();expect(prefill.replaceAll('\\','/')).toBe(path.replaceAll('\\','/'));
- await expect(create.getByLabel('Original stereo SVO')).not.toHaveValue('');await expect(create.getByLabel('Camera calibration source')).not.toHaveValue('');
+ await expect(create.locator('[aria-label="Original stereo SVO path"]')).not.toHaveText('No file selected');await expect(create.locator('[aria-label="Camera calibration source path"]')).not.toHaveText('No file selected');
  await create.getByRole('button',{name:'Cancel',exact:true}).click();
  await p.getByRole('button',{name:'Create image training set',exact:true}).click();
  await writeFile('../.test-artifacts/canonical-target-native.json',JSON.stringify({path,prefill,routing},null,2));

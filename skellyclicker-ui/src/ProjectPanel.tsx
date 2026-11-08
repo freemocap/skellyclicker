@@ -24,6 +24,8 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
   const [mode,setMode]=useState<'open'|'create'|null>(null);
   const dialog=useRef<HTMLDialogElement>(null);
   const [path,setPath]=useState(()=>localStorage.getItem('skellyclicker.projectPath') ?? '');
+  const [parentFolder,setParentFolder]=useState('');
+  const [projectName,setProjectName]=useState('');
   const [busy,setBusy]=useState(false);
   const [busyId,setBusyId]=useState<string|null>(null);
   const [error,setError]=useState('');
@@ -50,16 +52,35 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
   },[baseUrl,mode]);
   const recentPaths=[...new Set([...savedPaths,...recent.map(item=>item.path)])].slice(0,30);
   function show(next:'open'|'create') {
+    if(next==='create'){
+      setParentFolder(project?.root.replace(/[^/\\]+$/,'')??'');
+      setProjectName('');
+    }
     if(next==='create'&&project){
       const recording=project.recordings[0],target=project.targets[0];
       setSvo(recording?.source.path??'');setCalibration(recording?.calibration_source?.path??'');
       setStl(target?.geometry?project.root.replace(/[\\/]+$/,'')+'/'+target.geometry.path:'');
       setObjectId(target?.object_id??'object');setUnits(target?.authored_units??'mm');
     }
-    setError('');setPath(next==='open' ? project?.manifest_path ?? localStorage.getItem('skellyclicker.projectPath') ?? '' : project ? project.root.replace(/[^/\\]+$/,'new-project') : '');setMode(next);
+    setError('');setPath(project?.manifest_path??localStorage.getItem('skellyclicker.projectPath')??'');setMode(next);
+  }
+  async function browse(title:string,directory:boolean,defaultPath:string,onSelect:(value:string)=>void,extensions?:string[]){
+    try{
+      const selected=await openFile({title,directory,multiple:false,...(defaultPath?{defaultPath}:{}),
+        ...(extensions?{filters:[{name:title,extensions}]}:{})});
+      if(typeof selected==='string'){setError('');onSelect(selected);}
+    }catch(e){setError(String(e));}
   }
   async function submit(action:'open'|'create',projectPath:string,id:string|null=null) {
-    if(busy)return;if(action==='create'&&!stl){setError('Select an STL target.');return;}setBusy(true);setBusyId(id);setError('');
+    if(busy)return;
+    if(action==='create'){
+      const missing=!parentFolder?'Choose the parent folder.':!svo?'Choose the stereo recording.':!calibration?'Choose the calibration file.':!stl?'Choose the reference STL.':'';
+      if(missing){setError(missing);return;}
+      if(!projectName.trim()||/[<>:"/\\|?*]/.test(projectName)||/[. ]$/.test(projectName)){
+        setError('Enter a project name that can be used as a folder name.');return;
+      }
+    }
+    setBusy(true);setBusyId(id);setError('');
     try {
       const body=action==='create'?{project_path:projectPath,source_svo:svo,calibration_source:calibration,source_stl:stl,object_id:objectId,authored_units:units}:{project_path:projectPath};
       const response=await fetch(baseUrl+'/api/projects/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -74,27 +95,36 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
     <RecordingBrowser title="Projects" entries={projects} selectedId={project?.project.uuid} busyId={busyId} loading={busy} error={!mode?error:null} onSelect={id=>{const entry=recent.find(p=>p.id===id);if(entry)void submit('open',entry.path,id);}} onBrowse={()=>show('open')} browseLabel="Open project" onCreate={()=>show('create')} createLabel="New project" emptyMessage="No recent projects"/>
     {project&&<div className="project-child-recordings"><RecordingBrowser title="Recordings" entries={recordings} selectedId={recordingId} onSelect={onRecording} error={project.issues.join('\n')||null} emptyMessage="No recordings in this project."/></div>}
     <dialog ref={dialog} className="project-dialog" aria-labelledby="project-dialog-title" onCancel={event=>{event.preventDefault();if(!busy)setMode(null);}}>
-      <form onSubmit={event=>{event.preventDefault();if(mode)void submit(mode,path);}}>
+      <form onSubmit={event=>{event.preventDefault();if(mode)void submit(mode,mode==='create'?parentFolder.replace(/[/\\]+$/,'')+'/'+projectName.trim():path);}}>
         <header><h2 id="project-dialog-title">{mode==='create'?'New project':'Open project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>×</button></header>
         <div className="project-dialog-fields">
-          <AnchoredInfo title="Project location" text={mode==='create'?'Choose a new project folder. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a project folder or its named project manifest.'}/>
+          <AnchoredInfo title="Project location" text={mode==='create'?'Choose a parent folder and name the new project. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a project folder or its named project manifest.'}/>
           {mode==='open'&&<label>Recent projects
             <select value={recentPaths.includes(path)?path:''} disabled={busy||!recentPaths.length}
               onChange={event=>{setPath(event.target.value);setError('');}}>
               <option value="" disabled>{recentPaths.length?'Choose a recent project':'No recent projects'}</option>
-              {recentPaths.map(value=><option key={value} value={value}>{recent.find(item=>item.path===value)?.name??value.split(/[\\/]/).pop()?.replace(/_project\.json$/i,'')} � {value}</option>)}
+              {recentPaths.map(value=><option key={value} value={value}>{recent.find(item=>item.path===value)?.name??value.split(/[\\/]/).pop()?.replace(/_project\.json$/i,'')} / {value}</option>)}
             </select>
           </label>}
-          <label>{mode==='create'?'New project folder':'Project folder or manifest'}<input aria-label="Project path" autoFocus required value={path} onChange={event=>setPath(event.target.value)} disabled={busy}/></label>
+          {mode==='open'&&<div className="project-dialog-browse">
+            <button type="button" className="button sm secondary" disabled={busy} onClick={()=>void browse('Open project file',false,path,value=>{setPath(value);void submit('open',value);},['json'])}>Browse project files</button>
+            <button type="button" className="button sm secondary" disabled={busy} onClick={()=>void browse('Open project folder',true,project?.root??'',value=>{setPath(value);void submit('open',value);})}>Browse folders</button>
+          </div>}
           {mode==='create'&&<>
-            <label>Original stereo SVO<input required value={svo} onChange={event=>setSvo(event.target.value)} disabled={busy}/></label>
-            <label>Camera calibration source<input required value={calibration} onChange={event=>setCalibration(event.target.value)} disabled={busy}/></label>
-            <SettingFilePath label="Reference STL" path={stl||null} disabled={busy} onBrowse={()=>{void openFile({multiple:false,directory:false,filters:[{name:'STL geometry',extensions:['stl']}],...(stl?{defaultPath:stl}:{})}).then(selected=>{if(typeof selected==='string')setStl(selected);}).catch(e=>setError(String(e)));}}/>
+            <label>Project name<input autoFocus required value={projectName} onChange={event=>setProjectName(event.target.value)} disabled={busy}/></label>
+            {([
+              ['Parent folder',parentFolder,setParentFolder,true,undefined],
+              ['Original stereo SVO',svo,setSvo,false,['svo2']],
+              ['Camera calibration source',calibration,setCalibration,false,undefined],
+              ['Reference STL',stl,setStl,false,['stl']],
+            ] as const).map(([label,value,setValue,directory,extensions])=><div className="project-dialog-source" key={label}>
+              <span>{label}</span><SettingFilePath label={label} path={value||null} disabled={busy} onBrowse={()=>void browse(label,directory,value,setValue,extensions?[...extensions]:undefined)}/>
+            </div>)}
             <div className="project-dialog-pair"><label>Object ID<input required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}" value={objectId} onChange={event=>setObjectId(event.target.value)} disabled={busy}/></label><label>STL units<select value={units} onChange={event=>setUnits(event.target.value)} disabled={busy}><option value="mm">Millimetres</option><option value="m">Metres</option></select></label></div>
           </>}
           {error&&<p role="alert">{error}</p>}
         </div>
-        <footer><button type="button" disabled={busy} onClick={()=>setMode(null)}>Cancel</button><button type="submit" className="project-dialog-submit" disabled={busy}>{busy?'Verifying files…':mode==='create'?'Create project':'Open'}</button></footer>
+        <footer><button type="button" disabled={busy} onClick={()=>setMode(null)}>Cancel</button><button type="submit" className="project-dialog-submit" disabled={busy||(mode==='open'&&!path)}>{busy?'Verifying files…':mode==='create'?'Create project':'Open'}</button></footer>
       </form>
     </dialog>
   </div>;

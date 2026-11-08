@@ -195,3 +195,6 @@ html, body, #root {height:100%; margin:0;}
 .refinement-panel>.refinement-intro{margin-top:16px;margin-bottom:8px;}
 .refinement-panel>.refinement-method{margin-bottom:16px;}
 .refinement-panel>.refinement-actions{margin-top:12px;margin-bottom:16px;}
+
+.project-dialog-browse {display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.project-dialog-source {display:grid;gap:5px;margin-top:14px;font-size:13px}
