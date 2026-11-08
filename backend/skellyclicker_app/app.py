@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from fastapi import APIRouter, Request
@@ -70,10 +71,15 @@ def build_app():
             await asyncio.gather(*tasks, return_exceptions=True)
 
     app = create_app(
+    origins = ["http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"]
+    dev_origin = os.environ.get("SKELLYCLICKER_DEV_ORIGIN", "")
+    port = dev_origin.removeprefix("http://127.0.0.1:")
+    if dev_origin != port and port.isascii() and port.isdecimal() and 0 < int(port) <= 65535:
+        origins.append(dev_origin)
         title="SkellyClicker",
         routers=(router, project_router, preparation_router, playback_router, label_router, task_router, training_router, session_router, refinement_router, quality_router),
         lifespan=lifespan,
-        allowed_origins=("http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"),
+        allowed_origins=tuple(origins),
         websocket_handler=stream_updates,
     )
     app.state.log_session_id = hub.session_id
