@@ -70,12 +70,12 @@ def build_app():
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    app = create_app(
     origins = ["http://127.0.0.1:5176", "http://localhost:5176", "http://tauri.localhost", "tauri://localhost"]
     dev_origin = os.environ.get("SKELLYCLICKER_DEV_ORIGIN", "")
     port = dev_origin.removeprefix("http://127.0.0.1:")
     if dev_origin != port and port.isascii() and port.isdecimal() and 0 < int(port) <= 65535:
         origins.append(dev_origin)
+    app = create_app(
         title="SkellyClicker",
         routers=(router, project_router, preparation_router, playback_router, label_router, task_router, training_router, session_router, refinement_router, quality_router),
         lifespan=lifespan,
