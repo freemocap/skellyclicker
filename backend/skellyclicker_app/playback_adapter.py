@@ -1,7 +1,7 @@
 """Convert app-owned fresh candidates into the SDK's existing recorded playback contract."""
 from pathlib import Path
 from fastapi import HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import itertools
 import json
 import logging
@@ -34,6 +34,29 @@ def resolve_recording(recording_id):
 router=create_recording_router(resolve_recording)
 
 
+@router.get('/{recording_id}/point-cloud/batch')
+def point_cloud_batch(recording_id: str, first: int, count: int):
+    folder = _clouds.get(recording_id)
+    if folder is None:
+        raise HTTPException(404, 'No published point cloud')
+    if first < 0 or not 1 <= count <= 16:
+        raise HTTPException(422, 'Invalid point cloud chunk range')
+    paths = [folder / f'chunk-{index:04d}.bin' for index in range(first, first + count)]
+    if any(not path.is_file() for path in paths):
+        raise HTTPException(404, 'Missing cloud chunk')
+
+    def stream():
+        for path in paths:
+            with path.open('rb') as chunk:
+                while block := chunk.read(256 * 1024):
+                    yield block
+
+    return StreamingResponse(stream(), media_type='application/octet-stream', headers={
+        'Content-Length': str(sum(path.stat().st_size for path in paths)),
+        'Cache-Control': 'public, max-age=31536000, immutable',
+    })
+
+
 @router.get('/{recording_id}/point-cloud/{filename}')
 def point_cloud_file(recording_id: str, filename: str):
     folder=_clouds.get(recording_id)
@@ -42,6 +65,8 @@ def point_cloud_file(recording_id: str, filename: str):
         raise HTTPException(404,'Unknown cloud resource')
     path=resolve_relative(folder,filename)
     if not path.is_file():raise HTTPException(404,'Missing cloud resource')
+    if filename == 'manifest.json':
+        return {**json.loads(path.read_bytes()), 'batch_url': 'batch'}
     return FileResponse(path,media_type='application/json' if filename.endswith('.json') else 'application/octet-stream',
         headers={'Cache-Control':'public, max-age=31536000, immutable'})
 
