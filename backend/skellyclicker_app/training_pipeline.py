@@ -18,11 +18,14 @@ import pyarrow.parquet as pq
 from freemocap_sdk.storage import atomic_json,file_digest,resolve_relative
 from .training_inputs import freeze_training_inputs
 from .label_inputs import checked
+from .worker_failure import describe_worker_failure
 
 log=logging.getLogger('skellyclicker.training')
 
 def consume_event(event,ctx,job):
     kind=event['kind']
+    if kind == 'stage_progress':
+        job['worker_stage'] = event
     if kind=='metric':ctx.metric(event['id'],label=event['label'],step=event['step'],value=event['value'],unit=event['unit'],step_label='Epoch')
     elif kind=='preview':
         asset=resolve_relative(job['work'],event['path'])
@@ -32,8 +35,11 @@ def consume_event(event,ctx,job):
     elif kind=='scan_progress':ctx.progress(event['completed'],event['total'],'images','Analyzing recording images')
     elif kind=='progress':ctx.progress(event['epoch'],job['request']['epochs'],'epochs',f"{event['detail']} · epoch {event['epoch']} / {job['request']['epochs']}")
     elif kind=='checkpoint':
+        job['last_checkpoint_event'] = event
         ctx.artifacts(writes=(resolve_relative(job['work'],event['path']),));log.info('Saved checkpoint at epoch %s',event['epoch'])
-    elif kind=='error':job['worker_error']=event['message']
+    elif kind=='error':
+        job['worker_error'] = event['message']
+        job['worker_traceback'] = event.get('traceback')
 
 
 def run_worker(mode,job,ctx):
@@ -60,7 +66,8 @@ def run_worker(mode,job,ctx):
                     if events.exists() and events.stat().st_size>offset:continue
                     if cancelled:raise CancelledError('Training cancelled; completed checkpoints retained')
                     if timeout:raise TimeoutError('Training exceeded its configured maximum duration; completed checkpoints retained')
-                    if code:raise RuntimeError(job.get('worker_error',f'DLC {mode} failed with exit code {code}; see {mode}.log'))
+                    if code:
+                        raise RuntimeError(describe_worker_failure(mode, code, job, log))
                     break
                 time.sleep(.1)
         finally:
