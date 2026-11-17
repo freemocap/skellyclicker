@@ -24,3 +24,8 @@ __pycache__/
 /native/target/
 /native/binaries/
 /native/gen/
+
+# SkellyDocs local dependencies and generated site
+/skellyclicker-docs/node_modules/
+/skellyclicker-docs/.docusaurus/
+/skellyclicker-docs/build/

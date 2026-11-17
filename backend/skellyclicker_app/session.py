@@ -18,7 +18,7 @@ class Session(BaseModel):
     project_path: str | None = None
     recording_id: str | None = None
     workspace: Literal["viewer", "training"] = "viewer"
-    sidebar: Literal["images", "project"] = "images"
+    sidebar: Literal["images", "project", "labels"] = "images"
     training_run_id: str | None = None
 
 class SessionUpdate(BaseModel):
@@ -26,7 +26,7 @@ class SessionUpdate(BaseModel):
     project_path: str
     recording_id: str | None = None
     workspace: Literal["viewer", "training"] | None = None
-    sidebar: Literal["images", "project"] | None = None
+    sidebar: Literal["images", "project", "labels"] | None = None
     training_run_id: str | None = None
 
 def session_path():

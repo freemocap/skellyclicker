@@ -3,16 +3,16 @@ import {ResizablePanelGroup,ResizablePanel,ResizableHandle,WorkspaceTabs,ButtonS
 import logo from './assets/skellyclicker-logo.svg';
 export type WorkspaceView='viewer'|'generation'|'training';
 /** Product composition; all visual controls and resizing come from the public SDK. */
-export function AppShell({children,sidebar,bottom,connection,training,generation,view,onView,projectName,onCreateTrainingSet,onToolbarTarget,sidebarRequest=0}:{
- children:ReactNode;sidebar:ReactNode;sidebarRequest?:number;bottom?:ReactNode;connection?:ReactNode;training?:ReactNode;generation?:ReactNode;
- view:WorkspaceView;onView:(view:WorkspaceView)=>void;projectName?:string;onCreateTrainingSet?:()=>void;onToolbarTarget?:(element:HTMLDivElement|null)=>void;
+export function AppShell({manualRecording=false,children,sidebar,bottom,connection,training,generation,view,onView,projectName,recordingPicker,onCreateTrainingSet,onToolbarTarget,sidebarRequest=0}:{
+ manualRecording?:boolean;children:ReactNode;sidebar:ReactNode;sidebarRequest?:number;bottom?:ReactNode;connection?:ReactNode;training?:ReactNode;generation?:ReactNode;
+ view:WorkspaceView;onView:(view:WorkspaceView)=>void;projectName?:string;recordingPicker?:ReactNode;onCreateTrainingSet?:()=>void;onToolbarTarget?:(element:HTMLDivElement|null)=>void;
 }){
  const sidebarRef=useRef<ResizablePanelHandle>(null);
  const [sidebarOpen,setSidebarOpen]=useState(false);
  useEffect(()=>{if(sidebarRequest)sidebarRef.current?.expand();},[sidebarRequest]);
  return <div className="skellyclicker-app">
-  <header className="clicker-header"><div className="skellyclicker-brand"><img src={logo} alt=""/><h1>SkellyClicker</h1></div><span>{projectName??'Open a project'}</span><div className="clicker-connection">{connection}</div></header>
-  <div className="clicker-navigation"><WorkspaceTabs value={view} onChange={value=>onView(value as WorkspaceView)} tabs={[{id:'viewer',label:'Viewer',panelId:'viewer-view'},{id:'generation',label:'Generate training data',panelId:'generation-view'},{id:'training',label:'Training',panelId:'results-view'}]}/><div className="clicker-navigation-actions"><ButtonSm text={sidebarOpen?'Hide project / images':'Project / images'} buttonType="secondary" textColor="" ariaExpanded={sidebarOpen} onClick={()=>{if(sidebarOpen)sidebarRef.current?.collapse();else sidebarRef.current?.expand();}}/><ButtonSm text="Create image training set" buttonType="secondary" textColor="" disabled={!onCreateTrainingSet} onClick={onCreateTrainingSet}/></div></div>
+  <header className="clicker-header"><div className="skellyclicker-brand"><img src={logo} alt=""/><h1>SkellyClicker</h1></div>{recordingPicker}{projectName&&<span>{projectName}</span>}<div className="clicker-connection">{connection}</div></header>
+  <div className="clicker-navigation"><WorkspaceTabs value={view} onChange={value=>onView(value as WorkspaceView)} tabs={[{id:'viewer',label:'Viewer',panelId:'viewer-view'},...(manualRecording?[]:[{id:'generation',label:'Generate training data',panelId:'generation-view'}]),{id:'training',label:'Training',panelId:'results-view'}]}/><div className="clicker-navigation-actions"><ButtonSm text={sidebarOpen?'Hide labels / project':'Labels / project'} buttonType="secondary" textColor="" ariaExpanded={sidebarOpen} onClick={()=>{if(sidebarOpen)sidebarRef.current?.collapse();else sidebarRef.current?.expand();}}/>{!manualRecording&&<ButtonSm text="Create image training set" buttonType="secondary" textColor="" disabled={!onCreateTrainingSet} onClick={onCreateTrainingSet}/>}</div></div>
   <div ref={onToolbarTarget} className="clicker-command-slot" style={{display:view==='generation'?'none':undefined}}/>
   <ResizablePanelGroup direction="horizontal" autoSaveId="skellyclicker-main-layout" className={`skellyclicker-top-panes ${view==='generation'?'generation-layout':''}`}>
    <ResizablePanel ref={sidebarRef} defaultSize={0} minSize={18} maxSize={50} collapsible collapsedSize={0} onCollapse={()=>setSidebarOpen(false)} onExpand={()=>setSidebarOpen(true)}>

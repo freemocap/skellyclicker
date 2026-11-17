@@ -2,7 +2,7 @@
 
 SkellyClicker is a **Tauri desktop application** with a bundled SDK-backed Python server. Its first slice reproduces FreeMoCap's playback workspace with SkellyClicker branding. The native app owns backend startup, discovers its loopback address after readiness, and shuts it down when the window closes.
 
-The current workspace is empty: real recording selection, labeling, training and pose editing are subsequent work. Native development and portable Windows release launches are verified. The unsigned Windows installer is built; installer execution and other platforms have not been tested.
+Read the [SkellyClicker overview](skellyclicker-docs/docs/intro.mdx) for project terminology and workflow status. The [documentation site README](skellyclicker-docs/README.md) explains how to preview and build the site. Existing [engineering notes](docs/) cover individual features and their verification.
 
 ## Repository layout
 
@@ -33,13 +33,15 @@ An unsigned installer is also built at `native/target/release/bundle/nsis/Skelly
 
 ## Develop the desktop app
 
-Install the repository dependencies and build SDK client/UI packages as described in [PLAYBACK.md](PLAYBACK.md), then run from the repository root:
+With the sibling FreeMoCap project checkouts and the development toolchain available, run this from the repository root:
 
 ```powershell
 poe dev
 ```
 
-The first run builds the backend. Later runs reuse the bundle until backend code, editable Python packages, build inputs, or the bundle itself change. React and Rust watching are enabled. Users of the packaged application do not run Python or npm separately.
+The launcher installs locked npm dependencies, builds the SDK client and UI, syncs the Python environment, builds the backend, and starts Tauri. Later runs reuse the backend bundle until backend code, editable Python packages, build inputs, or the bundle itself change. React and Rust watching are enabled.
+
+On Windows and Linux x64, `poe dev` also prepares the pinned DeepLabCut environment and downloads the starting model on first use. Both training modes find that environment automatically. To train a keypoint, open a recording, label it on at least two synchronized frames, and select **Training → Start training**. By default the last labeled frame is held out for validation.
 
 Build the Windows application and installer:
 

@@ -1,0 +1,48 @@
+--- a/packages/ui/src/components/playback/usePlaybackController.ts
++++ b/packages/ui/src/components/playback/usePlaybackController.ts
+@@ -118,7 +118,7 @@
+         const opened = videosRef.current.map(video => {
+             const element = elements.current.get(video.videoId);
+             if (!element) throw new Error(`Missing video element: ${video.filename}`);
+-            return new BrowserVideo(element, video.streamUrl, duration, fail, (time, videoElement) => presented.capture(video.videoId, videoElement, time));
++            return new BrowserVideo(element, video.streamUrl, duration, fail, (time, videoElement) => presented.capture(video.videoId, videoElement, time), fps);
+         });
+         players.current = opened;
+         const start = videoFrameSeekTime(currentFrameRef.current, fps);
+--- a/packages/ui/src/services/recording/browser-video.ts
++++ b/packages/ui/src/services/recording/browser-video.ts
+@@ -12,7 +12,7 @@
+     presentedTime: number | null = null;
+     constructor(readonly element: HTMLVideoElement, private readonly url: string,
+         private readonly duration: number, private readonly fail: (error: Error) => void,
+-        private readonly onPresented?: (time: number, video: HTMLVideoElement) => void) {}
++        private readonly onPresented?: (time: number, video: HTMLVideoElement) => void, private readonly fps?: number) {}
+     async open(time: number): Promise<void> {
+         const presented = (_now: number, metadata: VideoFrameCallbackMetadata): void => {
+             if (this.closed) return;
+@@ -69,6 +69,8 @@
+         });
+     }
+     private async restart(time: number): Promise<void> {
++        // Seek inside the frame, but timestamp the converted segment at its source frame boundary.
++        const segmentStart = this.fps ? Math.floor(time * this.fps) / this.fps : time;
+         this.presentedTime = null;
+         this.abort.abort(); this.abort = new AbortController();
+         const signal = this.abort.signal;
+@@ -86,13 +88,13 @@
+                 signal.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), {once: true});
+             });
+             const buffer = media.addSourceBuffer(mime);
+-            buffer.timestampOffset = time;
++            buffer.timestampOffset = segmentStart;
+             media.duration = this.duration;
+             this.element.currentTime = time;
+             const url = new URL(this.url, location.href);
+             url.pathname += '/browser';
+-            url.searchParams.set('start_seconds', String(time));
+-            url.searchParams.set('duration_seconds', String(Math.max(0.1, this.duration - time)));
++            url.searchParams.set('start_seconds', String(segmentStart));
++            url.searchParams.set('duration_seconds', String(Math.max(0.1, this.duration - segmentStart)));
+             const response = await fetch(url, {signal});
+             if (!response.ok || !response.body) throw new Error(`Video conversion failed (${response.status}): ${await response.text()}`);
+             const reader = response.body.getReader();

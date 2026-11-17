@@ -55,7 +55,6 @@ html, body, #root {height:100%; margin:0;}
 .training-dashboard {padding:20px;overflow:auto;display:flex;flex-direction:column;gap:16px;height:100%;box-sizing:border-box;}
 .training-dashboard h2 {margin:0;font-size:20px;}
 .training-dashboard > p, .training-dashboard header > div > p {color:var(--gray-300);line-height:1.5;margin:0;}
-.training-python-input {width:100%;box-sizing:border-box;background:var(--gray-900);color:inherit;border:1px solid var(--gray-600);border-radius:4px;padding:8px;}
 
 .training-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .training-actions > .sdk-sidebar-processing-action {width:auto;min-width:150px;}
@@ -185,16 +184,41 @@ html, body, #root {height:100%; margin:0;}
 .training-augment h3 {margin:0 0 8px;font-size:18px;}
 .training-augment p {margin:4px 0;max-width:75ch;}
 .training-augment .button.sm {min-height:52px;min-width:210px;font-size:16px;border:2px solid var(--color-info);}
-.refinement-method {max-width:85ch;}
 @media(max-width:850px){.training-augment{align-items:stretch;flex-direction:column;gap:12px;}.training-augment .button.sm{width:100%;}}
 
 .training-augment .button.sm .text{font-size:16px;}
 .training-augment{flex-shrink:0;}
 .checkpoint-display-controls .sdk-setting-select{min-width:140px;}
 
-.refinement-panel>.refinement-intro{margin-top:16px;margin-bottom:8px;}
-.refinement-panel>.refinement-method{margin-bottom:16px;}
 .refinement-panel>.refinement-actions{margin-top:12px;margin-bottom:16px;}
 
 .project-dialog-browse {display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .project-dialog-source {display:grid;gap:5px;margin-top:14px;font-size:13px}
+#results-view {color:var(--gray-100,#e1e5e5); background:var(--gray-900,#121c1c); color-scheme:dark;}
+.keypoint-training {padding:clamp(16px,2vw,32px); overflow:auto; min-height:0; flex:1; container-type:inline-size;}
+.keypoint-training header {display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:20px;}
+.keypoint-training h2 {margin:0; font-size:22px; line-height:1.25; color:var(--gray-100,#e1e5e5);}
+.keypoint-training header span,.keypoint-names {color:var(--gray-300,#c0c6c7);}
+.keypoint-training-grid {display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px; max-width:76rem;}
+.keypoint-section {padding:20px; background:var(--gray-800,#242e2e); color:var(--gray-100,#e1e5e5); border:1px solid var(--gray-600,#444f4f); border-radius:8px; min-width:0;}
+.keypoint-section h3 {font-size:16px; color:inherit; margin:0 0 16px;}
+.keypoint-section fieldset {display:grid; gap:12px; border:0; padding:0; margin:0; min-width:0;}
+.keypoint-section fieldset > label {display:grid; gap:4px; color:inherit; font-size:13px;}
+.keypoint-section :is(select,input:not([type=checkbox])) {font:inherit; color:var(--gray-100,#e1e5e5); background:var(--gray-900,#121c1c); padding:7px 10px; border:1px solid var(--gray-500,#737b7b); border-radius:4px; min-height:34px; box-sizing:border-box; width:100%;}
+.keypoint-section input[type=number] {max-width:8em;}
+.keypoint-section :is(input,select,button):focus-visible {outline:2px solid var(--color-info,#94c4fa); outline-offset:2px;}
+.keypoint-actions {display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--gray-600,#444f4f); padding-top:16px; margin-top:18px;}
+.keypoint-actions .button.sm:disabled {opacity:.75;}
+.keypoint-counts {font-size:18px; font-variant-numeric:tabular-nums;}
+.keypoint-section legend {margin:12px 0 6px; padding:0;}
+.keypoint-frames {display:flex; flex-wrap:wrap; gap:6px;}
+.keypoint-frames label {display:flex; gap:6px; align-items:center; padding:5px 8px; border:1px solid var(--gray-500,#737b7b); border-radius:4px; color:inherit;}
+.keypoint-frames label:has(:checked) {border-color:var(--color-info,#94c4fa);}
+.keypoint-frames input {accent-color:var(--color-info,#94c4fa); margin:0;}
+.keypoint-history {margin-top:16px; max-width:76rem; box-sizing:border-box;}
+.keypoint-history p {display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; padding:10px 0; margin:0; border-top:1px solid var(--gray-600,#444f4f);}
+.keypoint-history [data-status=complete] {color:var(--green-100,#70d269);}
+.keypoint-section [role=alert],.keypoint-history [data-status=failed] {color:#ffb9b5; overflow-wrap:anywhere;}
+@container(max-width:660px) {.keypoint-training-grid {grid-template-columns:minmax(0,1fr);}}
+.training-model-field {display:grid; gap:4px;}
+.training-model-field > span {display:flex; gap:6px; align-items:center;}

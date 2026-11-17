@@ -6,7 +6,11 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 const require = createRequire(new URL('../skellyclicker-ui/package.json', import.meta.url));
 const ui = fileURLToPath(new URL('../skellyclicker-ui/', import.meta.url));
 const args = process.argv.slice(2);
-if (['dev', 'build'].includes(args[0])) await import('./prepare-desktop.mjs');
+if (['dev', 'build'].includes(args[0])) {
+  await import('./prepare-frontend.mjs');
+  await import('./prepare-desktop.mjs');
+}
+if (args[0] === 'build') await import('./stage-release-tools.mjs');
 
 let vite;
 try {

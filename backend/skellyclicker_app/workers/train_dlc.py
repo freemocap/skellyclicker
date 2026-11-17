@@ -3,6 +3,11 @@ import argparse,hashlib,json,math,os,sys,time,traceback
 from pathlib import Path
 os.environ.setdefault('DLClight','True');os.environ.setdefault('MPLBACKEND','Agg')
 os.environ.setdefault('HF_HUB_OFFLINE','1')
+# timm asks for the default revision of DLC's backbone. Provisioning maps that
+# revision to the qualified weights inside this environment's private Hub cache.
+managed_cache = Path(sys.prefix).parent / 'dlc-model-cache'
+if managed_cache.is_dir():
+    os.environ['HF_HUB_CACHE'] = str(managed_cache)
 
 class RequestedStop(Exception):pass
 
@@ -336,6 +341,14 @@ def train(request):
     emit('complete',epochs=epoch)
 
 if __name__=='__main__':
+    if sys.argv[1:] == ['check']:
+        import cv2, deeplabcut, pandas, tables, timm, torch, torchvision
+        from deeplabcut.pose_estimation_pytorch.apis.training import train as dlc_train
+        from deeplabcut.pose_estimation_pytorch.apis.utils import get_pose_inference_runner
+        timm.create_model('resnet50_gn', pretrained=True)
+        print('Loaded DLC', deeplabcut.__version__, 'and pretrained ResNet50-GN, torch', torch.__version__,
+              torch.cuda.get_device_name(0), torch.ones(1, device='cuda:0').sum().item(), flush=True)
+        sys.exit(0)
     parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['prepare','train','mine']);parser.add_argument('work',type=Path);args=parser.parse_args();WORK=args.work.resolve()
     try:
         request=json.loads((WORK/'worker-request.json').read_text());check_stop()

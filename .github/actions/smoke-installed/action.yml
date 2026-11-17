@@ -1,0 +1,16 @@
+name: Smoke test the installed SkellyClicker backend
+description: Install one native package and exercise its embedded backend, Node and media tools.
+inputs:
+  installer-directory:
+    description: Directory containing a single installer for the runner OS
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - shell: bash
+      env:
+        INSTALLER_DIRECTORY: ${{ inputs.installer-directory }}
+      run: python "$GITHUB_ACTION_PATH/../../../tools/smoke-installed.py" "$INSTALLER_DIRECTORY"

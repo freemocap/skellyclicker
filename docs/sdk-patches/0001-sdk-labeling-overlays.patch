@@ -1,0 +1,459 @@
+From 7df30d016c5610a281a4ea67296dea6dff0645ba Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 16 Nov 2026 21:09:22 -0500
+Subject: [PATCH] ui: image overlay slot, scene annotations, and calibration
+ callback for application labeling
+
+PlaybackWorkspace gains renderImageOverlay (drawn inside each tile's zoom transform, in
+source pixels), sceneAnnotations (points and segments in calibration world mm, drawn in the
+3D viewport under the reference transform) and onCalibration (the bundle's loaded calibration).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ packages/ui/src/PlaybackWorkspace.tsx         | 16 ++++--
+ .../playback/RecordingPlaybackSession.tsx     |  9 ++--
+ .../components/playback/SyncedVideoPlayer.tsx |  6 +--
+ .../components/playback/ZoomableVideoTile.tsx | 30 +++++++++--
+ .../components/viewport3d/ThreeJsCanvas.tsx   |  8 ++-
+ .../components/viewport3d/ThreeJsScene.tsx    |  3 ++
+ .../components/viewport3d/WorkerDataStore.ts  | 11 ++++
+ .../renderers/AnnotationRenderer.tsx          | 50 +++++++++++++++++++
+ .../viewport3d/scene-annotations.ts           | 26 ++++++++++
+ packages/ui/src/index.ts                      |  4 +-
+ packages/ui/src/playback-presentation.ts      | 19 +++++++
+ 11 files changed, 165 insertions(+), 17 deletions(-)
+ create mode 100644 packages/ui/src/components/viewport3d/renderers/AnnotationRenderer.tsx
+ create mode 100644 packages/ui/src/components/viewport3d/scene-annotations.ts
+
+diff --git a/packages/ui/src/PlaybackWorkspace.tsx b/packages/ui/src/PlaybackWorkspace.tsx
+index 4d9fb20..b45b6dd 100644
+--- a/packages/ui/src/PlaybackWorkspace.tsx
++++ b/packages/ui/src/PlaybackWorkspace.tsx
+@@ -1,18 +1,26 @@
+-import {useState} from 'react';
++import {useEffect, useState} from 'react';
+ import {I18nextProvider} from 'react-i18next';
+ import RecordingPlaybackSession from './components/playback/RecordingPlaybackSession';
+ import {PlaybackResources, useRecordingBundle, type RecordingSelection} from './playback-resources';
+ 
+ import translations from './i18n/i18n';
+ import type {PlaybackPresentationProps} from './playback-presentation';
++import type {SceneAnnotations} from './components/viewport3d/scene-annotations';
++import type {LoadedCalibration} from '@freemocap/client/recording';
+ 
+ export interface PlaybackWorkspaceProps extends PlaybackPresentationProps {baseUrl: string; recording: RecordingSelection | null; showTimingNotice?: boolean;
+-    pointCloud?: import('./components/viewport3d/point-cloud-format').PointCloudPlayback}
++    pointCloud?: import('./components/viewport3d/point-cloud-format').PointCloudPlayback;
++    /** Application-owned points and rays drawn in the 3D viewport, in calibration world mm. */
++    sceneAnnotations?: SceneAnnotations;
++    /** Called with the recording's loaded calibration (null when it has none) whenever the bundle changes. */
++    onCalibration?: (calibration: LoadedCalibration | null) => void}
+ 
+ /** Core's playback presentation, with explicit endpoint and selection inputs. */
+-export function PlaybackWorkspace({baseUrl, recording, showTimingNotice, pointCloud, controlsRef, onPresentedFrame, getTargetCrop, renderImageControls, activeVideoId, navigationGroups}: PlaybackWorkspaceProps) {
++export function PlaybackWorkspace({baseUrl, recording, showTimingNotice, pointCloud, sceneAnnotations, onCalibration, controlsRef, onPresentedFrame, getTargetCrop, renderImageControls, renderImageOverlay, activeVideoId, navigationGroups}: PlaybackWorkspaceProps) {
+     const resources = useRecordingBundle(baseUrl, recording);
+     const {bundle} = resources;
++    const calibration = bundle?.calibration ?? null;
++    useEffect(() => { onCalibration?.(calibration); }, [onCalibration, calibration]);
+     const recordingKey = JSON.stringify([baseUrl, recording?.id, recording?.parentDirectory]);
+     const [choice, setChoice] = useState<{key:string;source:string}|null>(null);
+     if(choice && choice.key!==recordingKey)setChoice(null);
+@@ -30,7 +38,7 @@ export function PlaybackWorkspace({baseUrl, recording, showTimingNotice, pointCl
+                 {resources.loading && <p role="status">Loading recording…</p>}
+                 {resources.error && <p role="alert">{resources.error}</p>}
+                 <RecordingPlaybackSession recording={recording} videos={videos} showTimingNotice={showTimingNotice}
+-                    pointCloud={pointCloud} getTargetCrop={getTargetCrop} renderImageControls={renderImageControls} activeVideoId={activeVideoId} navigationGroups={navigationGroups} controlsRef={controlsRef} onPresentedFrame={onPresentedFrame}
++                    pointCloud={pointCloud} sceneAnnotations={sceneAnnotations} getTargetCrop={getTargetCrop} renderImageControls={renderImageControls} renderImageOverlay={renderImageOverlay} activeVideoId={activeVideoId} navigationGroups={navigationGroups} controlsRef={controlsRef} onPresentedFrame={onPresentedFrame}
+                     availableSources={availableSources} selectedSource={selectedSource} setSelectedSource={setSelectedSource}/>
+             </div>
+         </PlaybackResources.Provider>
+diff --git a/packages/ui/src/components/playback/RecordingPlaybackSession.tsx b/packages/ui/src/components/playback/RecordingPlaybackSession.tsx
+index a4cfab2..4e08ac2 100644
+--- a/packages/ui/src/components/playback/RecordingPlaybackSession.tsx
++++ b/packages/ui/src/components/playback/RecordingPlaybackSession.tsx
+@@ -17,9 +17,10 @@ import type {PlaybackPresentationProps} from '../../playback-presentation';
+ interface Props extends PlaybackPresentationProps {recording: RecordingSelection | null; videos: VideoEntry[];
+     showTimingNotice?: boolean;
+     pointCloud?: import('../viewport3d/point-cloud-format').PointCloudPlayback;
++    sceneAnnotations?: import('../viewport3d/scene-annotations').SceneAnnotations;
+     availableSources: PlaybackBundle['videos']['sources'] | null; selectedSource: string | null;
+     setSelectedSource: (source: string) => void}
+-const RecordingPlaybackSession: React.FC<Props> = ({recording, videos, availableSources, selectedSource, setSelectedSource, showTimingNotice, pointCloud, controlsRef, onPresentedFrame, getTargetCrop, renderImageControls, activeVideoId, navigationGroups}) => {
++const RecordingPlaybackSession: React.FC<Props> = ({recording, videos, availableSources, selectedSource, setSelectedSource, showTimingNotice, pointCloud, sceneAnnotations, controlsRef, onPresentedFrame, getTargetCrop, renderImageControls, renderImageOverlay, activeVideoId, navigationGroups}) => {
+     const {t} = useTranslation();
+     const {bundle, reloadManifest} = usePlaybackResources();
+     const [settings, setSettings] = useState<CameraSettings>({columns: null, show3dView: true, layoutDirection: 'horizontal'});
+@@ -100,7 +101,7 @@ const RecordingPlaybackSession: React.FC<Props> = ({recording, videos, available
+                                                 manualColumns={settings.columns}
+                                                 resetKey={resetKey}
+                                                 controller={controller}
+-                                                renderImageControls={renderImageControls} activeVideoId={activeVideoId}
++                                                renderImageControls={renderImageControls} renderImageOverlay={renderImageOverlay} activeVideoId={activeVideoId}
+                                             />
+                                         </div>
+                                     </Panel>
+@@ -119,7 +120,7 @@ const RecordingPlaybackSession: React.FC<Props> = ({recording, videos, available
+                                                 onPlaybackRun={controller.setPlaybackRun}
+                                                 onDataReady={onDataReady}
+                                             >
+-                                                <ThreeJsCanvas calibration={bundle?.calibration ?? null} pointCloud={pointCloud} getRecordingTime={controller.getRecordingTime}/>
++                                                <ThreeJsCanvas calibration={bundle?.calibration ?? null} pointCloud={pointCloud} getRecordingTime={controller.getRecordingTime} annotations={sceneAnnotations}/>
+                                             </RecordingPlaybackProvider>
+                                         </div>
+                                     </Panel>
+@@ -130,7 +131,7 @@ const RecordingPlaybackSession: React.FC<Props> = ({recording, videos, available
+                                     manualColumns={settings.columns}
+                                     resetKey={resetKey}
+                                     controller={controller}
+-                                                renderImageControls={renderImageControls} activeVideoId={activeVideoId}
++                                                renderImageControls={renderImageControls} renderImageOverlay={renderImageOverlay} activeVideoId={activeVideoId}
+                                 />
+                             )}
+                         </div>
+diff --git a/packages/ui/src/components/playback/SyncedVideoPlayer.tsx b/packages/ui/src/components/playback/SyncedVideoPlayer.tsx
+index 4cef592..b5d0039 100644
+--- a/packages/ui/src/components/playback/SyncedVideoPlayer.tsx
++++ b/packages/ui/src/components/playback/SyncedVideoPlayer.tsx
+@@ -19,7 +19,7 @@ export interface PlaybackSettings {
+     timestampFormat: 'timecode' | 'seconds';
+ }
+ 
+-interface SyncedVideoPlayerProps extends Pick<PlaybackPresentationProps,'renderImageControls'|'activeVideoId'> {
++interface SyncedVideoPlayerProps extends Pick<PlaybackPresentationProps,'renderImageControls'|'renderImageOverlay'|'activeVideoId'> {
+     videos: VideoEntry[];
+     manualColumns: number | null;
+     resetKey: number;
+@@ -30,7 +30,7 @@ export const SyncedVideoPlayer: React.FC<SyncedVideoPlayerProps> = ({
+     videos,
+     manualColumns,
+     resetKey,
+-    controller, renderImageControls, activeVideoId,
++    controller, renderImageControls, renderImageOverlay, activeVideoId,
+ }) => {
+     const {t} = useTranslation();
+ 
+@@ -103,7 +103,7 @@ export const SyncedVideoPlayer: React.FC<SyncedVideoPlayerProps> = ({
+                             setPresentationRef={setPresentationRef}
+                             setCropRef={controller.setCropRef}
+                             showTargetCrop={controller.showTargetCrop}
+-                            renderImageControls={renderImageControls} active={activeVideoId===video.videoId}
++                            renderImageControls={renderImageControls} renderImageOverlay={renderImageOverlay} active={activeVideoId===video.videoId}
+                             pause={controller.pause} getPresentedImage={controller.getPresentedImage}
+                             setFrameOverlayRef={setFrameOverlayRef}
+                         />
+diff --git a/packages/ui/src/components/playback/ZoomableVideoTile.tsx b/packages/ui/src/components/playback/ZoomableVideoTile.tsx
+index 4cfddec..0b40eff 100644
+--- a/packages/ui/src/components/playback/ZoomableVideoTile.tsx
++++ b/packages/ui/src/components/playback/ZoomableVideoTile.tsx
+@@ -1,11 +1,11 @@
+ import type {PlaybackPresentationProps} from '../../playback-presentation';
+ import {TargetCloseup} from './TargetCloseup';
+-import React, {useCallback, useRef} from 'react';
++import React, {useCallback, useEffect, useRef, useState} from 'react';
+ import {useTranslation} from 'react-i18next';
+ import {useZoomTransform} from '@/hooks/useZoomTransform';
+ import type {PlaybackController} from './usePlaybackController';
+ 
+-interface ZoomableVideoTileProps extends Pick<PlaybackPresentationProps,'renderImageControls'> {
++interface ZoomableVideoTileProps extends Pick<PlaybackPresentationProps,'renderImageControls'|'renderImageOverlay'> {
+     active?:boolean;
+     pause:PlaybackController['pause'];
+     getPresentedImage:PlaybackController['getPresentedImage'];
+@@ -29,13 +29,32 @@ export const ZoomableVideoTile: React.FC<ZoomableVideoTileProps> = ({
+     hasError,
+     setVideoRef,
+     setPresentationRef,
+-    setFrameOverlayRef, showTargetCrop, setCropRef, renderImageControls, active, pause, getPresentedImage,
++    setFrameOverlayRef, showTargetCrop, setCropRef, renderImageControls, renderImageOverlay, active, pause, getPresentedImage,
+ }) => {
+     const surfaceRef=useRef<HTMLDivElement>(null);
+     const containerRef = useRef<HTMLDivElement>(null);
++    const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
++    const [imageSize, setImageSize] = useState<{width: number; height: number} | null>(null);
+     const registerVideo = useCallback((element: HTMLVideoElement | null): void => {
+         setVideoRef(videoId, element);
++        setVideoElement(element);
+     }, [videoId, setVideoRef]);
++    useEffect(() => {
++        if (!videoElement) { setImageSize(null); return; }
++        const measure = (): void => {
++            const {videoWidth: width, videoHeight: height} = videoElement;
++            setImageSize(previous => width > 0 && height > 0
++                ? (previous?.width === width && previous.height === height ? previous : {width, height})
++                : null);
++        };
++        measure();
++        videoElement.addEventListener('loadedmetadata', measure);
++        videoElement.addEventListener('resize', measure);
++        return () => {
++            videoElement.removeEventListener('loadedmetadata', measure);
++            videoElement.removeEventListener('resize', measure);
++        };
++    }, [videoElement]);
+     const registerPresentation = useCallback((canvas: HTMLCanvasElement | null): void => setPresentationRef(videoId, canvas), [videoId, setPresentationRef]);
+     const registerCrop=useCallback((canvas:HTMLCanvasElement|null)=>setCropRef(videoId,canvas),[videoId,setCropRef]);
+     const { zoomWrapperStyle, cursor, containerHandlers } = useZoomTransform(containerRef);
+@@ -58,6 +77,11 @@ export const ZoomableVideoTile: React.FC<ZoomableVideoTileProps> = ({
+                 />
+                 <canvas ref={registerPresentation} data-video-id={videoId} className="playback-presented-image w-full h-full block"
+                     style={{position: 'absolute', inset: 0, objectFit: 'contain', objectPosition:'center top', background: '#000'}} />
++                {renderImageOverlay && imageSize && <div className="playback-image-overlay" data-video-id={videoId}
++                    style={{position: 'absolute', inset: 0}}>
++                    {renderImageOverlay({videoId, filename, imageWidth: imageSize.width, imageHeight: imageSize.height,
++                        pause, getPresentedFrame: () => getPresentedImage(videoId)})}
++                </div>}
+             </div>
+ 
+             </div>
+diff --git a/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx b/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx
+index 7524497..33388fb 100644
+--- a/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx
++++ b/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx
+@@ -21,6 +21,7 @@ import type {PointCloudPlayback} from './point-cloud-format';
+ import { type InspectionTarget, type ViewportStats } from "./helpers/viewport3d-types";
+ import {ViewportFrameSender} from './viewport-frame-transfer';
+ import {hasVisibleKeypoints, KeypointPackingWorkspace} from './keypoint-storage';
++import {EMPTY_SCENE_ANNOTATIONS, type SceneAnnotations} from './scene-annotations';
+ Object3D.DEFAULT_UP.set(0, 0, 1);
+ /** Borrow model channel views for the occasional camera-fit command. */
+ function fittableOrigins(models: ResolvedModelFrame[] | null): KeypointsFrame | null {
+@@ -142,8 +143,8 @@ function serializeWheelEvent(e: WheelEvent, rect: DOMRect) {
+     },
+   };
+ }
+-export function ThreeJsCanvas({calibration, pointCloud, getRecordingTime}: {calibration: LoadedCalibration | null;
+-  pointCloud?: PointCloudPlayback; getRecordingTime?: () => number | null}) {
++export function ThreeJsCanvas({calibration, pointCloud, getRecordingTime, annotations}: {calibration: LoadedCalibration | null;
++  pointCloud?: PointCloudPlayback; getRecordingTime?: () => number | null; annotations?: SceneAnnotations}) {
+   const cloudProgress = usePointCloudForwarder(VIEWPORT_WORKER, pointCloud, getRecordingTime);
+   const camerasPaused = false;
+   const {
+@@ -158,6 +159,9 @@ export function ThreeJsCanvas({calibration, pointCloud, getRecordingTime}: {cali
+   const canvasRef = useRef<HTMLCanvasElement>(null);
+   const cameraFitWorkspace = useMemo(() => new KeypointPackingWorkspace(), []);
+   useReferenceFrameForwarder(VIEWPORT_WORKER, isLive, calibration);
++  useEffect(() => {
++    VIEWPORT_WORKER.postMessage({type: "annotations", data: annotations ?? EMPTY_SCENE_ANNOTATIONS});
++  }, [annotations]);
+   useEffect(() => {
+     const canvas = canvasRef.current;
+     const container = containerRef.current;
+diff --git a/packages/ui/src/components/viewport3d/ThreeJsScene.tsx b/packages/ui/src/components/viewport3d/ThreeJsScene.tsx
+index e00a0a1..e1e4391 100644
+--- a/packages/ui/src/components/viewport3d/ThreeJsScene.tsx
++++ b/packages/ui/src/components/viewport3d/ThreeJsScene.tsx
+@@ -21,6 +21,7 @@ import {useViewportState} from "@/components/viewport3d/scene/ViewportStateConte
+ import {useKeypointsSource} from "./KeypointsSourceContext";
+ import {workerDataStore} from "./WorkerDataStore";
+ import {PointCloudRenderer} from './renderers/PointCloudRenderer';
++import {AnnotationRenderer} from './renderers/AnnotationRenderer';
+ import {OutputPass} from 'three/examples/jsm/postprocessing/OutputPass.js';
+ /**
+  * Calls invalidate() whenever scene data changes so the WebGL render loop
+@@ -38,6 +39,7 @@ function DataInvalidator() {
+             workerDataStore.subscribeToVisibility(() => invalidate()),
+             workerDataStore.subscribeToCalibration(() => invalidate()),
+             workerDataStore.subscribeToReferenceTransform(() => invalidate()),
++            workerDataStore.subscribeToAnnotations(() => invalidate()),
+         ];
+         return () => unsubs.forEach(fn => fn());
+     }, [invalidate, subscribeToKeypoints, subscribeToModelFrames]);
+@@ -115,6 +117,7 @@ export function ThreeJsScene({ cameraControlsRef }: ThreeJsSceneProps) {
+             {visibility.boneLines && <ModelConnectionRenderer />}
+             {(visibility.face || visibility.faceConnections) && <FaceRenderer />}
+             {visibility.cameras && <MocapCameraRenderer />}
++            <AnnotationRenderer />
+             {visibility.bones && <RigidBodyBoneRenderer />}
+             {visibility.skellyMesh && <SkellyMeshRenderer />}
+             {visibility.segmentAxes && <SegmentAxesRenderer />}
+diff --git a/packages/ui/src/components/viewport3d/WorkerDataStore.ts b/packages/ui/src/components/viewport3d/WorkerDataStore.ts
+index 9700c16..b68c2c0 100644
+--- a/packages/ui/src/components/viewport3d/WorkerDataStore.ts
++++ b/packages/ui/src/components/viewport3d/WorkerDataStore.ts
+@@ -15,6 +15,7 @@ import type { ModelDefinition } from '@freemocap/client';
+ import { DEFAULT_VISIBILITY, type ViewportVisibility } from "./helpers/viewport3d-types";
+ import type { PackedKeypointsFrame, KeypointsFrame, KeypointsSource, ModelFramesCallback, ModelsCallback } from "./KeypointsSourceContext";
+ import {PresentationBuffer} from './presentation-buffer';
++import {EMPTY_SCENE_ANNOTATIONS, SceneAnnotationsSchema, type SceneAnnotations} from './scene-annotations';
+ import {snapshotEqual} from '@freemocap/client';
+ 
+ // ---------------------------------------------------------------------------
+@@ -75,6 +76,7 @@ const calibChan = makeChannel<SceneCalibration | null>(null, {replayOnSubscribe:
+ const calibConfigChan = makeChannel<CalibrationConfig>(DEFAULT_CALIBRATION_CONFIG, {replayOnSubscribe: true});
+ const visibilityChan = makeChannel<ViewportVisibility>(DEFAULT_VISIBILITY);
+ const referenceTransformChan = makeChannel<number[] | null>(null, {replayOnSubscribe: true});
++const annotationsChan = makeChannel<SceneAnnotations>(EMPTY_SCENE_ANNOTATIONS, {replayOnSubscribe: true});
+ 
+ // One-shot command channels (fit/reset camera)
+ const fitCameraChan = makeChannel<KeypointsFrame | null>(null);
+@@ -97,6 +99,8 @@ export const workerDataStore: Omit<KeypointsSource, 'getLatestKeypoints'> & {
+     getCalibration: () => SceneCalibration | null;
+     subscribeToReferenceTransform: (cb: Listener<number[] | null>) => () => void;
+     getReferenceTransform: () => number[] | null;
++    subscribeToAnnotations: (cb: Listener<SceneAnnotations>) => () => void;
++    getAnnotations: () => SceneAnnotations;
+     subscribeToCalibrationConfig: (cb: Listener<CalibrationConfig>) => () => void;
+     getCalibrationConfig: () => CalibrationConfig;
+     subscribeToVisibility: (cb: Listener<ViewportVisibility>) => () => void;
+@@ -134,6 +138,10 @@ export const workerDataStore: Omit<KeypointsSource, 'getLatestKeypoints'> & {
+     subscribeToReferenceTransform: referenceTransformChan.subscribe,
+     getReferenceTransform: referenceTransformChan.getLatest,
+ 
++    // Application-owned points and rays
++    subscribeToAnnotations: annotationsChan.subscribe,
++    getAnnotations: annotationsChan.getLatest,
++
+     // Calibration config (charuco board dims, etc.)
+     subscribeToCalibrationConfig: calibConfigChan.subscribe,
+     getCalibrationConfig: calibConfigChan.getLatest,
+@@ -198,6 +206,9 @@ export const workerDataStore: Omit<KeypointsSource, 'getLatestKeypoints'> & {
+             case "referenceTransform":
+                 referenceTransformChan.dispatch(data as number[] | null);
+                 break;
++            case "annotations":
++                annotationsChan.dispatch(SceneAnnotationsSchema.parse(data));
++                break;
+             case "calibrationConfig":
+                 calibConfigChan.dispatch(data as CalibrationConfig);
+                 break;
+diff --git a/packages/ui/src/components/viewport3d/renderers/AnnotationRenderer.tsx b/packages/ui/src/components/viewport3d/renderers/AnnotationRenderer.tsx
+new file mode 100644
+index 0000000..da16544
+--- /dev/null
++++ b/packages/ui/src/components/viewport3d/renderers/AnnotationRenderer.tsx
+@@ -0,0 +1,50 @@
++import {useEffect, useMemo, useSyncExternalStore} from 'react';
++import {BufferAttribute, BufferGeometry, Color, Matrix4} from 'three';
++import {workerDataStore} from '../WorkerDataStore';
++import {useReferenceTransform} from '../scene/ReferenceFrame';
++import type {SceneAnnotations} from '../scene-annotations';
++
++type Segment = SceneAnnotations['segments'][number];
++
++function segmentGeometry(segments: readonly Segment[]): BufferGeometry {
++    const positions = new Float32Array(segments.length * 6);
++    const colors = new Float32Array(segments.length * 6);
++    const color = new Color();
++    segments.forEach((segment, index) => {
++        positions.set([...segment.start, ...segment.end], index * 6);
++        color.set(segment.color);
++        colors.set([color.r, color.g, color.b, color.r, color.g, color.b], index * 6);
++    });
++    const geometry = new BufferGeometry();
++    geometry.setAttribute('position', new BufferAttribute(positions, 3));
++    geometry.setAttribute('color', new BufferAttribute(colors, 3));
++    return geometry;
++}
++
++function SegmentLines({segments, dashed}: {segments: readonly Segment[]; dashed: boolean}) {
++    const geometry = useMemo(() => segmentGeometry(segments), [segments]);
++    useEffect(() => () => geometry.dispose(), [geometry]);
++    if (!segments.length) return null;
++    return <lineSegments geometry={geometry} onUpdate={line => { if (dashed) line.computeLineDistances(); }}>
++        {dashed
++            ? <lineDashedMaterial vertexColors dashSize={12} gapSize={8} transparent opacity={0.9}/>
++            : <lineBasicMaterial vertexColors transparent opacity={0.9}/>}
++    </lineSegments>;
++}
++
++/** Draws the application's points and rays in calibration world coordinates. */
++export function AnnotationRenderer() {
++    const annotations = useSyncExternalStore(workerDataStore.subscribeToAnnotations, workerDataStore.getAnnotations);
++    const referenceTransform = useReferenceTransform();
++    const solid = useMemo(() => annotations.segments.filter(segment => !segment.dashed), [annotations]);
++    const dashed = useMemo(() => annotations.segments.filter(segment => segment.dashed), [annotations]);
++    if (!annotations.points.length && !annotations.segments.length) return null;
++    return <group name="Application annotations" matrix={referenceTransform ?? new Matrix4()} matrixAutoUpdate={false}>
++        <SegmentLines segments={solid} dashed={false}/>
++        <SegmentLines segments={dashed} dashed={true}/>
++        {annotations.points.map(point => <mesh key={point.id} position={point.position}>
++            <sphereGeometry args={[point.radiusMm, 16, 12]}/>
++            <meshBasicMaterial color={point.color}/>
++        </mesh>)}
++    </group>;
++}
+diff --git a/packages/ui/src/components/viewport3d/scene-annotations.ts b/packages/ui/src/components/viewport3d/scene-annotations.ts
+new file mode 100644
+index 0000000..79da644
+--- /dev/null
++++ b/packages/ui/src/components/viewport3d/scene-annotations.ts
+@@ -0,0 +1,26 @@
++import {z} from 'zod';
++
++const Vector3Schema = z.tuple([z.number(), z.number(), z.number()]);
++const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
++
++/**
++ * Application-owned 3D markup drawn in calibration world coordinates (mm), under the same
++ * reference transform as the camera frustums. The SDK draws exactly what it is given.
++ */
++export const SceneAnnotationsSchema = z.object({
++    points: z.array(z.object({
++        id: z.string(),
++        position: Vector3Schema,
++        color: HexColorSchema,
++        radiusMm: z.number().positive(),
++    })),
++    segments: z.array(z.object({
++        id: z.string(),
++        start: Vector3Schema,
++        end: Vector3Schema,
++        color: HexColorSchema,
++        dashed: z.boolean(),
++    })),
++});
++export type SceneAnnotations = z.infer<typeof SceneAnnotationsSchema>;
++export const EMPTY_SCENE_ANNOTATIONS: SceneAnnotations = {points: [], segments: []};
+diff --git a/packages/ui/src/index.ts b/packages/ui/src/index.ts
+index 1575753..53ca1db 100644
+--- a/packages/ui/src/index.ts
++++ b/packages/ui/src/index.ts
+@@ -23,7 +23,9 @@ export {default as ValueSelector} from './components/ui-components/ValueSelector
+ 
+ export {SettingFilePath, type SettingFilePathProps} from './pipeline/settings/setting-file-path';
+ 
+-export type {PresentedFrame, PlaybackWorkspaceHandle, PlaybackPresentationProps, TargetCropBounds, TargetCropRequest, TargetCropProvider, PresentedImage, ImageControlContext, PlaybackNavigationGroup} from './playback-presentation';
++export type {PresentedFrame, PlaybackWorkspaceHandle, PlaybackPresentationProps, TargetCropBounds, TargetCropRequest, TargetCropProvider, PresentedImage, ImageControlContext, ImageOverlayContext, PlaybackNavigationGroup} from './playback-presentation';
++export type {SceneAnnotations} from './components/viewport3d/scene-annotations';
++export type {LoadedCalibration, CalibrationCameraData} from '@freemocap/client/recording';
+ 
+ export {ImageCatalog,ImageSelectionToggle,type ImageCatalogProps,type ImageCatalogItem,type DatasetImageItem,type ImageCatalogFilter,type ImageCatalogNavigation,type ImageSelectionToggleProps} from './browser/ImageCatalog';
+ export {MetricSeriesChart,type MetricSeriesChartProps} from './charts/MetricSeriesChart';
+diff --git a/packages/ui/src/playback-presentation.ts b/packages/ui/src/playback-presentation.ts
+index d6b41f5..a984464 100644
+--- a/packages/ui/src/playback-presentation.ts
++++ b/packages/ui/src/playback-presentation.ts
+@@ -18,6 +18,7 @@ export interface PlaybackWorkspaceHandle {
+ export interface PlaybackPresentationProps {
+     navigationGroups?:readonly PlaybackNavigationGroup[];
+     renderImageControls?: (context:ImageControlContext)=>ReactNode;
++    renderImageOverlay?: (context:ImageOverlayContext)=>ReactNode;
+     activeVideoId?:string;
+     getTargetCrop?: TargetCropProvider;
+     controlsRef?: Ref<PlaybackWorkspaceHandle>;
+@@ -50,3 +51,21 @@ export interface PlaybackNavigationGroup {
+     /** Singular accessible target name, e.g. training frame, supplied by the application. */
+     itemLabel?:string;detail?:string;
+ }
++
++/**
++ * Image-space overlay slot. The element is rendered inside the tile's zoom transform and fills the
++ * same box as the presented image, which is drawn with object-fit contain anchored center top.
++ * Draw in source pixels with an SVG `viewBox="0 0 imageWidth imageHeight"` and
++ * `preserveAspectRatio="xMidYMin meet"`; the overlay then tracks zoom and pan exactly.
++ * Pointer events on the overlay bubble to the tile, so drag-to-pan keeps working.
++ */
++export interface ImageOverlayContext {
++    readonly videoId:string;
++    readonly filename:string;
++    /** Decoded video size in source pixels. */
++    readonly imageWidth:number;
++    readonly imageHeight:number;
++    pause():void;
++    /** Read on click: null while seeking or before a committed image exists. */
++    getPresentedFrame():PresentedImage|null;
++}
+-- 
+2.43.0
+

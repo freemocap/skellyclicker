@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "recording_id": "freemocap_test_data",
+  "tracked_point_names": [
+    "nose"
+  ],
+  "observations": [
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 10,
+      "x_px": 250.66662740150787,
+      "y_px": 298.66666445008514,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 10,
+      "x_px": 187.39307210603124,
+      "y_px": 179.3618525048638,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 10,
+      "x_px": 317.333376398346,
+      "y_px": 122.66667109982984,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 45,
+      "x_px": 231.99995820160507,
+      "y_px": 434.66667679961097,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 45,
+      "x_px": 58.89492643482504,
+      "y_px": 366.754839114178,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 45,
+      "x_px": 213.33328900170227,
+      "y_px": 264.00001139956225,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 80,
+      "x_px": 255.99999810007307,
+      "y_px": 320.0000189992704,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 80,
+      "x_px": 259.67319354936785,
+      "y_px": 206.1322852702457,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 80,
+      "x_px": 362.66664260092375,
+      "y_px": 149.33335359922182,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 115,
+      "x_px": 269.33329660141067,
+      "y_px": 312.0000056997811,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 115,
+      "x_px": 326.5991685919262,
+      "y_px": 200.77822436618442,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 115,
+      "x_px": 399.99998100072935,
+      "y_px": 154.66668154942852,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 150,
+      "x_px": 325.33330420111884,
+      "y_px": 381.3333118008269,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 150,
+      "x_px": 281.08943716561294,
+      "y_px": 313.2140163317729,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 150,
+      "x_px": 408.00007979693555,
+      "y_px": 240.00001424945287,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 185,
+      "x_px": 290.66669389895424,
+      "y_px": 314.66664830070533,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 185,
+      "x_px": 289.12065676678026,
+      "y_px": 203.45525481821505,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 185,
+      "x_px": 386.66659700267473,
+      "y_px": 154.66668154942852,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam1",
+      "source_frame": 210,
+      "x_px": 295.99997910080265,
+      "y_px": 330.6666748996839,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam2",
+      "source_frame": 210,
+      "x_px": 147.23731608706248,
+      "y_px": 230.22568758359682,
+      "origin": "click"
+    },
+    {
+      "point": "nose",
+      "camera_id": "Cam3",
+      "source_frame": 210,
+      "x_px": 333.3334029973248,
+      "y_px": 160.0000094996352,
+      "origin": "click"
+    }
+  ],
+  "session": {
+    "active_point": "nose",
+    "active_camera": "Cam3",
+    "source_frame": 210,
+    "local_frame_index": 210
+  }
+}

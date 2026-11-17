@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Match videos to calibrated cameras</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121c1c}
+a{color:#86c2c5}a:hover{color:#badadb}
+</style>
+</helmet>
+<div style="position: relative; width: 100%; min-height: 900px; box-sizing: border-box; background: #0b1111; color: #e1e5e5; font-family: Inter, system-ui, sans-serif; font-size: 13px; line-height: 1.45; display: flex; justify-content: center; align-items: flex-start; padding: 48px 16px;">
+
+  <section role="dialog" aria-labelledby="match-title" style="width: 100%; max-width: 960px; box-sizing: border-box; background: #1a2424; border: 1px solid #444f4f; border-radius: 10px; box-shadow: 0 18px 70px rgba(0,0,0,0.6); display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: flex-start; gap: 16px; padding: 18px 22px 14px; border-bottom: 1px solid #353f40;">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+        <h1 id="match-title" style="margin: 0; font-size: 18px; font-weight: 600;">Match videos to calibrated cameras</h1>
+        <span style="font-size: 12px; color: #babfc0;">The calibration names <span style="font-family: ui-monospace, Consolas, monospace; color: #ced3d3;">cam_0, cam_1, cam_2</span>, all 1920×1080. Two videos have names that match none of them.</span>
+        <span style="font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #babfc0; overflow-wrap: anywhere;">2026-10-12_toy_gopro_3cam_camera_calibration.toml</span>
+      </div>
+      <a href="V_Ambiguous.dc.html" aria-label="Close" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 5px; color: #e1e5e5; text-decoration: none; font-size: 20px;">×</a>
+    </header>
+
+    <div style="padding: 16px 22px; display: flex; flex-direction: column; gap: 22px;">
+
+      <section aria-labelledby="videos-h" style="display: flex; flex-direction: column; gap: 8px;">
+        <h2 id="videos-h" style="margin: 0; font-size: 13px; font-weight: 600;">Videos in this recording</h2>
+        <div style="overflow-x: auto; border: 1px solid #353f40; border-radius: 8px;">
+          <table style="width: 100%; min-width: 720px; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align: left; color: #babfc0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;">
+                <th scope="col" style="padding: 8px 14px; font-weight: 600; border-bottom: 1px solid #353f40;">Video file</th>
+                <th scope="col" style="padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #353f40;">Size</th>
+                <th scope="col" style="padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #353f40;">Frames</th>
+                <th scope="col" style="padding: 8px 10px; font-weight: 600; border-bottom: 1px solid #353f40;">Calibrated camera</th>
+                <th scope="col" style="padding: 8px 14px; font-weight: 600; border-bottom: 1px solid #353f40;">Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 10px 14px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace;">cam_0.mp4</td>
+                <td style="padding: 10px; border-bottom: 1px solid #353f40;">1920×1080</td>
+                <td style="padding: 10px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums;">9,000</td>
+                <td style="padding: 10px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace; color: #86c2c5;">cam_0</td>
+                <td style="padding: 10px 14px; border-bottom: 1px solid #353f40; color: #babfc0; font-size: 12px;">Name and size match</td>
+              </tr>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+                <tr>
+                  <td style="padding: 10px 14px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace;">{{r.file}}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #353f40;">1920×1080</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums;">9,000</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #353f40;">
+                    <label style="display: flex; flex-direction: column; gap: 2px;">
+                      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Camera for {{r.file}}</span>
+                      <select value="{{r.value}}" onChange="{{r.onChange}}" style="{{r.selectStyle}}">
+                        <option value="">Choose…</option>
+                        <option value="cam_1">cam_1</option>
+                        <option value="cam_2">cam_2</option>
+                      </select>
+                    </label>
+                  </td>
+                  <td style="padding: 10px 14px; border-bottom: 1px solid #353f40; color: #f3c490; font-size: 12px;">No name match · size fits cam_1 and cam_2</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{conflict}}" hint-placeholder-val="{{false}}"><span role="alert" style="color: #f9a4a1; font-size: 12px;">Both videos are set to the same camera. Each calibrated camera can take one video.</span></sc-if>
+      </section>
+
+      <section aria-labelledby="test-h" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <h2 id="test-h" style="margin: 0; font-size: 13px; font-weight: 600;">Test both assignments</h2>
+          <span style="font-size: 12px; color: #babfc0;">Uses <strong style="color: #ff8a7a; font-weight: 600;">3 toy_nose</strong>, clicked in all three videos at frame 1,284. Each option triangulates with that assignment and checks whether the projection lands on your click.</span>
+        </div>
+        <div role="radiogroup" aria-label="Assignment" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px;">
+          <sc-for list="{{options}}" as="o" hint-placeholder-count="2">
+            <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.onClick}}" style="{{o.style}}">
+              <span style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                <span style="{{o.radioStyle}}"></span>
+                <strong style="font-weight: 600;">{{o.title}}</strong>
+                <span style="{{o.verdictStyle}}">{{o.verdict}}</span>
+              </span>
+              <span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3; text-align: left;">{{o.mapping}}</span>
+              <span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%;">
+                <sc-for list="{{o.thumbs}}" as="t" hint-placeholder-count="2">
+                  <span style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #1b2627;">
+                      <span style="position: absolute; left: 0; right: 0; top: 60%; bottom: 0; background: #2b3637;"></span>
+                      <span style="{{t.body}}"></span>
+                      <span style="{{t.head}}"></span>
+                      <span style="{{t.click}}"></span>
+                      <span style="{{t.ring}}"></span>
+                    </span>
+                    <span style="font-size: 11px; color: #babfc0; text-align: left;">{{t.caption}}</span>
+                  </span>
+                </sc-for>
+              </span>
+              <span style="{{o.errStyle}}">{{o.err}}</span>
+            </button>
+          </sc-for>
+        </div>
+        <span style="font-size: 12px; color: #babfc0;">Not enough clicks yet? Click any one point in all three videos, then come back — or set the cameras by hand above.</span>
+      </section>
+
+      <p style="margin: 0; font-size: 12px; color: #babfc0;">The match is saved with this recording's SkellyClicker data. The calibration file is not changed.</p>
+    </div>
+
+    <footer style="display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; padding: 12px 22px; border-top: 1px solid #353f40;">
+      <a href="V_Ambiguous.dc.html" style="margin-right: auto; font-size: 12px;">Keep labeling in 2D for now</a>
+      <sc-if value="{{canApply}}" hint-placeholder-val="{{true}}">
+        <a href="S3_Projected.dc.html" style="display: inline-flex; align-items: center; height: 34px; padding: 0 18px; border-radius: 5px; background: #30a7ad; color: #0b1111; font-weight: 600; text-decoration: none;">Apply match</a>
+      </sc-if>
+      <sc-if value="{{cannotApply}}" hint-placeholder-val="{{false}}">
+        <button type="button" disabled="{{true}}" style="height: 34px; padding: 0 18px; border-radius: 5px; border: 0; background: #30a7ad; color: #0b1111; font: inherit; font-weight: 600; opacity: 0.5; cursor: not-allowed;">Apply match</button>
+      </sc-if>
+    </footer>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  current() {
+    return Object.assign({ m417: 'cam_1', m418: 'cam_2' }, this.state || {});
+  }
+
+  thumb(nose, ringOffset, caption) {
+    const pct = (v) => (v * 100).toFixed(1) + '%';
+    const r = [nose[0] + ringOffset[0], nose[1] + ringOffset[1]];
+    return {
+      caption: caption,
+      body: `position:absolute;left:${pct(Math.min(nose[0], nose[0] + 0.28 * nose[2]) + 0.02)};width:26%;top:${pct(nose[1] - 0.06)};height:13%;border-radius:50%;background:#8c7a60;`,
+      head: `position:absolute;left:${pct(nose[0] + 0.035 * nose[2] - 0.045)};width:9%;top:${pct(nose[1] - 0.08)};height:16%;border-radius:50%;background:#a3906f;`,
+      click: `position:absolute;left:${pct(nose[0])};top:${pct(nose[1])};width:10px;height:10px;transform:translate(-50%,-50%);border-radius:50%;background:#ff8a7a;box-shadow:0 0 0 2px #0b1111;`,
+      ring: `position:absolute;left:${pct(r[0])};top:${pct(r[1])};width:18px;height:18px;box-sizing:border-box;transform:translate(-50%,-50%);border-radius:50%;border:2px dashed #ff8a7a;`
+    };
+  }
+
+  renderVals() {
+    const s = this.current();
+    const chosen = s.m417 === 'cam_1' && s.m418 === 'cam_2' ? 'A' : (s.m417 === 'cam_2' && s.m418 === 'cam_1' ? 'B' : '');
+    const conflict = Boolean(s.m417) && s.m417 === s.m418;
+    const sel = (v) => `height:30px;min-width:130px;padding:0 8px;border-radius:4px;border:1.5px solid ${v ? '#30a7ad' : '#d1603c'};background:#232d2e;color:#e1e5e5;font:inherit;font-family:ui-monospace,Consolas,monospace;`;
+    const n417 = [0.66, 0.55, -1];
+    const n418 = [0.3, 0.5, 1];
+    const defs = [
+      { id: 'A', title: 'Option A', mapping: 'GX010417 → cam_1   GX010418 → cam_2', verdict: 'Fits', good: true, err: 'Mean reprojection error 1.9 px', thumbs: [this.thumb(n417, [0.004, -0.004], 'GX010417 as cam_1'), this.thumb(n418, [-0.003, 0.004], 'GX010418 as cam_2')], set: { m417: 'cam_1', m418: 'cam_2' } },
+      { id: 'B', title: 'Option B', mapping: 'GX010417 → cam_2   GX010418 → cam_1', verdict: 'Doesn’t fit', good: false, err: 'Mean reprojection error 47.6 px — projections miss your clicks', thumbs: [this.thumb(n417, [-0.21, -0.17], 'GX010417 as cam_2'), this.thumb(n418, [0.24, 0.15], 'GX010418 as cam_1')], set: { m417: 'cam_2', m418: 'cam_1' } }
+    ];
+    const options = defs.map((d) => {
+      const on = chosen === d.id;
+      return {
+        title: d.title,
+        mapping: d.mapping,
+        verdict: d.verdict,
+        err: d.err,
+        thumbs: d.thumbs,
+        checked: on,
+        onClick: () => this.setState(d.set),
+        style: `display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:8px;font:inherit;color:#e1e5e5;cursor:pointer;text-align:left;background:${on ? '#0f1919' : '#232d2e'};border:1.5px solid ${on ? '#30a7ad' : '#444f4f'};`,
+        radioStyle: `flex:none;width:14px;height:14px;box-sizing:border-box;border-radius:50%;border:2px solid ${on ? '#4cafb4' : '#737b7b'};background:${on ? '#4cafb4' : 'transparent'};box-shadow:${on ? 'inset 0 0 0 3px #0f1919' : 'none'};`,
+        verdictStyle: `margin-left:auto;font-size:11px;padding:2px 8px;border-radius:9px;background:${d.good ? 'rgba(76,175,180,0.14)' : 'rgba(209,96,60,0.2)'};color:${d.good ? '#86c2c5' : '#f3c490'};`,
+        errStyle: `font-size:12px;color:${d.good ? '#ced3d3' : '#f3c490'};font-variant-numeric:tabular-nums;`
+      };
+    });
+    const rows = [
+      { file: 'GX010417.mp4', value: s.m417, onChange: (e) => this.setState({ m417: e.target.value }), selectStyle: sel(s.m417) },
+      { file: 'GX010418.mp4', value: s.m418, onChange: (e) => this.setState({ m418: e.target.value }), selectStyle: sel(s.m418) }
+    ];
+    const canApply = Boolean(s.m417) && Boolean(s.m418) && !conflict;
+    return { rows: rows, options: options, conflict: conflict, canApply: canApply, cannotApply: !canApply };
+  }
+}
+</script>
+</body>
+</html>

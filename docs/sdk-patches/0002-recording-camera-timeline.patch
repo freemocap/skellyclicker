@@ -1,0 +1,40 @@
+diff --git a/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx b/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx
+index f0d8671..0f7cf28 100644
+--- a/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx
++++ b/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx
+@@ -27,7 +27,7 @@ export function RecordingPlaybackProvider({recordingId, recordingParentDirectory
+     const pointSubscribers = useRef(new Set<KeypointsCallback>());
+     const run = manifest?.runs.find(item => item.run_id === runId);
+     const clock = run?.timelines.find(item => item.sensor_group === group && item.source === `timing:${group}`);
+-    const groups = useMemo(() => [...new Set(run?.channels.map(channel => channel.sensor_group) ?? [])], [run]);
++    const groups = useMemo(() => [...new Set(run?.timelines.map(timeline => timeline.sensor_group) ?? [])], [run]);
+     const {resourceUrl: baseUrl} = usePlaybackResources();
+     const parameters = new URLSearchParams();
+     if (recordingParentDirectory) parameters.set('recording_parent_directory', recordingParentDirectory);
+@@ -46,7 +46,7 @@ export function RecordingPlaybackProvider({recordingId, recordingParentDirectory
+         if (!manifest) return;
+         const selected = manifest.runs.find(item => item.run_id === manifest.selected_run_id);
+         if (!selected) {setError('Selected recording result is missing'); return;}
+-        setRunId(selected.run_id); setGroup(selected.channels[0]?.sensor_group ?? '');
++        setRunId(selected.run_id); setGroup(selected.channels[0]?.sensor_group ?? selected.timelines[0]?.sensor_group ?? '');
+         setDataPlaying(false);
+     }, [manifest]);
+     useEffect(() => {if (run) onPlaybackRun(run);}, [run, onPlaybackRun]);
+@@ -86,7 +86,7 @@ export function RecordingPlaybackProvider({recordingId, recordingParentDirectory
+         pointSubscribers.current.forEach(callback => callback({pointNames: [], interleaved: new Float32Array()}));
+         if (!clock?.timestamps_s.length) {setError('Recording has no synchronized timeline for this group'); return;}
+         if (loaded?.manifest !== manifest) return;
+-        const channels = loaded.runs[run.run_id];
++        const channels = loaded.runs[run.run_id] ?? (run.channels.length === 0 ? [] : undefined);
+         if (!channels) {setError('Selected recording samples are missing'); return;}
+         let modelReaders: Array<(time: number) => ResolvedModelFrame>;
+         let pointReader: ReturnType<typeof prepareRecordedKeypoints>;
+@@ -176,7 +176,7 @@ export function RecordingPlaybackProvider({recordingId, recordingParentDirectory
+         selectRun: (nextRunId: number) => {
+             const selected = manifest?.runs.find(item => item.run_id === nextRunId);
+             if (!selected) throw new Error(`Recording result ${nextRunId} is not in the manifest`);
+-            setRunId(nextRunId); setGroup(selected.channels[0]?.sensor_group ?? '');
++            setRunId(nextRunId); setGroup(selected.channels[0]?.sensor_group ?? selected.timelines[0]?.sensor_group ?? '');
+         },
+         groups,
+         group,

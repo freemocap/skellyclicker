@@ -89,7 +89,13 @@ def register_project(root: Path, project: Project):
     _registered[manifest.recording_id]=RecordingResources(manifest=manifest,parquet=folder/'display.parquet',videos=media)
     cloud=folder/'point_cloud'
     if (cloud/'manifest.json').is_file():_clouds[manifest.recording_id]=cloud
-    return {'id':manifest.recording_id,'targetCropUrl':f'/freemocap/recordings/{manifest.recording_id}/target-crops','displayName':f'{project.project_id} - fresh pose candidates',
+    prepared = resolve_relative(root, project.sample_result)
+    source_id = json.loads((prepared / 'manifest.json').read_bytes())['descriptor']['recording_id']
+    run = next(run for run in manifest.runs if run.run_id == manifest.selected_run_id)
+    from .manual_recording import register_label_source
+    paths = recording_structure(root, source_id)
+    return {'id':manifest.recording_id, 'labelSource': register_label_source(paths.full_path, paths.application_dir('skellyclicker')),
+            'cameras':list(run.camera_geometry.get('stereo', ())), 'targetCropUrl':f'/freemocap/recordings/{manifest.recording_id}/target-crops','displayName':f'{project.project_id} - fresh pose candidates',
             'pointCloudManifest':f'/freemocap/recordings/{manifest.recording_id}/point-cloud/manifest.json' if manifest.recording_id in _clouds else None}
 
 

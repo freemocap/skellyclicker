@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from .projects import CreateProject, OpenProject, create_project, open_project
 from .session import remember_project
+from .manual_recording import OpenFolder, open_folder
 from .stl_selection import ValidateStl, validate_stl
 
 router = APIRouter(prefix="/api/projects")
@@ -49,4 +50,13 @@ def validate_stl_selection(request: ValidateStl):
         return validate_stl(request)
     except (ValueError, OSError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/open-folder")
+def open_workspace_folder(request: OpenFolder):
+    """Dispatch a directory selection using the contents of the chosen folder."""
+    root = Path(request.path)
+    if root.is_dir() and any(path.is_file() for path in root.glob("*_project.json")):
+        return {"project": open_existing(OpenProject(project_path=str(root)))}
+    return open_folder(request)
 

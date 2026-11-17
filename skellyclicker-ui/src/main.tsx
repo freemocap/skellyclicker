@@ -1,10 +1,11 @@
-import {useEffect, useRef, useState, lazy, Suspense} from 'react';
+import {useEffect, useMemo, useRef, useState, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import {PlaybackWorkspace, Legend, BottomLogPanel, LogStore, ServerConnectionStatus, type PlaybackWorkspaceHandle, type PresentedFrame} from '@freemocap/ui';
 import '@freemocap/ui/styles.css';
 import {createHttpClient, TransportService, ConnectionState, pipelineSnapshotKind, type PipelineSnapshot} from '@freemocap/client';
 import {stateKind} from './state-message';
 import {AppShell,type WorkspaceView} from './AppShell';
+import {KeypointTraining} from './KeypointTraining';
 import {TrainingDashboard} from './TrainingDashboard';
 import {resolveBackendUrl} from './config';
 import './shell.css';
@@ -16,6 +17,10 @@ import {ProjectPanel, type ProjectView} from './ProjectPanel';
 import {SidebarProcessingAction,ButtonSm} from '@freemocap/ui';
 import './training-set.css';
 import {emptySession,type SessionState} from './session';
+import {useFolderPicker, readFolder, type OpenRecording} from './RecordingPicker';
+import {useLabeling} from './labeling/useLabeling';
+import {LabelPanel} from './labeling/LabelPanel';
+import './labeling/labeling.css';
 
 const TrainingSetPanel = lazy(() => import('./TrainingSetPanel').then(module => ({default: module.TrainingSetPanel})));
 
@@ -27,6 +32,11 @@ function App({backendUrl}: {backendUrl: string}) {
   const getTargetCrop=useTargetCrop(backendUrl,project?.playback?.targetCropUrl);
   const playbackControls=useRef<PlaybackWorkspaceHandle|null>(null);
   const [presented,setPresented]=useState<PresentedFrame|null>(null);
+  const [manual,setManual] = useState<OpenRecording|null>(null);
+  const playback = manual ?? project?.playback;
+  const labelSource = playback?.labelSource;
+  const labelRecording = useMemo(() => labelSource ? {recordingId:labelSource.id,parentDirectory:labelSource.parent} : null, [labelSource]);
+  const labeling=useLabeling({baseUrl:backendUrl,recording:labelRecording,sourceSizes:manual?.sourceSizes,playbackId:playback?.id,cameraEntries:playback?.cameras,presented,controls:playbackControls});
   const [datasetRefreshRevision,setDatasetRefreshRevision]=useState('');
   const review=useCandidateReview({baseUrl:backendUrl,project,controls:playbackControls,presented,refreshKey:Object.values(pipelineSnapshots).filter(s=>s.status==='complete').map(s=>s.run_id).join(',')+':'+datasetRefreshRevision});
   const [session,setSession]=useState<SessionState>(emptySession);
@@ -42,11 +52,23 @@ function App({backendUrl}: {backendUrl: string}) {
       if(!response.ok)throw new Error((await response.json()).detail??'Session save failed');
     }).catch(error=>setSessionError(String(error)));
   }
-  function acceptProject(value:ProjectView){setProject(value);setSessionError('');if(value.session_state)setSession(value.session_state);}
+  function acceptRecording(value:OpenRecording){
+    localStorage.setItem('skellyclicker.manualRecording',value.root);
+    setManual(value);setProject(null);setSession({...emptySession,sidebar:'labels',workspace:'viewer'});
+    setSessionError('');setSidebarRequest(v=>v+1);
+  }
+  function acceptProject(value:ProjectView){localStorage.setItem('skellyclicker.projectPath',value.manifest_path);localStorage.removeItem('skellyclicker.manualRecording');setManual(null);setProject(value);setSessionError('');if(value.session_state)setSession(value.session_state);}
+  const folderPicker = useFolderPicker(backendUrl, acceptRecording, acceptProject);
   async function restoreSession(signal?:AbortSignal){
     setRestoring(true);setSessionError('');
     try{
       const ready=await fetch(backendUrl+'/api/status',{signal});if(!ready.ok)throw new Error('Backend unavailable. Retry when connected.');
+      const lastRecording = localStorage.getItem('skellyclicker.manualRecording');
+      if(lastRecording){
+        const result=await readFolder(backendUrl,lastRecording);
+        if(!signal?.aborted && !('candidates' in result))acceptRecording(result);
+        return;
+      }
       const response=await fetch(backendUrl+'/api/session',{signal});if(!response.ok)throw new Error('Saved session unavailable. Retry when connected.');
       const saved=await response.json();if(signal?.aborted)return;
       if(saved.state)setSession(saved.state);
@@ -108,15 +130,16 @@ function App({backendUrl}: {backendUrl: string}) {
     void checkHttp();
     return () => {active=false;window.removeEventListener('beforeunload',persistLogs);clearInterval(logErrorTimer);actions.current=null;abort.abort();stream.off('state-change',stateChanged);unsubscribePipeline();unsubscribeErrors();unsubscribeLogs();stream.disconnect();logs.dispose();};
   }, [backendUrl, logs]);
-  return <><AppShell sidebarRequest={sidebarRequest} projectName={project?.project.project_id} onCreateTrainingSet={project?()=>{setGenerationMode('recording');localStorage.setItem('skellyclicker.generation-view','recording');goTo('generation');}:undefined} onToolbarTarget={setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={goTo} training={restoring?<p role="status">Restoring your last project...</p>:<TrainingDashboard validateInputs={session.workspace!=='viewer'&&resultView==='training'} includedImageCount={review.result?review.selection.selected_image_ids.length:undefined} generationTarget={generationTarget} onGoTraining={()=>goTo('training')} onDatasetChanged={(revision)=>setDatasetRefreshRevision(revision)} toolbarTarget={toolbarTarget} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
+return <><AppShell manualRecording={!!manual} sidebarRequest={sidebarRequest} recordingPicker={<><ButtonSm text="Open folder…" buttonType="secondary" disabled={folderPicker.busy||restoring} onClick={()=>void folderPicker.browse()}/>{folderPicker.dialog}</>} projectName={manual?.displayName??project?.project.project_id} onCreateTrainingSet={project?()=>{setGenerationMode('recording');localStorage.setItem('skellyclicker.generation-view','recording');goTo('generation');}:undefined} onToolbarTarget={manual?undefined:setToolbarTarget} view={session.workspace==='viewer'?'viewer':resultView} onView={goTo} training={restoring?<p role="status">Restoring your last project...</p>:manual?.labelSource?<KeypointTraining key={manual.root} baseUrl={backendUrl} id={manual.labelSource.id} parent={manual.labelSource.parent} labeling={labeling}/>:<TrainingDashboard validateInputs={session.workspace!=='viewer'&&resultView==='training'} includedImageCount={review.result?review.selection.selected_image_ids.length:undefined} generationTarget={generationTarget} onGoTraining={()=>goTo('training')} onDatasetChanged={(revision)=>setDatasetRefreshRevision(revision)} toolbarTarget={project?toolbarTarget:null} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} selectionRevision={review.selectionRevision} rememberedRun={session.training_run_id} onRememberRun={training_run_id=>saveSession({training_run_id})}/>} sidebar={<>
     {restoring&&<p role="status">Restoring your last project...</p>}
     {logPersistenceError&&<p role="alert">Log history cannot be saved for reload: {logPersistenceError}</p>}
     {sessionError&&<div role="alert" className="session-recovery"><p>{sessionError}</p><SidebarProcessingAction text="Retry saved session" iconClass="rotate-icon" onClick={()=>void restoreSession()}/><SidebarProcessingAction text="Show projects" iconClass="import-icon" onClick={()=>setSession(s=>({...s,sidebar:'project'}))}/></div>}
-    {review.catalog&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
-      <ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>saveSession({sidebar:'images'})}/>
+    {(manual||project)&&<div className="review-sidebar-tabs" role="group" aria-label="Sidebar view">
+      {playback&&<ButtonSm text="Labels" textColor="" ariaPressed={sidebarMode==='labels'} onClick={()=>saveSession({sidebar:'labels'})}/>}
+      {review.catalog&&<ButtonSm text="Images" textColor="" ariaPressed={sidebarMode==='images'} onClick={()=>saveSession({sidebar:'images'})}/>}
       <ButtonSm text="Project" textColor="" ariaPressed={sidebarMode==='project'} onClick={()=>saveSession({sidebar:'project'})}/>
     </div>}
-    {!restoring&&(review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
+    {!restoring&&(playback&&sidebarMode==='labels'?<>{manual?.issues.map(issue=><p key={issue}>{issue}</p>)}<LabelPanel labeling={labeling}/></>:review.catalog&&sidebarMode==='images'?review.catalog:<><ProjectPanel onBrowseFolder={folderPicker.browse} baseUrl={backendUrl} project={project} onProject={acceptProject} recordingId={session.recording_id} onRecording={recording_id=>saveSession({recording_id})}/>{project&&<PreparationPanel baseUrl={backendUrl} project={project} onComplete={acceptProject}/>}</>)}
   </>}
     generation={<DatasetQualityPanel onRefresh={()=>setDatasetRefreshRevision('refresh:'+Date.now())} baseUrl={backendUrl} projectPath={project?.manifest_path} result={review.result} selection={review.selection} onSelection={value=>{review.applySelection(value);setDatasetRefreshRevision(value.sha256??'');}} onNavigate={id=>{void review.navigate(id);goTo('viewer');}} mode={generationMode} onMode={mode=>{setGenerationMode(mode);localStorage.setItem('skellyclicker.generation-view',mode);}}
       recording={project?<Suspense fallback={<p role="status">Loading recording…</p>}><TrainingSetPanel embedded key={project.project.uuid} baseUrl={backendUrl} project={project} snapshots={pipelineSnapshots} onClose={()=>goTo('viewer')} onReview={openGeneratedImages}/></Suspense>:<p role="status">No project selected</p>}
@@ -132,11 +155,11 @@ function App({backendUrl}: {backendUrl: string}) {
         {label:'Keypoints',color:'#ff45e6',description:'Authored points projected through the fitted pose; hollow image points are mesh-self-occluded'},
         {label:'Mesh outline',color:'#37eaff',description:'Thin visible mesh crease and silhouette edges in annotated images'},
       ]:[]),
-    ]} note="Training-set images are approved for training" details={<>
+    ]} details={<>
       <p>Points show target geometry projected through the fitted pose, not detector predictions. Training-set membership records your approval for training.</p>
       <p>The purple reference shows the authored geometry at the origin. Green and orange show fitted candidates.</p>
     </>}/> }
-    <PlaybackWorkspace navigationGroups={review.navigationGroups} renderImageControls={review.renderImageControls} activeVideoId={review.activeVideoId} getTargetCrop={getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={backendUrl} recording={project?.playback?{...project.playback,displayName:project.project.project_id+' - fresh pose candidates'}:null} showTimingNotice={false}/>
+    <PlaybackWorkspace navigationGroups={manual?undefined:review.navigationGroups} renderImageControls={manual?undefined:review.renderImageControls} renderImageOverlay={sidebarMode==='labels' && session.workspace==='viewer' ? labeling.renderImageOverlay : undefined} sceneAnnotations={labeling.sceneAnnotations} onCalibration={labeling.onCalibration} activeVideoId={sidebarMode==='labels'?labeling.document?.session.active_camera??undefined:review.activeVideoId} getTargetCrop={manual?undefined:getTargetCrop} controlsRef={playbackControls} onPresentedFrame={setPresented} pointCloud={project?.playback?.pointCloudManifest?{manifestUrl:backendUrl+project.playback.pointCloudManifest,loading:{concurrency:16,maxResidentBytes:512*1024*1024}}:undefined} baseUrl={manual?backendUrl+'/core':backendUrl} recording={playback??null} showTimingNotice={false}/>
   </AppShell>
 
   </>;

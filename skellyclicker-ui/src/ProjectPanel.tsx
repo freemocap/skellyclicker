@@ -8,7 +8,7 @@ export interface ProjectView {
   project: {project_id: string; uuid: string; created_at?: string; sample_result?:string|null; playback_result?:string|null; recording_manifests?:string[]; target_manifests?:string[]};
   recordings: {recording_id: string; source: {path: string; bytes?: number; sha256?:string}; calibration_source?:{path:string}; calibration_state: string; streams: {camera_id: string}[]}[];
   targets: {object_id: string; authored_units: string; geometry?:{path:string;sha256:string}; authored_geometry?: {path:string;sha256?:string}|null}[];
-  issues: string[]; sample_state: string; playback: {id:string;displayName?:string;pointCloudManifest?:string|null;targetCropUrl?:string|null}|null;
+  issues: string[]; sample_state: string; playback: {id:string;labelSource?:{id:string;parent:string};cameras?:import('@freemocap/ui').CalibrationCameraData[];displayName?:string;pointCloudManifest?:string|null;targetCropUrl?:string|null}|null;
 }
 interface RecentProject {id: string; name: string; path: string; timestamp?: number; recordings: number; targets: number}
 const recentKey='skellyclicker.recentProjects';
@@ -18,7 +18,7 @@ function loadRecent(): RecentProject[] {
     return Array.isArray(value) ? value.filter((v):v is RecentProject=>v && typeof v.id==='string' && typeof v.name==='string' && typeof v.path==='string' && typeof v.recordings==='number' && typeof v.targets==='number').slice(0,30) : [];
   } catch {return [];}
 }
-export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}:{baseUrl:string;project:ProjectView|null;onProject:(p:ProjectView)=>void;recordingId:string|null;onRecording:(id:string)=>void}) {
+export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording,onBrowseFolder}:{onBrowseFolder:()=>Promise<void>;baseUrl:string;project:ProjectView|null;onProject:(p:ProjectView)=>void;recordingId:string|null;onRecording:(id:string)=>void}) {
   const [recent,setRecent]=useState(loadRecent);
   const [savedPaths,setSavedPaths]=useState<string[]>([]);
   const [mode,setMode]=useState<'open'|'create'|null>(null);
@@ -92,13 +92,13 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
   const projects:BrowserEntry[]=recent.map(item=>({id:item.id,name:item.name,path:item.path,timestamp:item.timestamp,subtitle:`${item.recordings} recording${item.recordings===1?'':'s'} · ${item.targets} reference${item.targets===1?'':'s'}`,status:item.id===project?.project.uuid?{label:'Open',tone:'success'}:undefined,details:[{label:'Manifest',value:item.path}]}));
   const recordings:BrowserEntry[]=(project?.recordings ?? []).map(recording=>({id:recording.recording_id,name:recording.recording_id,path:recording.source.path,cameraCount:recording.streams.length,sizeBytes:recording.source.bytes,subtitle:recording.streams.map(stream=>stream.camera_id).join(' + '),status:{label:'Linked original',tone:'neutral'},details:[{label:'Original',value:recording.source.path},{label:'Calibration',value:project?.playback?'Fresh replay calibration loaded':recording.calibration_state==='ready'?'Ready':'Awaiting fresh replay'},{label:'Reference',value:project!.targets.map(t=>`${t.object_id} (${t.authored_units})`).join(', ')}]}));
   return <div className="project-browser-stack">
-    <RecordingBrowser title="Projects" entries={projects} selectedId={project?.project.uuid} busyId={busyId} loading={busy} error={!mode?error:null} onSelect={id=>{const entry=recent.find(p=>p.id===id);if(entry)void submit('open',entry.path,id);}} onBrowse={()=>show('open')} browseLabel="Open project" onCreate={()=>show('create')} createLabel="New project" emptyMessage="No recent projects"/>
+    <RecordingBrowser title="Projects" entries={projects} selectedId={project?.project.uuid} busyId={busyId} loading={busy} error={!mode?error:null} onSelect={id=>{const entry=recent.find(p=>p.id===id);if(entry)void submit('open',entry.path,id);}} onBrowse={()=>show('open')} browseLabel="Open recording or project" onCreate={()=>show('create')} createLabel="New STL project" emptyMessage="No recent projects"/>
     {project&&<div className="project-child-recordings"><RecordingBrowser title="Recordings" entries={recordings} selectedId={recordingId} onSelect={onRecording} error={project.issues.join('\n')||null} emptyMessage="No recordings in this project."/></div>}
     <dialog ref={dialog} className="project-dialog" aria-labelledby="project-dialog-title" onCancel={event=>{event.preventDefault();if(!busy)setMode(null);}}>
       <form onSubmit={event=>{event.preventDefault();if(mode)void submit(mode,mode==='create'?parentFolder.replace(/[/\\]+$/,'')+'/'+projectName.trim():path);}}>
-        <header><h2 id="project-dialog-title">{mode==='create'?'New project':'Open project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>×</button></header>
+        <header><h2 id="project-dialog-title">{mode==='create'?'New STL project':'Open recording or project'}</h2><button type="button" aria-label="Close project dialog" disabled={busy} onClick={()=>setMode(null)}>×</button></header>
         <div className="project-dialog-fields">
-          <AnchoredInfo title="Project location" text={mode==='create'?'Choose a parent folder and name the new project. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a project folder or its named project manifest.'}/>
+          <AnchoredInfo title="Project location" text={mode==='create'?'Choose a parent folder and name the new project. Original media stays linked; the STL is copied into the standard SkellyClicker input folder inside the recording.':'Choose a FreeMoCap recording folder, a SkellyClicker project folder, or a saved project file.'}/>
           {mode==='open'&&<label>Recent projects
             <select value={recentPaths.includes(path)?path:''} disabled={busy||!recentPaths.length}
               onChange={event=>{setPath(event.target.value);setError('');}}>
@@ -108,7 +108,7 @@ export function ProjectPanel({baseUrl,project,onProject,recordingId,onRecording}
           </label>}
           {mode==='open'&&<div className="project-dialog-browse">
             <button type="button" className="button sm secondary" disabled={busy} onClick={()=>void browse('Open project file',false,path,value=>{setPath(value);void submit('open',value);},['json'])}>Browse project files</button>
-            <button type="button" className="button sm secondary" disabled={busy} onClick={()=>void browse('Open project folder',true,project?.root??'',value=>{setPath(value);void submit('open',value);})}>Browse folders</button>
+            <button type="button" className="button sm secondary" disabled={busy} onClick={()=>{setMode(null);void onBrowseFolder();}}>Browse folders</button>
           </div>}
           {mode==='create'&&<>
             <label>Project name<input autoFocus required value={projectName} onChange={event=>setProjectName(event.target.value)} disabled={busy}/></label>

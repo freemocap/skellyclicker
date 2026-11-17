@@ -1,0 +1,41 @@
+.label-panel {display:flex; flex-direction:column; gap:14px; font-size:13px;}
+.label-panel h3 {margin:0; font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;}
+.label-panel h4 {margin:0 0 4px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--gray-300);}
+.label-panel p {margin:0;}
+.label-panel code {font-family:var(--font-mono, ui-monospace, monospace); font-size:12px;}
+.label-panel button {height:28px; padding:0 10px; border-radius:4px; border:1.5px solid var(--gray-500); background:transparent; color:inherit; font:inherit; font-size:12px; cursor:pointer;}
+.label-panel button:disabled {opacity:.5; cursor:not-allowed;}
+.label-panel button:focus-visible, .label-panel textarea:focus-visible {outline:2px solid var(--blue-400, #68b7bb); outline-offset:2px;}
+.label-panel .label-primary {border-color:transparent; background:var(--blue-600, #30a7ad); color:#0b1111; font-weight:600;}
+.label-muted {color:var(--gray-300); font-size:12px;}
+.label-warning {color:var(--color-warning-text, #f3c490); font-size:12px;}
+.label-error {color:var(--color-danger-text, #f9a4a1); overflow-wrap:anywhere;}
+.label-actions {display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end;}
+.label-camera-issues {margin:0; padding:8px 10px; list-style:none; border-radius:6px; background:var(--color-warning-surface, #d1603c33); display:flex; flex-direction:column; gap:4px; font-size:12px;}
+
+.label-define {display:flex; flex-direction:column; gap:10px; padding:12px; border-radius:8px; background:var(--gray-800);}
+.label-define label {display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--gray-200);}
+.label-define textarea {padding:8px; border-radius:4px; border:1.5px solid var(--gray-500); background:var(--gray-900); color:inherit; font:13px/1.6 var(--font-mono, ui-monospace, monospace); resize:vertical;}
+.label-file input {font-size:12px; color:var(--gray-200);}
+
+.label-points-head {display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+.label-points {list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+.label-panel .label-point {display:flex; align-items:center; gap:10px; width:100%; height:auto; padding:7px 8px; border:0; border-radius:6px; text-align:left;}
+.label-panel .label-point[aria-pressed=true] {background:var(--gray-900); box-shadow:inset 0 0 0 1.5px var(--blue-600, #30a7ad);}
+.label-point-text {flex:1; min-width:0; display:flex; flex-direction:column;}
+.label-point-text > * {overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.label-glyphs {display:flex; gap:6px; align-items:center;}
+.label-badge {flex:none; width:20px; height:20px; border-radius:50%; background:var(--point-color); color:#0b1111; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;}
+
+.label-glyph {display:inline-block; flex:none; box-sizing:border-box; width:10px; height:10px;}
+.label-glyph[data-kind=click] {border-radius:50%; background:var(--point-color);}
+.label-glyph[data-kind=accepted] {border-radius:50%; background:var(--point-color); box-shadow:inset 0 0 0 2px var(--gray-900), 0 0 0 1px var(--point-color);}
+.label-glyph[data-kind=projected] {width:11px; height:11px; border-radius:50%; border:2px dashed var(--point-color);}
+.label-glyph[data-kind=none] {height:2px; margin:4px 0; border-radius:1px; background:var(--gray-500);}
+
+.label-inspector {display:flex; flex-direction:column; gap:8px; padding-top:12px; border-top:1px solid var(--gray-700);}
+.label-views {list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+.label-views > li {display:flex; flex-direction:column; gap:4px; padding:8px 10px; border-radius:6px; background:var(--gray-800);}
+.label-view-head {display:flex; align-items:center; gap:8px;}
+.label-kind {margin-left:auto; font-size:12px;}
+.label-triangulation {display:flex; flex-direction:column; gap:2px;}

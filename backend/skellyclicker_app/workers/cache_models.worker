@@ -1,0 +1,25 @@
+"""Run with the freshly synced interpreter for the corresponding model."""
+import sys
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+
+worker, revision, destination = sys.argv[1:]
+if worker == "pose":
+    snapshot_download("SpatialHub/foundationpose", revision=revision, local_dir=destination,
+                      allow_patterns=["refine_net.onnx", "score_net.onnx"])
+elif worker == "training":
+    model = Path(destination) / "models--timm--resnet50_gn.a1h_in1k"
+    ref = model / "refs" / "main"
+    if ((model / "snapshots" / revision / "model.safetensors").is_file()
+            and ref.is_file() and ref.read_text(encoding="ascii") == revision):
+        sys.exit(0)
+    snapshot = Path(snapshot_download("timm/resnet50_gn.a1h_in1k", revision=revision,
+                                      allow_patterns=["model.safetensors"], cache_dir=destination))
+    # timm requests this model's default branch. Give only this worker's
+    # private cache a default-branch ref to our release-pinned revision.
+    ref = snapshot.parent.parent / "refs" / "main"
+    ref.parent.mkdir(exist_ok=True)
+    ref.write_text(revision, encoding="ascii")
+else:
+    raise ValueError(f"Unknown model worker: {worker}")

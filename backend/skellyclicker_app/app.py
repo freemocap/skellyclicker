@@ -12,6 +12,9 @@ from .preparation import router as preparation_router, shutdown_jobs
 from .playback_adapter import router as playback_router
 from .label_routes import router as label_router, task_router, registry
 from .training_routes import router as training_router
+from .keypoint_training_routes import router as keypoint_training_router
+from .manual_recording import router as manual_router, resources as recording_resources
+from freemocap.core.recording.recording_access import RecordingAccess
 from .session import router as session_router
 from .refinement_routes import router as refinement_router
 from .quality_routes import router as quality_router
@@ -77,10 +80,11 @@ def build_app():
         origins.append(dev_origin)
     app = create_app(
         title="SkellyClicker",
-        routers=(router, project_router, preparation_router, playback_router, label_router, task_router, training_router, session_router, refinement_router, quality_router),
+        routers=(router, manual_router, recording_resources, project_router, preparation_router, playback_router, label_router, task_router, training_router, keypoint_training_router, session_router, refinement_router, quality_router),
         lifespan=lifespan,
         allowed_origins=tuple(origins),
         websocket_handler=stream_updates,
     )
+    app.state.recording_access = RecordingAccess()
     app.state.log_session_id = hub.session_id
     return app

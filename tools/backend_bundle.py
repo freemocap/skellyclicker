@@ -17,22 +17,25 @@ OUTPUT = ROOT / "native" / "binaries"
 NAME = "skellyclicker-backend"
 
 
-def source_digest():
-    lock = BACKEND / "uv.lock"
-    files = {Path(__file__), ROOT / "tools/prepare-desktop.mjs",
-             BACKEND / "desktop_entry.py", BACKEND / ".python-version", lock}
-    # Editable package code and package data can change without a lockfile change.
-    for package in tomllib.loads(lock.read_text(encoding="utf-8"))["package"]:
+def editable_roots():
+    for package in tomllib.loads((BACKEND / "uv.lock").read_text(encoding="utf-8"))["package"]:
         editable = package["source"].get("editable")
-        if editable is None:
-            continue
-        root = (BACKEND / editable).resolve()
+        if editable is not None:
+            yield (BACKEND / editable).resolve()
+
+
+def source_digest():
+    files = {Path(__file__), ROOT / "tools/prepare-desktop.mjs", ROOT / "tools/smoke-installed.py",
+             BACKEND / "desktop_entry.py", BACKEND / ".python-version", BACKEND / "uv.lock"}
+    # Editable package code and package data can change without a lockfile change.
+    for root in editable_roots():
         files.add(root / "pyproject.toml")
         for base in (root, root / "src"):
             if base.is_dir():
                 for init in base.glob("*/__init__.py"):
-                    files.update(p for p in init.parent.rglob("*") if p.is_file()
-                                 and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo"))
+                    for directory, subdirs, names in os.walk(init.parent):
+                        subdirs[:] = [name for name in subdirs if name not in (".venv", "__pycache__")]
+                        files.update(Path(directory) / name for name in names if not name.endswith((".pyc", ".pyo")))
     digest = hashlib.sha256()
     for path in sorted(files):
         digest.update(str(path).encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
@@ -92,12 +95,22 @@ def prepare(*, force):
                 return
         state_file.unlink(missing_ok=True)
         print("Building SkellyClicker backend…", flush=True)
+        # PyInstaller's static analysis cannot follow setuptools editable import finders.
+        search_paths = [str(base) for root in editable_roots() for base in (root, root / "src") if base.is_dir()]
+        if os.environ.get("PYTHONPATH"):
+            search_paths.append(os.environ["PYTHONPATH"])
+        app = BACKEND / "skellyclicker_app"
+        resources = [*sorted((app / "workers").glob("*.*")), *sorted((app / "gpu").glob("*/pyproject.toml")),
+                     *sorted((app / "gpu").glob("*/uv.lock"))]
         subprocess.run([
             sys.executable, "-m", "freemocap_sdk.bundle", "--entrypoint", str(BACKEND / "desktop_entry.py"),
             "--name", NAME, "--output", str(OUTPUT), "--work", str(WORK),
-            "--add-data", f"{BACKEND / 'skellyclicker_app/workers/train_dlc.py'}:skellyclicker_app/workers",
-            "--collect-data", "skellyclicker_app", "--collect-data", "skellyforge", "--collect-data", "freemocap_sdk",
-        ], cwd=ROOT, check=True)
+            *[arg for path in resources for arg in ("--add-data", f"{path}:{path.parent.relative_to(BACKEND).as_posix()}")],
+            "--collect-data", "skellyforge", "--collect-data", "skellytracker",
+        ], cwd=ROOT, env={**os.environ, "PYTHONPATH": os.pathsep.join(search_paths)}, check=True)
+        executable = OUTPUT / NAME / (NAME + (".exe" if os.name == "nt" else ""))
+        subprocess.run([sys.executable, str(ROOT / "tools/smoke-installed.py"), "--backend-only", str(executable)],
+                       check=True)
         inventory = bundle_inventory()
         if not inventory or source_digest() != inputs:
             raise RuntimeError("Backend build incomplete or inputs changed during the build. Run again.")

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rigid and STL tools in the label workspace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121c1c}
+a{color:#86c2c5}a:hover{color:#badadb}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; box-sizing: border-box; background: #121c1c; color: #e1e5e5; font-family: Inter, system-ui, sans-serif; font-size: 13px; line-height: 1.45; display: flex; flex-direction: column;">
+
+  <header style="height: 44px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid #353f40;">
+    <strong style="font-size: 15px; font-weight: 600;">SkellyClicker</strong>
+    <span style="font-weight: 600;">2026-11-03_toy_3cam</span>
+    <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #babfc0;"><span style="width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #70d269;"></span>Saved to the recording</span>
+  </header>
+  <nav aria-label="Workspace" style="height: 38px; flex: none; display: flex; align-items: stretch; gap: 4px; padding: 0 16px; border-bottom: 1px solid #353f40;">
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #e1e5e5; text-decoration: none; font-weight: 600; box-shadow: inset 0 -2px 0 #4cafb4;">Label</a>
+    <a href="#" style="display: flex; align-items: center; padding: 0 12px; color: #babfc0; text-decoration: none;">Training data</a>
+    <a href="#" style="display: flex; align-items: center; padding: 0 12px; color: #babfc0; text-decoration: none;">Train &amp; review</a>
+  </nav>
+
+  <div style="flex: 1; display: flex; flex-wrap: wrap; min-height: 0;">
+
+    <aside aria-label="Target geometry" style="flex: 0 0 340px; box-sizing: border-box; border-right: 1px solid #353f40; padding: 14px 16px; display: flex; flex-direction: column; gap: 16px; overflow: auto; max-height: 818px;">
+
+      <section style="display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Target · toy</span>
+        <div role="group" aria-label="Target type" style="display: flex; padding: 2px; border-radius: 6px; background: #1a2424; gap: 2px;">
+          <button type="button" aria-pressed="false" style="flex: 1; height: 28px; border: 0; border-radius: 4px; background: transparent; color: #babfc0; font: inherit; font-size: 12px;">Points</button>
+          <button type="button" aria-pressed="false" style="flex: 1; height: 28px; border: 0; border-radius: 4px; background: transparent; color: #babfc0; font: inherit; font-size: 12px;">Rigid</button>
+          <button type="button" aria-pressed="true" style="flex: 1; height: 28px; border: 0; border-radius: 4px; background: #0f1919; color: #e1e5e5; font: inherit; font-size: 12px; box-shadow: inset 0 0 0 1px #30a7ad;">Mesh (STL)</button>
+        </div>
+        <span style="font-size: 12px; color: #babfc0;">Switching type keeps every click. Points list, rows and glyphs stay exactly as in plain labeling — these sections are added below them.</span>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 8px; background: #1a2424;">
+        <span style="display: flex; align-items: center; gap: 8px;"><strong style="font-weight: 600;">Mesh</strong><a href="#" style="margin-left: auto; font-size: 12px;">Replace…</a></span>
+        <span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3;">toy_v2.stl</span>
+        <span style="font-size: 12px; color: #babfc0;">Units: mm · 2,314 vertices · 41 × 18 × 22 mm</span>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Landmark bindings</span>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; background: #1a2424;">
+            <span style="width: 20px; height: 20px; flex: none; border-radius: 50%; background: #ffd166; color: #0b1111; font: 700 11px/20px Inter, system-ui, sans-serif; text-align: center;">1</span>
+            <span style="flex: 1; display: flex; flex-direction: column;"><strong style="font-weight: 600;">toy_top</strong><span style="font-size: 11px; color: #babfc0; font-family: ui-monospace, Consolas, monospace;">vertex 1042 · (12.0, 0.0, 31.5)</span></span>
+            <span style="font-size: 11px; color: #86c2c5;">Bound</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; background: #1a2424;">
+            <span style="width: 20px; height: 20px; flex: none; border-radius: 50%; background: #c39bff; color: #0b1111; font: 700 11px/20px Inter, system-ui, sans-serif; text-align: center;">2</span>
+            <span style="flex: 1; display: flex; flex-direction: column;"><strong style="font-weight: 600;">toy_tail_base</strong><span style="font-size: 11px; color: #babfc0; font-family: ui-monospace, Consolas, monospace;">vertex 2210 · (38.4, 0.0, 9.2)</span></span>
+            <span style="font-size: 11px; color: #86c2c5;">Bound</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; background: #0f1919; box-shadow: inset 0 0 0 1.5px #30a7ad;">
+            <span style="width: 20px; height: 20px; flex: none; border-radius: 50%; background: #ff8a7a; color: #0b1111; font: 700 11px/20px Inter, system-ui, sans-serif; text-align: center;">3</span>
+            <span style="flex: 1; display: flex; flex-direction: column;"><strong style="font-weight: 600;">toy_nose</strong><span style="font-size: 11px; color: #f3c490;">Not bound — click the spot on the mesh preview</span></span>
+            <a href="#" style="font-size: 12px;">Bind…</a>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 8px; background: #1a2424;">
+        <strong style="font-weight: 600;">Pose at this frame</strong>
+        <span style="font-size: 12px; color: #ced3d3;">Needs 3 non-collinear landmarks clicked in 2+ views: <strong style="color: #86c2c5; font-weight: 600;">3 of 3</strong></span>
+        <span style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" style="height: 30px; padding: 0 12px; border-radius: 5px; border: 0; background: #30a7ad; color: #0b1111; font: inherit; font-weight: 600; font-size: 12px; cursor: pointer;">Fit pose</button>
+          <button type="button" style="height: 30px; padding: 0 12px; border-radius: 5px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Fit across labeled frames</button>
+        </span>
+        <span style="font-size: 12px; color: #babfc0; font-variant-numeric: tabular-nums;">Last fit: RMS 2.4 px across 3 cameras</span>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 8px; border: 1px dashed #444f4f;">
+        <strong style="font-weight: 600; color: #babfc0;">Depth assist</strong>
+        <span style="font-size: 12px; color: #babfc0;">Needs a ZED depth stream. This recording has none. Existing ZED stereo projects show this enabled.</span>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 8px; border: 1px solid #353f40;">
+        <strong style="font-weight: 600;">If the type were Rigid (no mesh)</strong>
+        <span style="font-size: 12px; color: #babfc0;">Mesh and bindings are replaced by <strong style="color: #ced3d3;">Reference landmarks</strong>:</span>
+        <span style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px;">Take from frame 1,284</button>
+          <button type="button" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px;">Type coordinates…</button>
+        </span>
+        <span style="font-size: 11px; color: #babfc0;">"Take from frame" is enabled when every point is triangulated on that frame.</span>
+      </section>
+    </aside>
+
+    <section aria-label="Cameras" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; border-bottom: 1px solid #353f40;">
+        <div style="display: flex; padding: 2px; border-radius: 6px; background: #1a2424; gap: 2px;">
+          <button type="button" style="height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: #babfc0; font: inherit; font-size: 12px;">Grid</button>
+          <button type="button" aria-pressed="true" style="height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: #0f1919; color: #e1e5e5; font: inherit; font-size: 12px; box-shadow: inset 0 0 0 1px #30a7ad;">Focus</button>
+          <button type="button" style="height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: #babfc0; font: inherit; font-size: 12px;">Single</button>
+        </div>
+        <span style="width: 1px; height: 20px; background: #353f40;"></span>
+        <span style="font-size: 11px; color: #babfc0;">Geometry overlays</span>
+        <button type="button" aria-pressed="true" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #30a7ad; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px;">Mesh outline</button>
+        <button type="button" aria-pressed="true" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #30a7ad; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px;">Mesh landmarks</button>
+        <button type="button" aria-pressed="false" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px;">Pose axes</button>
+        <span style="margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 11px; color: #ced3d3;">
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 14px; height: 8px; border: 1.5px solid #37eaff; border-radius: 50%;"></span>Mesh (fitted pose)</span>
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 8px; height: 8px; border: 1.5px solid #37eaff; background: #121c1c;"></span>Mesh landmark</span>
+        </span>
+      </div>
+
+      <div style="flex: 1; padding: 12px; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 10px; align-items: start;">
+        <div style="grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600;">cam_0</span><span style="color: #babfc0;">1920×1080</span><span style="margin-left: auto; color: #86c2c5; font-weight: 600; font-size: 11px;">Active</span></div>
+          <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #1b2627; outline: 2px solid #4cafb4; outline-offset: -2px;">
+            <span style="position: absolute; left: 0; right: 0; top: 62%; bottom: 0; background: #2b3637; border-top: 1px solid #3a4647;"></span>
+            <span style="position: absolute; left: 38%; width: 25%; top: 51.25%; height: 13%; border-radius: 50%; background: #8c7a60;"></span>
+            <span style="position: absolute; left: 47.5%; width: 5%; top: 44.75%; height: 12.75%; border-radius: 45% 45% 10% 10%; background: #76664f;"></span>
+            <span style="position: absolute; left: 35%; width: 9%; top: 49%; height: 16%; border-radius: 50%; background: #a3906f;"></span>
+            <span style="position: absolute; left: 64%; width: 7%; top: 57.7%; height: 1.6%; border-radius: 2px; background: #76664f;"></span>
+            <span style="position: absolute; left: 37.6%; width: 26%; top: 50.6%; height: 14.2%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 34.6%; width: 9.4%; top: 48.6%; height: 16.8%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 47.2%; width: 5.4%; top: 44.4%; height: 7%; border-radius: 45% 45% 0 0; border: 1.5px solid #37eaff; border-bottom: 0; box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 50%; top: 45%; width: 18px; height: 18px; transform: translate(-50%,-50%); border-radius: 50%; background: #ffd166; color: #0b1111; font: 700 10px/18px Inter, system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px #0b1111;">1</span>
+            <span style="position: absolute; left: 50.4%; top: 44.4%; width: 9px; height: 9px; transform: translate(-50%,-50%); border: 1.5px solid #37eaff; background: rgba(11,17,17,0.4); box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 64%; top: 58.5%; width: 18px; height: 18px; transform: translate(-50%,-50%); border-radius: 50%; background: #c39bff; color: #0b1111; font: 700 10px/18px Inter, system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px #0b1111;">2</span>
+            <span style="position: absolute; left: 64.5%; top: 58.1%; width: 9px; height: 9px; transform: translate(-50%,-50%); border: 1.5px solid #37eaff; background: rgba(11,17,17,0.4); box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 36%; top: 57%; width: 18px; height: 18px; transform: translate(-50%,-50%); border-radius: 50%; background: #ff8a7a; color: #0b1111; font: 700 10px/18px Inter, system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px #0b1111;">3</span>
+            <span style="position: absolute; left: 36%; top: 57%; transform: translate(18px,-50%); white-space: nowrap; padding: 2px 6px; border-radius: 3px; background: rgba(11,17,17,0.88); color: #ff8a7a; font: 600 11px/1.3 Inter, system-ui, sans-serif;">3 toy_nose · no mesh landmark yet</span>
+            <span style="position: absolute; right: 10px; top: 10px; padding: 6px 10px; border-radius: 4px; background: rgba(11,17,17,0.85); font-size: 11px; color: #ced3d3; display: flex; flex-direction: column; gap: 2px;"><strong style="color: #e1e5e5; font-weight: 600;">Pose fit · frame 1,284</strong><span>RMS 2.4 px · 3 landmarks · 3 cameras</span></span>
+            <span style="position: absolute; left: 8px; bottom: 6px; font: 500 10px/1 ui-monospace, Consolas, monospace; color: #c0c6c7; background: rgba(11,17,17,0.6); padding: 2px 4px; border-radius: 2px;">cam_0  00:42.80  f1284</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600;">cam_1</span><span style="color: #babfc0;">1920×1080</span></div>
+          <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #1d2524; outline: 1px solid #353f40; outline-offset: -1px;">
+            <span style="position: absolute; left: 0; right: 0; top: 60%; bottom: 0; background: #2d3534;"></span>
+            <span style="position: absolute; left: 41%; width: 24%; top: 51%; height: 13%; border-radius: 50%; background: #8c7a60;"></span>
+            <span style="position: absolute; left: 58%; width: 9%; top: 47%; height: 16%; border-radius: 50%; background: #a3906f;"></span>
+            <span style="position: absolute; left: 40.6%; width: 24.8%; top: 50.4%; height: 14.2%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 57.6%; width: 9.8%; top: 46.6%; height: 16.8%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600;">cam_2</span><span style="color: #babfc0;">1920×1080</span></div>
+          <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #19221f; outline: 1px solid #353f40; outline-offset: -1px;">
+            <span style="position: absolute; left: 0; right: 0; top: 22%; bottom: 0; background: #29322f;"></span>
+            <span style="position: absolute; left: 32%; width: 38%; top: 42.5%; height: 13%; border-radius: 50%; background: #8c7a60;"></span>
+            <span style="position: absolute; left: 29%; width: 9%; top: 42%; height: 16%; border-radius: 50%; background: #a3906f;"></span>
+            <span style="position: absolute; left: 31.6%; width: 38.8%; top: 41.9%; height: 14.2%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+            <span style="position: absolute; left: 28.6%; width: 9.8%; top: 41.6%; height: 16.8%; border-radius: 50%; border: 1.5px solid #37eaff; box-sizing: border-box;"></span>
+          </div>
+        </div>
+      </div>
+      <p style="margin: 0; padding: 0 12px 14px; font-size: 12px; color: #babfc0; max-width: 90ch;">Same views, same transport, same point list. Geometry adds overlays (cyan, matching today's mesh-outline legend) and a section in the left rail. Mesh landmarks are where the STL says a point should be; colored dots are still your clicks.</p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

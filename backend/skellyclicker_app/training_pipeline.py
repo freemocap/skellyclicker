@@ -10,7 +10,8 @@ GRAPH=compile_graph(GraphDefinition(nodes=(
  GraphNode(id='publish_run',operation='publish_run',effects=('read_record','write_disk'),inputs=(port('trained','trained_model'),),outputs=(port('result','training_result'),)),
 ),edges=(edge('freeze_inputs','dataset','prepare_trainer','dataset'),edge('prepare_trainer','prepared','train_model','prepared'),edge('train_model','trained','publish_run','trained'))))
 
-import json,logging,os,subprocess,time
+import json,logging,subprocess,time
+from .gpu_runtime import launch_external
 from pathlib import Path
 from urllib.parse import quote
 from concurrent.futures import CancelledError
@@ -30,7 +31,8 @@ def consume_event(event,ctx,job):
     elif kind=='preview':
         asset=resolve_relative(job['work'],event['path'])
         if not asset.is_file():raise ValueError('Worker preview was not published')
-        url=f"/api/training/runs/{job['run'].run_id}/artifact?project_path={quote(str(job['manifest']),safe='')}&path={quote(event['path'],safe='')}"
+        base=job.get('artifact_url') or f"/api/training/runs/{job['run'].run_id}/artifact?project_path={quote(str(job['manifest']),safe='')}"
+        url=f"{base}&path={quote(event['path'],safe='')}"
         ctx.preview(event['id'],label=event['label'],image_url=url,step=event['step'],step_label='Epoch',checkpoint_id=event['checkpoint_id'])
     elif kind=='scan_progress':ctx.progress(event['completed'],event['total'],'images','Analyzing recording images')
     elif kind=='progress':ctx.progress(event['epoch'],job['request']['epochs'],'epochs',f"{event['detail']} · epoch {event['epoch']} / {job['request']['epochs']}")
@@ -46,7 +48,7 @@ def run_worker(mode,job,ctx):
     work=job['work'];events=work/'events.jsonl';offset=events.stat().st_size if events.exists() else 0;partial=b''
     worker=Path(__file__).parent/'workers/train_dlc.py';cancel_at=None
     with (work/f'{mode}.log').open('w',encoding='utf-8') as output:
-        process=subprocess.Popen([job['request']['python_path'],'-B',str(worker),mode,str(work)],stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+        process=launch_external([job['request']['python_path'],'-B',str(worker),mode,str(work)],stdout=output,stderr=subprocess.STDOUT)
         job['process']=process
         try:
             while True:

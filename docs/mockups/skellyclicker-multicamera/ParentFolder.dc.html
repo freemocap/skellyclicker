@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SkellyClicker — pick a recording in this folder</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121c1c}
+a{color:#86c2c5}a:hover{color:#badadb}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; box-sizing: border-box; background: #121c1c; color: #e1e5e5; font-family: Inter, system-ui, sans-serif; font-size: 13px; line-height: 1.45; display: flex; flex-direction: column;">
+
+  <header style="height: 44px; flex: none; display: flex; align-items: center; gap: 24px; padding: 0 20px; border-bottom: 1px solid #353f40;">
+    <strong style="font-size: 15px; font-weight: 600;">SkellyClicker</strong>
+    <span style="color: #babfc0;">No recording open</span>
+    <span style="margin-left: auto; display: flex; align-items: center; gap: 8px; color: #babfc0; font-size: 12px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #70d269; display: inline-block;"></span>Backend connected</span>
+  </header>
+
+  <main style="flex: 1; display: flex; justify-content: center; padding: 48px 24px;">
+    <div style="width: 100%; max-width: 1040px; display: flex; flex-direction: column; gap: 20px;">
+
+      <a href="Main.dc.html" style="font-size: 12px; text-decoration: none;">← Back</a>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h1 style="margin: 0; font-size: 22px; line-height: 1.25; font-weight: 600;">This folder holds 4 recordings. Pick one.</h1>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+          <code style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3; background: #1a2424; padding: 4px 8px; border-radius: 4px; overflow-wrap: anywhere;">C:\Users\jon\freemocap_data\recording_sessions</code>
+          <a href="Main.dc.html" style="font-size: 12px;">Change folder…</a>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid #353f40; border-radius: 8px;">
+        <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="text-align: left; color: #babfc0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">
+              <th scope="col" style="padding: 10px 16px; font-weight: 600; border-bottom: 1px solid #353f40;">Recording</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #353f40;">Cameras</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #353f40;">Frames</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #353f40;">Calibration</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #353f40;">Videos found in</th>
+              <th scope="col" style="padding: 10px 16px; border-bottom: 1px solid #353f40;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Action</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: #1a2424;">
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40;"><strong style="font-weight: 600;">2026-11-03_toy_3cam</strong><br><span style="font-size: 11px; color: #86c2c5;">Has SkellyClicker labels · last frame 1,284</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;">3</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums;">9,000</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;"><span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(76,175,180,0.14); color: #86c2c5;">Calibrated · 3/3</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3;">synchronized_videos/</td>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40; text-align: right;"><a href="V_Reopened.dc.html" style="display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 5px; background: #30a7ad; color: #0b1111; font-weight: 600; text-decoration: none;">Open</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40;"><strong style="font-weight: 600;">2026-11-07_toy_3cam_dropped</strong></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;">3</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums; color: #f3c490;">9,000 / 9,000 / 8,940</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;"><span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(76,175,180,0.14); color: #86c2c5;">Calibrated · 3/3</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3;">synchronized_videos/</td>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40; text-align: right;"><a href="V_FrameMismatch.dc.html" style="display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 5px; border: 1.5px solid #737b7b; color: #e1e5e5; text-decoration: none;">Open</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40;"><strong style="font-weight: 600;">2026-10-28_toy_3cam_uncalibrated</strong></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;">3</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums;">7,200</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;"><span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #232d2e; color: #babfc0;">None · 2D labeling</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3;">videos/synchronized/</td>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40; text-align: right;"><a href="V_NoCalibration.dc.html" style="display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 5px; border: 1.5px solid #737b7b; color: #e1e5e5; text-decoration: none;">Open</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40;"><strong style="font-weight: 600;">2026-11-03_calibration</strong><br><span style="font-size: 11px; color: #babfc0;">Calibration recording (charuco board)</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;">3</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-variant-numeric: tabular-nums;">2,400</td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40;"><span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(76,175,180,0.14); color: #86c2c5;">Source of calibration</span></td>
+              <td style="padding: 12px; border-bottom: 1px solid #353f40; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ced3d3;">synchronized_videos/</td>
+              <td style="padding: 12px 16px; border-bottom: 1px solid #353f40; text-align: right;"><a href="S1_Opened.dc.html" style="display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 5px; border: 1.5px solid #737b7b; color: #e1e5e5; text-decoration: none;">Open</a></td>
+            </tr>
+            <tr style="color: #babfc0;">
+              <td style="padding: 12px 16px;"><span style="font-weight: 600;">2026-09-30_test</span><br><span style="font-size: 11px; color: #f3c490;">Not a recording: no synchronized_videos/ or videos/synchronized/ folder</span></td>
+              <td style="padding: 12px;">—</td>
+              <td style="padding: 12px;">—</td>
+              <td style="padding: 12px;">—</td>
+              <td style="padding: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px;">raw_videos/ only</td>
+              <td style="padding: 12px 16px; text-align: right;"><span style="font-size: 12px;">Can't open</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin: 0; color: #babfc0; font-size: 12px; max-width: 80ch;">Searched this folder and one level down. A recording opens in place — videos are linked, not copied. Labels go in the recording's own <code style="font-family: ui-monospace, Consolas, monospace; color: #ced3d3;">skellyclicker/</code> folder.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

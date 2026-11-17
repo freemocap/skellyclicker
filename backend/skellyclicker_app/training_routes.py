@@ -1,14 +1,14 @@
 from typing import Literal
-import os
 from pathlib import Path
 from fastapi import APIRouter,HTTPException
 from pydantic import Field, model_validator
 from .training_inputs import TrainingInputs,training_input_preview
 from .training_pipeline import GRAPH
+from .gpu_runtime import training_python
 
 router=APIRouter(prefix='/api/training')
 class TrainingRequest(TrainingInputs):
-    python_path:str=''
+    python_path:str=Field(default_factory=training_python)
     epochs:int=Field(default=10,ge=1,le=10000)
     batch_size:int=Field(default=2,ge=1,le=32)
     save_every:int=Field(default=1,ge=1,le=1000)
@@ -30,8 +30,7 @@ class TrainingRequest(TrainingInputs):
 
 @router.get('/configuration')
 def configuration():
-    candidates=[os.environ.get('SKELLYCLICKER_TRAINING_PYTHON',''),str(Path.home()/'freemocap_data/training_environments/benchy-dlc/Scripts/python.exe')]
-    return {'graph':GRAPH.model_dump(mode='json'),'defaults':TrainingRequest(project_path='',python_path=next((p for p in candidates if p and Path(p).is_file()),'')).model_dump(mode='json'),'backend':'DeepLabCut 3.0.2 · ResNet-50'}
+    return {'graph':GRAPH.model_dump(mode='json'),'defaults':TrainingRequest(project_path='').model_dump(mode='json'),'backend':'DeepLabCut 3.0.2 · ResNet-50'}
 
 @router.post('/preview')
 def preview(request:TrainingRequest):
@@ -54,22 +53,37 @@ def start(request:TrainingRequest):
     with guard:
         if busy():raise HTTPException(409,'Another preparation, labeling or training run is active')
         if not request.expected_selection_sha256 or not request.expected_label_manifest_sha256:raise HTTPException(422,'Preview the current included images before starting')
-        if not Path(request.python_path).is_absolute() or not Path(request.python_path).is_file():raise HTTPException(422,'Select the isolated DLC Python executable')
+        if not Path(request.python_path).is_absolute() or not Path(request.python_path).is_file():raise HTTPException(422,"DeepLabCut is unavailable. Run poe dev to prepare the training environment, or provision the installed app's GPU workers.")
         try:training_input_preview(request)
         except StaleInputs as error:raise HTTPException(409,str(error)) from error
         except (ValueError,OSError,KeyError) as error:raise HTTPException(422,str(error)) from error
         manifest=Path(request.project_path).resolve();project=read_model(manifest,Project)
-        recording=read_model(resolve_relative(manifest.parent,project.recording_manifests[0]),Recording);job={}
-        def observe(snapshot):
-            job['status']={'job_id':snapshot['run_id'],'state':snapshot['status'],'stage':'training',**snapshot}
-            atomic_json(job['work']/'status.json',snapshot)
-        run=PipelineRun(GRAPH,labels={'freeze_inputs':'Freeze included images','prepare_trainer':'Prepare DeepLabCut','train_model':'Train and evaluate','publish_run':'Save run artifacts'},on_snapshot=observe)
-        work=recording_structure(manifest.parent,recording.recording_id).application_dir('skellyclicker')/'training-runs'/run.run_id;work.mkdir(parents=True)
-        job.update(kind="training",root=manifest.parent,manifest=manifest,work=work,request=request.model_dump(mode='json'),status={'state':'queued'},cancel=RunCancellation(run),process=None,run=run,started=time.monotonic())
-        atomic_json(work/'request.json',request.model_dump(mode='json'));registry.add(run)
-        thread=threading.Thread(target=lambda:run.execute(handlers(request,job),resource_capacity={'compute':1}),name='skellyclicker-training',daemon=False)
-        job['thread']=thread;jobs[run.run_id]=job;thread.start()
-        return {'run_id':run.run_id,'snapshot':run.snapshot()}
+        recording=read_model(resolve_relative(manifest.parent,project.recording_manifests[0]),Recording)
+        folder=recording_structure(manifest.parent,recording.recording_id).application_dir('skellyclicker')/'training-runs'
+        return launch_training(request, manifest, folder, handlers)
+
+
+def launch_training(request, manifest, folder, make_handlers):
+    """Register and start a training job while the caller holds the admission lock."""
+    job = {}
+    def observe(snapshot):
+        job['status'] = {'job_id':snapshot['run_id'], 'state':snapshot['status'], 'stage':'training', **snapshot}
+        atomic_json(job['work']/'status.json', snapshot)
+    run = PipelineRun(GRAPH, labels={'freeze_inputs':'Freeze included images','prepare_trainer':'Prepare DeepLabCut',
+                                    'train_model':'Train and evaluate','publish_run':'Save run artifacts'}, on_snapshot=observe)
+    work = folder/run.run_id
+    work.mkdir(parents=True)
+    job.update(kind='training', root=manifest.parent, manifest=manifest, work=work, request=request.model_dump(mode='json'),
+               status={'state':'queued'}, cancel=RunCancellation(run), process=None, run=run, started=time.monotonic())
+    atomic_json(work/'request.json', job['request'])
+    operations = make_handlers(request, job)
+    registry.add(run)
+    thread = threading.Thread(target=lambda:run.execute(operations, resource_capacity={'compute':1}), name='skellyclicker-training')
+    thread.daemon = False
+    job['thread'] = thread
+    jobs[run.run_id] = job
+    thread.start()
+    return {'run_id':run.run_id, 'snapshot':run.snapshot()}
 
 
 def run_folder(project_path,run_id):

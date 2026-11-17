@@ -1,0 +1,105 @@
+--- a/packages/ui/src/components/viewport3d/hooks/useReferenceFrameForwarder.ts
++++ b/packages/ui/src/components/viewport3d/hooks/useReferenceFrameForwarder.ts
+@@ -11,7 +11,7 @@
+     useEffect(() => {
+         target.postMessage({
+             type: 'calibrationScene',
+-            data: {calibration: !isLive && selection ? {cameras: selection.cameras ?? [], referenceFrame: selection.referenceFrame} : calibration,
++            data: {calibration: !isLive && selection?.runIds.length ? {cameras: selection.cameras ?? [], referenceFrame: selection.referenceFrame} : calibration,
+                 referenceTransform: null},
+         });
+     }, [target, isLive, calibration, selection]);
+--- a/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx
++++ b/packages/ui/src/components/viewport3d/RecordingPlaybackProvider.tsx
+@@ -193,7 +193,6 @@
+         </div>}
+         {manifest && loaded?.manifest !== manifest && !error && <p role="status" className="p-2">Loading recording data…</p>}
+         {error && <p role="alert" className="text-error p-2">{error}</p>}
+-        {!manifest && !error && <p className="p-2">No reconstruction loaded.</p>}
+         <div className="flex-1 min-h-0" style={{position: 'relative'}}>
+         {children}
+         </div>
+--- a/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx
++++ b/packages/ui/src/components/viewport3d/ThreeJsCanvas.tsx
+@@ -15,6 +15,7 @@
+ import {
+   type LoadedCalibration,
+ } from "@/calibration";
++import {useRecordingSelection} from './RecordingSelectionContext';
+ import {useReferenceFrameForwarder} from './hooks/useReferenceFrameForwarder';
+ import {usePointCloudForwarder} from './hooks/usePointCloudForwarder';
+ import type {PointCloudPlayback} from './point-cloud-format';
+@@ -146,6 +147,8 @@
+ export function ThreeJsCanvas({calibration, pointCloud, getRecordingTime, annotations}: {calibration: LoadedCalibration | null;
+   pointCloud?: PointCloudPlayback; getRecordingTime?: () => number | null; annotations?: SceneAnnotations}) {
+   const cloudProgress = usePointCloudForwarder(VIEWPORT_WORKER, pointCloud, getRecordingTime);
++  const selection = useRecordingSelection();
++  const rawRig = !selection?.runIds.length ? calibration?.cameras : undefined;
+   const camerasPaused = false;
+   const {
+     isLive,
+@@ -245,6 +248,11 @@
+     const receive = (event: MessageEvent) => {
+       if (fitted || event.data.type !== (pointCloud ? 'pointCloudStats' : 'stats')) return;
+       if (pointCloud && !event.data.data.visible) return;
++      if (rawRig?.length && event.data.data.cameras === rawRig.length) {
++        VIEWPORT_WORKER.postMessage({type: 'fitCamera', data: null});
++        fitted = true;
++        return;
++      }
+       const pointSources = (getLatestModelFrames() ?? []).flatMap(model => {
+         const points = model.landmarks ?? model.segmentOrigins;
+         return points ? [points] : [];
+@@ -258,7 +266,7 @@
+     };
+     VIEWPORT_WORKER.addEventListener('message', receive);
+     return () => {reset(); VIEWPORT_WORKER.removeEventListener('message', receive);};
+-  }, [isLive, subscribeToModels, getModels, getLatestModelFrames, cameraFitWorkspace, pointCloud?.manifestUrl]);
++  }, [isLive, subscribeToModels, getModels, getLatestModelFrames, cameraFitWorkspace, pointCloud?.manifestUrl, rawRig]);
+ 
+   const handleFit = useCallback(() => {
+     // Frame every RECONSTRUCTED thing — a person and a board both belong in the shot —
+@@ -275,7 +283,10 @@
+       } });
+       return true;
+     };
+-    if (!postFit()) return;
++    if (!postFit()) {
++      if (rawRig?.length) VIEWPORT_WORKER.postMessage({type: 'fitCamera', data: null});
++      return;
++    }
+     // Refine over 2s — each new frame recomputes the target so the camera smoothly
+     // converges as the reconstruction settles.
+     const start = performance.now();
+@@ -287,7 +298,7 @@
+       }
+       postFit();
+     }, 150);
+-  }, [getLatestModelFrames, cameraFitWorkspace]);
++  }, [getLatestModelFrames, cameraFitWorkspace, rawRig]);
+   const handleReset = useCallback(() => {
+     VIEWPORT_WORKER.postMessage({ type: "resetCamera" });
+   }, []);
+--- a/packages/ui/src/components/viewport3d/viewport3d.worker.tsx
++++ b/packages/ui/src/components/viewport3d/viewport3d.worker.tsx
+@@ -268,7 +268,19 @@
+     useEffect(() => {
+         console.log("[viewport3d worker] WorkerScene mounted");
+         const unsub1 = workerDataStore.subscribeToFitCamera((pts) => {
+-            fitCameraToPoints(controlsRef.current, withCloudBounds(pts, pointCloudStore.getLatest()?.positions));
++            if (pts) {
++                fitCameraToPoints(controlsRef.current, withCloudBounds(pts, pointCloudStore.getLatest()?.positions));
++                return;
++            }
++            const bounds = new THREE.Box3();
++            for (const camera of workerDataStore.getCalibration()?.cameras ?? []) {
++                if (camera.world_position) bounds.expandByPoint(new THREE.Vector3(...camera.world_position));
++            }
++            if (!bounds.isEmpty()) {
++                const sphere = bounds.getBoundingSphere(new THREE.Sphere());
++                sphere.radius += 150; // Include the physical camera bodies and their frustums.
++                void controlsRef.current?.fitToSphere(sphere, false);
++            }
+         });
+         const unsub2 = workerDataStore.subscribeToResetCamera(() => {
+             controlsRef.current?.reset(true);

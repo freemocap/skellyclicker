@@ -4,5 +4,5 @@ tool:
       type: simple
     tasks:
       dev:
-        help: Rebuild the backend if needed and launch SkellyClicker with live reload
+        help: Prepare DeepLabCut and the app, then launch SkellyClicker with live reload
         cmd: node tools/desktop.mjs dev

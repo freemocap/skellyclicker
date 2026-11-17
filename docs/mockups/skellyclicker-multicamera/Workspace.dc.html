@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SkellyClicker — label workspace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 100%; min-height: 900px; box-sizing: border-box; background: #121c1c; color: #e1e5e5; font-family: Inter, system-ui, sans-serif; font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- App header: recording identity, save state, open actions within reach -->
+  <header style="height: 44px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 16px 0 20px; border-bottom: 1px solid #353f40; flex-wrap: wrap;">
+    <strong style="font-size: 15px; font-weight: 600;">SkellyClicker</strong>
+    <span style="font-weight: 600; color: #e1e5e5;">{{recordingName}}</span>
+    <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #babfc0;"><span style="{{saveDotStyle}}"></span>{{saveText}}</span>
+    <span style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+      <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 5px; border: 1.5px solid #737b7b; color: #e1e5e5; text-decoration: none; font-size: 12px; font-weight: 500;">Open recording…</a>
+      <a href="Main.dc.html" style="display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border-radius: 5px; color: #babfc0; text-decoration: none; font-size: 12px;">Open project…</a>
+      <span style="display: flex; align-items: center; gap: 6px; color: #babfc0; font-size: 12px; padding-left: 8px; border-left: 1px solid #353f40;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #70d269; display: inline-block;"></span>Connected</span>
+    </span>
+  </header>
+
+  <!-- Workspace tabs (existing app tabs, re-scoped) -->
+  <nav aria-label="Workspace" style="height: 38px; flex: none; display: flex; align-items: stretch; gap: 4px; padding: 0 16px; border-bottom: 1px solid #353f40;">
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #e1e5e5; text-decoration: none; font-weight: 600; box-shadow: inset 0 -2px 0 #4cafb4;">Label</a>
+    <a href="#" style="display: flex; align-items: center; padding: 0 12px; color: #babfc0; text-decoration: none;">Training data</a>
+    <a href="#" style="display: flex; align-items: center; padding: 0 12px; color: #babfc0; text-decoration: none;">Train &amp; review</a>
+  </nav>
+
+  <div style="flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-items: stretch;">
+
+    <!-- LEFT RAIL: recording + target + ordered points -->
+    <aside aria-label="Recording and points" style="flex: 0 0 280px; box-sizing: border-box; border-right: 1px solid #353f40; display: flex; flex-direction: column; min-width: 0; max-height: 818px; overflow: auto;">
+
+      <section style="padding: 14px 16px; border-bottom: 1px solid #353f40; display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Recording</span>
+        <span style="font-weight: 600; overflow-wrap: anywhere;">{{recordingName}}</span>
+        <span style="font-size: 12px; color: #babfc0;">{{recordingFacts}}</span>
+        <span style="{{calSummaryStyle}}">{{calSummary}}</span>
+      </section>
+
+      <section style="padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Target</span>
+          <sc-if value="{{hasPoints}}" hint-placeholder-val="{{true}}">
+            <span style="font-weight: 600;">{{targetName}}</span>
+            <span style="font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #232d2e; color: #ced3d3;">{{targetTypeLabel}}</span>
+            <button type="button" onClick="{{editPoints}}" style="margin-left: auto; height: 26px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Edit points</button>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{noPoints}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 8px; background: #1a2424;">
+            <span style="font-weight: 600;">What are you tracking?</span>
+            <span style="font-size: 12px; color: #babfc0;">List the point names in order. You can watch and scrub the footage without them.</span>
+            <button type="button" onClick="{{openDefine}}" style="height: 34px; border-radius: 5px; border: 0; background: #30a7ad; color: #0b1111; font: inherit; font-weight: 600; cursor: pointer;">Define points…</button>
+            <button type="button" onClick="{{loadJsonDirect}}" style="height: 30px; border-radius: 5px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Load point list (.json)…</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{hasPoints}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 0 8px; font-size: 11px; color: #babfc0;">
+            <span style="flex: 1;">Points (in order)</span>
+            <span style="display: flex; gap: 6px; font-variant-numeric: tabular-nums;" aria-hidden="true">
+              <sc-for list="{{camNums}}" as="cn" hint-placeholder-count="3"><span style="width: 10px; text-align: center;">{{cn.n}}</span></sc-for>
+            </span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+              <button type="button" onClick="{{r.onClick}}" aria-pressed="{{r.pressed}}" title="{{r.title}}" style="{{r.rowStyle}}">
+                <span style="{{r.badgeStyle}}">{{r.num}}</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left;">
+                  <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{r.name}}</span>
+                  <span style="{{r.statusStyle}}">{{r.status}}</span>
+                </span>
+                <span style="display: flex; gap: 6px; align-items: center;">
+                  <sc-for list="{{r.glyphs}}" as="g" hint-placeholder-count="3"><span title="{{g.label}}" style="{{g.style}}"></span></sc-for>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+          <span style="font-size: 11px; color: #babfc0; padding: 0 8px;">1–9 pick a point · Tab next point</span>
+        </sc-if>
+      </section>
+
+      <section style="margin-top: auto; padding: 12px 16px; border-top: 1px solid #353f40; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Target geometry</span>
+        <span style="font-size: 12px; color: #babfc0;">Reference landmarks, STL mesh and pose fitting appear here when the target is Rigid or Mesh. Clicks stay as they are.</span>
+        <a href="TargetTools.dc.html" style="font-size: 12px; color: #86c2c5;">See rigid / STL tools →</a>
+      </section>
+    </aside>
+
+    <!-- CENTER: toolbar, banner, synchronized camera views, shared transport -->
+    <section aria-label="Cameras" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box;">
+
+      <div style="flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; border-bottom: 1px solid #353f40;">
+        <div role="group" aria-label="Layout" style="display: flex; padding: 2px; border-radius: 6px; background: #1a2424; gap: 2px;">
+          <sc-for list="{{layouts}}" as="l" hint-placeholder-count="3">
+            <button type="button" onClick="{{l.onClick}}" aria-pressed="{{l.pressed}}" title="{{l.hint}}" style="{{l.style}}">{{l.label}}</button>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{toggleProj}}" aria-pressed="{{showProj}}" style="{{projBtnStyle}}">{{projBtnLabel}}</button>
+        <span style="font-size: 12px; color: #babfc0;">Zoom: Fit · scroll to zoom, Space + drag to pan</span>
+        <span style="margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 11px; color: #ced3d3; flex-wrap: wrap;" aria-label="Legend">
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #e1e5e5;"></span>Clicked</span>
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 11px; height: 11px; box-sizing: border-box; border-radius: 50%; border: 2px dashed #e1e5e5;"></span>Projected</span>
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #e1e5e5; box-shadow: inset 0 0 0 2px #121c1c, 0 0 0 1px #e1e5e5;"></span>Accepted</span>
+          <span style="display: flex; align-items: center; gap: 5px;"><span style="display: inline-block; width: 8px; height: 8px; margin: 1px; box-sizing: border-box; border: 2px solid #e1e5e5; transform: rotate(45deg);"></span>Model</span>
+        </span>
+      </div>
+
+      <sc-if value="{{banner.show}}" hint-placeholder-val="{{false}}">
+        <div role="status" style="{{banner.style}}">
+          <span style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+            <strong style="font-weight: 600; color: #e1e5e5;">{{banner.title}}</strong>
+            <span style="color: #ced3d3; font-size: 12px;">{{banner.body}}</span>
+          </span>
+          <sc-if value="{{banner.showLink}}" hint-placeholder-val="{{false}}">
+            <a href="{{banner.href}}" style="display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 5px; background: #e1e5e5; color: #0b1111; text-decoration: none; font-weight: 600; font-size: 12px;">{{banner.linkText}}</a>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <div style="flex: 1; min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+
+        <sc-if value="{{isSingle}}" hint-placeholder-val="{{false}}">
+          <div role="tablist" aria-label="Camera" style="display: flex; gap: 4px; border-bottom: 1px solid #353f40;">
+            <sc-for list="{{views}}" as="t" hint-placeholder-count="3">
+              <button type="button" role="tab" aria-selected="{{t.isActive}}" onClick="{{t.onSelect}}" style="{{t.tabStyle}}"><span style="{{t.tabGlyph}}"></span>{{t.title}}</button>
+            </sc-for>
+            <span style="margin-left: auto; align-self: center; font-size: 11px; color: #babfc0;">[ and ] switch camera</span>
+          </div>
+        </sc-if>
+
+        <div style="{{gridStyle}}">
+          <sc-for list="{{views}}" as="v" hint-placeholder-count="3">
+            <div style="{{v.cellStyle}}">
+              <div style="display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 12px;">
+                <span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600; color: #e1e5e5;">{{v.title}}</span>
+                <span style="color: #babfc0; font-variant-numeric: tabular-nums;">{{v.dims}}</span>
+                <span style="{{v.chipStyle}}">{{v.chip}}</span>
+                <sc-if value="{{v.isActive}}" hint-placeholder-val="{{false}}">
+                  <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #86c2c5;">Active</span>
+                </sc-if>
+              </div>
+              <button type="button" onClick="{{v.onClick}}" aria-label="{{v.aria}}" style="{{v.frameStyle}}">
+                <sc-for list="{{v.scene}}" as="sh" hint-placeholder-count="6"><span style="{{sh.style}}"></span></sc-for>
+                <span style="position: absolute; left: 8px; bottom: 6px; font: 500 10px/1 ui-monospace, Consolas, monospace; color: #c0c6c7; background: rgba(11,17,17,0.6); padding: 2px 4px; border-radius: 2px; pointer-events: none;">{{v.burnIn}}</span>
+                <sc-for list="{{v.markers}}" as="m" hint-placeholder-count="2">
+                  <span style="{{m.style}}">{{m.text}}</span>
+                  <sc-if value="{{m.showChip}}" hint-placeholder-val="{{false}}"><span style="{{m.chipStyle}}">{{m.chip}}</span></sc-if>
+                </sc-for>
+                <sc-if value="{{v.showOverlay}}" hint-placeholder-val="{{false}}">
+                  <span style="position: absolute; right: 8px; top: 8px; max-width: 70%; padding: 4px 8px; border-radius: 4px; background: rgba(11,17,17,0.85); color: #f3c490; font-size: 11px; text-align: right; pointer-events: none;">{{v.overlay}}</span>
+                </sc-if>
+              </button>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{showTips}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px dashed #444f4f; border-radius: 6px; color: #babfc0; font-size: 12px; align-self: stretch;">
+              <strong style="color: #e1e5e5; font-weight: 600; font-size: 13px;">Need room to click precisely?</strong>
+              <span><strong style="color: #ced3d3;">Focus (F)</strong> — active camera large, others as thumbnails. Click a thumbnail to swap.</span>
+              <span><strong style="color: #ced3d3;">Single (S)</strong> — one camera at full width, tabs show which have the point.</span>
+              <span><strong style="color: #ced3d3;">Zoom</strong> — scroll on a view; zoom follows the active point across cameras.</span>
+              <span>With 6+ cameras, Grid becomes 3 columns and Focus is the default.</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!-- Shared transport: one frame index for every camera -->
+      <div style="flex: none; border-top: 1px solid #353f40; padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;">
+          <button type="button" onClick="{{stepM10}}" aria-label="Back 10 frames (Shift+←)" style="height: 28px; min-width: 40px; border-radius: 4px; border: 1.5px solid #444f4f; background: #1a2424; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">−10</button>
+          <button type="button" onClick="{{stepM1}}" aria-label="Previous frame (←)" style="height: 28px; min-width: 34px; border-radius: 4px; border: 1.5px solid #444f4f; background: #1a2424; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">◀</button>
+          <button type="button" aria-label="Play" style="height: 28px; min-width: 44px; border-radius: 4px; border: 1.5px solid #444f4f; background: #1a2424; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Play</button>
+          <button type="button" onClick="{{stepP1}}" aria-label="Next frame (→)" style="height: 28px; min-width: 34px; border-radius: 4px; border: 1.5px solid #444f4f; background: #1a2424; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">▶</button>
+          <button type="button" onClick="{{stepP10}}" aria-label="Forward 10 frames (Shift+→)" style="height: 28px; min-width: 40px; border-radius: 4px; border: 1.5px solid #444f4f; background: #1a2424; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">+10</button>
+          <span style="font-variant-numeric: tabular-nums; font-size: 13px;">Frame <strong style="font-weight: 600;">{{frameText}}</strong> <span style="color: #babfc0;">of {{totalText}}</span></span>
+          <span style="font-variant-numeric: tabular-nums; color: #babfc0; font-family: ui-monospace, Consolas, monospace; font-size: 12px;">{{timeText}}</span>
+          <span style="margin-left: auto; font-size: 11px; color: #babfc0;">All cameras show this frame · {{syncText}}</span>
+        </div>
+        <button type="button" onClick="{{seek}}" aria-label="Seek" style="position: relative; display: block; width: 100%; height: 18px; padding: 0; border: 0; background: transparent; cursor: pointer;">
+          <span style="position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: #353f40;"></span>
+          <sc-for list="{{allTicks}}" as="tk" hint-placeholder-count="3"><span style="{{tk.style}}"></span></sc-for>
+          <span style="{{playheadStyle}}"></span>
+        </button>
+        <sc-if value="{{hasPoints}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-direction: column; gap: 3px;" aria-label="Labeled frames per point">
+            <sc-for list="{{lanes}}" as="ln" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="width: 96px; flex: none; font-size: 10px; color: #babfc0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ln.name}}</span>
+                <span style="position: relative; flex: 1; height: 8px; border-radius: 2px; background: #1a2424;">
+                  <sc-for list="{{ln.ticks}}" as="lt" hint-placeholder-count="3"><span style="{{lt.style}}"></span></sc-for>
+                  <span style="{{lanePlayheadStyle}}"></span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+
+    <!-- RIGHT RAIL: inspector for the active point at this frame -->
+    <aside aria-label="Inspector" style="flex: 0 0 320px; box-sizing: border-box; border-left: 1px solid #353f40; display: flex; flex-direction: column; min-width: 0; max-height: 818px; overflow: auto;">
+
+      <sc-if value="{{showInspector}}" hint-placeholder-val="{{true}}">
+        <section style="padding: 14px 16px; border-bottom: 1px solid #353f40; display: flex; flex-direction: column; gap: 4px;">
+          <span style="display: flex; align-items: center; gap: 8px;">
+            <span style="{{insp.badgeStyle}}">{{insp.num}}</span>
+            <strong style="font-size: 15px; font-weight: 600; overflow-wrap: anywhere;">{{insp.name}}</strong>
+          </span>
+          <span style="font-size: 12px; color: #babfc0; font-variant-numeric: tabular-nums;">Frame {{frameText}} · {{timeText}}</span>
+        </section>
+
+        <section style="padding: 12px 16px; border-bottom: 1px solid #353f40; display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Evidence per camera</span>
+          <sc-for list="{{insp.rows}}" as="ir" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 6px; background: #1a2424;">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="{{ir.glyphStyle}}"></span>
+                <span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 600;">{{ir.cam}}</span>
+                <span style="{{ir.kindStyle}}">{{ir.kind}}</span>
+              </span>
+              <span style="{{ir.detailStyle}}">{{ir.detail}}</span>
+              <span style="display: flex; gap: 6px;">
+                <sc-if value="{{ir.showAccept}}" hint-placeholder-val="{{false}}">
+                  <button type="button" onClick="{{ir.onAccept}}" style="height: 26px; padding: 0 10px; border-radius: 4px; border: 0; background: #30a7ad; color: #0b1111; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">Accept projection</button>
+                </sc-if>
+                <sc-if value="{{ir.showClear}}" hint-placeholder-val="{{false}}">
+                  <button type="button" onClick="{{ir.onClear}}" style="height: 26px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Clear</button>
+                </sc-if>
+              </span>
+            </div>
+          </sc-for>
+        </section>
+
+        <section style="padding: 12px 16px; border-bottom: 1px solid #353f40; display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">3D</span>
+          <strong style="{{insp.triTitleStyle}}">{{insp.triTitle}}</strong>
+          <sc-for list="{{insp.triLines}}" as="tl" hint-placeholder-count="2"><span style="{{tl.style}}">{{tl.text}}</span></sc-for>
+          <sc-if value="{{insp.showCalBtn}}" hint-placeholder-val="{{false}}">
+            <button type="button" style="align-self: flex-start; height: 28px; padding: 0 12px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Add calibration TOML…</button>
+          </sc-if>
+          <sc-if value="{{insp.showMatch}}" hint-placeholder-val="{{false}}">
+            <a href="CameraMatch.dc.html" style="align-self: flex-start; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 4px; background: #e1e5e5; color: #0b1111; text-decoration: none; font-size: 12px; font-weight: 600;">Match cameras…</a>
+          </sc-if>
+        </section>
+
+        <section style="padding: 12px 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" onClick="{{nextPoint}}" style="flex: 1; height: 32px; border-radius: 5px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Next point: {{nextPointName}} (Tab)</button>
+          <button type="button" onClick="{{stepP1}}" style="flex: 1; height: 32px; border-radius: 5px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Next frame (→)</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{showRecordingInfo}}" hint-placeholder-val="{{false}}">
+        <section style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #babfc0;">Cameras found</span>
+          <sc-for list="{{views}}" as="ci" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 6px; background: #1a2424;">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600;">{{ci.title}}</span>
+                <span style="{{ci.chipStyle}}">{{ci.chip}}</span>
+              </span>
+              <span style="font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #babfc0;">{{ci.file}}</span>
+              <span style="font-size: 12px; color: #ced3d3; font-variant-numeric: tabular-nums;">{{ci.dims}}</span>
+            </div>
+          </sc-for>
+          <span style="font-size: 12px; color: #babfc0;">{{syncLong}}</span>
+          <span style="font-size: 12px; color: #babfc0;">Pick a point on the left to start clicking. Until then you can scrub, play and switch layouts.</span>
+        </section>
+      </sc-if>
+    </aside>
+  </div>
+
+  <!-- Point definition drawer -->
+  <sc-if value="{{drawerOpen}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 82px 0 0 0; background: rgba(6,6,6,0.6); z-index: 20;"></div>
+    <section role="dialog" aria-label="Define what to track" style="position: absolute; top: 82px; left: 0; bottom: 0; width: 440px; max-width: 100%; box-sizing: border-box; z-index: 21; background: #1a2424; border-right: 1px solid #444f4f; box-shadow: 12px 0 40px rgba(0,0,0,0.45); display: flex; flex-direction: column;">
+      <div style="padding: 18px 20px 12px; border-bottom: 1px solid #353f40; display: flex; flex-direction: column; gap: 4px;">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 600;">Define what to track</h2>
+        <span style="font-size: 12px; color: #babfc0;">Names and order become the training labels. You can rename, reorder or add points later.</span>
+      </div>
+      <div style="flex: 1; overflow: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #ced3d3;">Target name
+          <input type="text" value="{{targetName}}" onChange="{{onTargetName}}" style="height: 32px; padding: 0 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: #232d2e; color: #e1e5e5; font: inherit;">
+        </label>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+          <label style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #ced3d3;">Point names, one per line, in order
+            <textarea rows="7" onChange="{{onDraft}}" value="{{draft}}" style="padding: 8px 10px; border-radius: 4px; border: 1.5px solid #737b7b; background: #232d2e; color: #e1e5e5; font: 13px/1.6 ui-monospace, Consolas, monospace; resize: vertical;"></textarea>
+          </label>
+          <div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #ced3d3;">
+            <span>Preview</span>
+            <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;">
+              <sc-for list="{{draftPreview}}" as="dp" hint-placeholder-count="3">
+                <li style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span style="{{dp.badgeStyle}}">{{dp.num}}</span><span style="overflow-wrap: anywhere;">{{dp.name}}</span></li>
+              </sc-for>
+            </ol>
+            <sc-if value="{{draftError.show}}" hint-placeholder-val="{{false}}"><span role="alert" style="color: #f9a4a1; font-size: 12px;">{{draftError.text}}</span></sc-if>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+          <button type="button" onClick="{{loadJson}}" style="height: 30px; padding: 0 12px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Load .json…</button>
+          <span style="font-size: 11px; color: #babfc0; font-family: ui-monospace, Consolas, monospace;">{"tracked_point_names": [...]}</span>
+          <sc-if value="{{loadedJson}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #86c2c5;">Loaded toy_tracked_points.json · 3 points</span></sc-if>
+        </div>
+
+        <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+          <legend style="font-size: 12px; color: #ced3d3; margin-bottom: 8px;">How do the points move? <span style="color: #babfc0;">(change any time)</span></legend>
+          <sc-for list="{{targetTypes}}" as="tt" hint-placeholder-count="3">
+            <button type="button" onClick="{{tt.onClick}}" aria-pressed="{{tt.pressed}}" style="{{tt.style}}">
+              <span style="{{tt.radioStyle}}"></span>
+              <span style="display: flex; flex-direction: column; gap: 2px; text-align: left;">
+                <strong style="font-weight: 600; color: #e1e5e5;">{{tt.title}}</strong>
+                <span style="font-size: 12px; color: #babfc0;">{{tt.desc}}</span>
+              </span>
+            </button>
+          </sc-for>
+        </fieldset>
+      </div>
+      <div style="padding: 12px 20px; border-top: 1px solid #353f40; display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onClick="{{cancelDefine}}" style="height: 34px; padding: 0 16px; border-radius: 5px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; cursor: pointer;">Cancel</button>
+        <button type="button" onClick="{{startLabeling}}" disabled="{{startDisabled}}" style="{{startStyle}}">{{startLabel}}</button>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- Restore toast -->
+  <sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+    <div role="status" style="position: absolute; top: 94px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 6px; background: #232d2e; border: 1px solid #444f4f; box-shadow: 0 10px 30px rgba(0,0,0,0.45); max-width: calc(100% - 32px);">
+      <span style="display: flex; flex-direction: column; gap: 2px;">
+        <strong style="font-weight: 600;">Picked up where you left off</strong>
+        <span style="font-size: 12px; color: #ced3d3;">Frame 1,284 · active point toy_nose · cam_1 · 2 clicks restored. cam_2 still shows a projection, not a click.</span>
+        <span style="font-size: 11px; color: #babfc0; font-family: ui-monospace, Consolas, monospace;">{{recordingName}}/skellyclicker/</span>
+      </span>
+      <button type="button" onClick="{{dismissToast}}" style="height: 28px; padding: 0 12px; border-radius: 4px; border: 1.5px solid #737b7b; background: transparent; color: #e1e5e5; font: inherit; font-size: 12px; cursor: pointer;">Dismiss</button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"stage":{"editor":"enum","options":["opened","defining","labeling"],"default":"opened","section":"Scenario"},"seed":{"editor":"enum","options":["none","two-clicks"],"default":"none","section":"Scenario"},"issue":{"editor":"enum","options":["none","missing","ambiguous","frames"],"default":"none","section":"Scenario"},"layout":{"editor":"enum","options":["grid","focus","single"],"default":"grid","section":"Scenario"},"restored":{"editor":"enum","options":["no","yes"],"default":"no","section":"Scenario"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  camDefs() {
+    const issue = this.issue();
+    const files = issue === 'ambiguous' ? ['cam_0.mp4', 'GX010417.mp4', 'GX010418.mp4'] : ['cam_0.mp4', 'cam_1.mp4', 'cam_2.mp4'];
+    return [
+      { id: 'cam_0', file: files[0], nose: [0.36, 0.57], tail: [0.64, 0.585], lift: 0.12, table: 62, wall: '#1b2627', tableColor: '#2b3637', board: 'left: 76%; top: 16%; width: 12%; height: 30%;' },
+      { id: 'cam_1', file: files[1], nose: [0.66, 0.55], tail: [0.39, 0.6], lift: 0.12, table: 60, wall: '#1d2524', tableColor: '#2d3534', board: 'left: 9%; top: 14%; width: 12%; height: 30%;' },
+      { id: 'cam_2', file: files[2], nose: [0.3, 0.5], tail: [0.71, 0.48], lift: 0.075, table: 22, wall: '#19221f', tableColor: '#29322f', board: 'left: 80%; top: 64%; width: 13%; height: 24%;' }
+    ];
+  }
+
+  issue() { return (this.props && this.props.issue) || 'none'; }
+
+  colors() { return ['#ffd166', '#c39bff', '#ff8a7a', '#7fd6ff', '#9be38b', '#ffa8e0']; }
+
+  defaultNames() { return ['toy_top', 'toy_tail_base', 'toy_nose']; }
+
+  truth(ci, pi, f) {
+    const c = this.camDefs()[ci];
+    const dir = ci === 1 ? -1 : 1;
+    const d = Math.max(-0.14, Math.min(0.14, (f - 1284) * 0.0025)) * dir;
+    const nose = [c.nose[0] + d, c.nose[1]];
+    const tail = [c.tail[0] + d, c.tail[1]];
+    const mid = [(nose[0] + tail[0]) / 2, (nose[1] + tail[1]) / 2];
+    if (pi === 0) return [mid[0], mid[1] - c.lift];
+    if (pi === 1) return tail;
+    if (pi === 2) return nose;
+    const k = 0.2 + ((pi - 3) * 0.17) % 0.6;
+    return [nose[0] + (tail[0] - nose[0]) * k, nose[1] + (tail[1] - nose[1]) * k - 0.035];
+  }
+
+  initialState() {
+    const p = this.props || {};
+    const restored = p.restored === 'yes';
+    const seeded = p.seed === 'two-clicks' || restored;
+    const stage = seeded ? 'labeling' : (p.stage || 'opened');
+    const names = stage === 'labeling' ? this.defaultNames() : [];
+    const obs = {};
+    if (seeded) {
+      const cams = ['cam_0', 'cam_1', 'cam_2'];
+      [312, 640, 1020].forEach((f) => {
+        obs[f] = {};
+        [0, 1, 2].forEach((pi) => {
+          obs[f][pi] = {};
+          cams.forEach((cid, ci) => {
+            const t = this.truth(ci, pi, f);
+            obs[f][pi][cid] = { x: t[0] + 0.003, y: t[1] - 0.002, origin: 'click' };
+          });
+        });
+      });
+      delete obs[1020][0].cam_2;
+      delete obs[1020][0].cam_1;
+      const n0 = this.truth(0, 2, 1284);
+      const n1 = this.truth(1, 2, 1284);
+      const t2 = this.truth(2, 1, 1284);
+      obs[1284] = {
+        2: { cam_0: { x: n0[0] + 0.004, y: n0[1] + 0.003, origin: 'click' }, cam_1: { x: n1[0] - 0.003, y: n1[1] + 0.002, origin: 'click' } },
+        1: { cam_2: { x: t2[0] + 0.012, y: t2[1] - 0.009, origin: 'prediction', conf: 0.91 } }
+      };
+    }
+    return {
+      stage: stage,
+      names: names,
+      active: seeded ? 2 : 0,
+      frame: 1284,
+      obs: obs,
+      layout: p.layout || 'grid',
+      activeCam: seeded ? 'cam_1' : 'cam_0',
+      draft: 'toy_top\ntoy_tail_base\ntoy_nose',
+      targetName: 'toy',
+      targetType: 'points',
+      showProj: true,
+      toast: restored,
+      loadedJson: false
+    };
+  }
+
+  current() { return Object.assign(this.initialState(), this.state || {}); }
+
+  usable(ci) {
+    const issue = this.issue();
+    if (issue === 'missing') return false;
+    if (issue === 'ambiguous') return ci === 0;
+    if (issue === 'frames') return ci !== 2;
+    return true;
+  }
+
+  projectable(ci) {
+    const issue = this.issue();
+    if (issue === 'missing' || issue === 'ambiguous') return false;
+    if (issue === 'frames') return ci !== 2;
+    return true;
+  }
+
+  evidence(pi, f, s) {
+    const cams = this.camDefs();
+    const po = (s.obs[f] && s.obs[f][pi]) || {};
+    const tri = [];
+    cams.forEach((c, ci) => { const o = po[c.id]; if (o && o.origin === 'click' && this.usable(ci)) tri.push(ci); });
+    const canTri = tri.length >= 2;
+    const per = cams.map((c, ci) => {
+      const o = po[c.id];
+      if (o) return { kind: o.origin, x: o.x, y: o.y, conf: o.conf };
+      if (canTri && this.projectable(ci)) {
+        const t = this.truth(ci, pi, f);
+        return { kind: 'projected', x: t[0] + 0.004, y: t[1] - 0.003 };
+      }
+      return { kind: 'none' };
+    });
+    const errs = canTri ? tri.map((ci) => {
+      const o = po[cams[ci].id];
+      const t = this.truth(ci, pi, f);
+      return Math.hypot((o.x - t[0]) * 1920, (o.y - t[1]) * 1080) * 0.5 + 0.6;
+    }) : [];
+    return { per: per, tri: tri, canTri: canTri, errs: errs };
+  }
+
+  glyph(kind, color, size) {
+    const z = size;
+    const b = 'display:inline-block;flex:none;box-sizing:border-box;';
+    if (kind === 'click') return b + `width:${z}px;height:${z}px;border-radius:50%;background:${color};`;
+    if (kind === 'accepted') return b + `width:${z}px;height:${z}px;border-radius:50%;background:${color};box-shadow:inset 0 0 0 2px #121c1c,0 0 0 1px ${color};`;
+    if (kind === 'projected') return b + `width:${z + 1}px;height:${z + 1}px;border-radius:50%;border:2px dashed ${color};`;
+    if (kind === 'prediction') return b + `width:${z - 2}px;height:${z - 2}px;margin:1px;border:2px solid ${color};transform:rotate(45deg);`;
+    return b + `width:${z}px;height:2px;margin:${(z - 2) / 2}px 0;border-radius:1px;background:#737b7b;`;
+  }
+
+  kindLabel(kind) {
+    return { click: 'Clicked', accepted: 'Accepted projection', projected: 'Projected', prediction: 'Model prediction', none: 'No observation' }[kind];
+  }
+
+  marker(e, color, isActive, num, name) {
+    const left = (e.x * 100).toFixed(2);
+    const top = (e.y * 100).toFixed(2);
+    const base = `position:absolute;left:${left}%;top:${top}%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;pointer-events:none;font:700 10px/1 Inter,system-ui,sans-serif;z-index:${isActive ? 3 : 2};opacity:${isActive ? 1 : 0.8};`;
+    let style = '';
+    let text = '';
+    let chip = '';
+    if (e.kind === 'click') {
+      const z = isActive ? 18 : 15;
+      style = base + `width:${z}px;height:${z}px;transform:translate(-50%,-50%);border-radius:50%;background:${color};color:#0b1111;box-shadow:0 0 0 2px #0b1111;`;
+      text = String(num);
+      chip = `${num} ${name}`;
+    } else if (e.kind === 'accepted') {
+      const z = isActive ? 20 : 16;
+      style = base + `width:${z}px;height:${z}px;transform:translate(-50%,-50%);border-radius:50%;background:${color};color:#0b1111;box-shadow:inset 0 0 0 3px #0b1111,0 0 0 2px ${color};`;
+      text = String(num);
+      chip = `${num} ${name} · accepted projection`;
+    } else if (e.kind === 'projected') {
+      const z = isActive ? 26 : 20;
+      style = base + `width:${z}px;height:${z}px;transform:translate(-50%,-50%);border-radius:50%;border:2px dashed ${color};background:rgba(11,17,17,0.35);color:${color};`;
+      text = String(num);
+      chip = `${num} ${name} · projected, not observed`;
+    } else {
+      style = base + `width:13px;height:13px;transform:translate(-50%,-50%) rotate(45deg);border:2px solid ${color};background:rgba(11,17,17,0.35);`;
+      chip = `${num} ${name} · model ${Math.round(e.conf * 100)}%`;
+    }
+    const flip = e.x > 0.68;
+    const chipStyle = `position:absolute;left:${left}%;top:${top}%;transform:${flip ? 'translate(calc(-100% - 18px),-50%)' : 'translate(18px,-50%)'};pointer-events:none;white-space:nowrap;padding:2px 6px;border-radius:3px;background:rgba(11,17,17,0.88);color:${color};font:600 11px/1.3 Inter,system-ui,sans-serif;z-index:4;`;
+    return { style: style, text: text, chip: chip, showChip: isActive || e.kind === 'prediction', chipStyle: chipStyle };
+  }
+
+  scene(c, ci, f) {
+    const pct = (v) => (v * 100).toFixed(2) + '%';
+    const top = this.truth(ci, 0, f);
+    const tail = this.truth(ci, 1, f);
+    const nose = this.truth(ci, 2, f);
+    const minX = Math.min(nose[0], tail[0]);
+    const maxX = Math.max(nose[0], tail[0]);
+    const midY = (nose[1] + tail[1]) / 2;
+    const towardTail = tail[0] > nose[0] ? 1 : -1;
+    const styles = [
+      `position:absolute;left:0;right:0;top:${c.table}%;bottom:0;background:${c.tableColor};border-top:1px solid #3a4647;`,
+      `position:absolute;${c.board}background:#2f3a3b;border:1px solid #4a5657;border-radius:2px;`,
+      `position:absolute;left:${pct(minX)};width:${pct(maxX - minX)};top:${pct(midY + 0.05)};height:4%;border-radius:50%;background:rgba(0,0,0,0.28);`,
+      `position:absolute;left:${pct(towardTail > 0 ? tail[0] : tail[0] - 0.07)};width:7%;top:${pct(tail[1] - 0.008)};height:1.6%;border-radius:2px;background:#76664f;`,
+      `position:absolute;left:${pct(minX + 0.02)};width:${pct(maxX - minX - 0.03)};top:${pct(midY - 0.065)};height:13%;border-radius:50%;background:#8c7a60;`,
+      `position:absolute;left:${pct(top[0] - 0.025)};width:5%;top:${pct(top[1] - 0.01)};height:${pct(midY - top[1])};border-radius:45% 45% 10% 10%;background:#76664f;`,
+      `position:absolute;left:${pct(nose[0] + towardTail * 0.035 - 0.045)};width:9%;top:${pct(nose[1] - 0.08)};height:16%;border-radius:50%;background:#a3906f;`
+    ];
+    return styles.map((style) => ({ style: style }));
+  }
+
+  camStatus(ci) {
+    const issue = this.issue();
+    const teal = 'font-size:11px;padding:1px 7px;border-radius:9px;background:rgba(76,175,180,0.14);color:#86c2c5;';
+    const neutral = 'font-size:11px;padding:1px 7px;border-radius:9px;background:#232d2e;color:#babfc0;';
+    const warn = 'font-size:11px;padding:1px 7px;border-radius:9px;background:rgba(209,96,60,0.2);color:#f3c490;';
+    if (issue === 'missing') return { chip: 'No calibration', chipStyle: neutral };
+    if (issue === 'ambiguous' && ci > 0) return { chip: 'cam_1 or cam_2?', chipStyle: warn };
+    if (issue === 'frames' && ci === 2) return { chip: '8,940 frames ≠ 9,000', chipStyle: warn };
+    return { chip: 'Calibrated', chipStyle: teal };
+  }
+
+  cloneObs(obs) { return JSON.parse(JSON.stringify(obs)); }
+
+  setObs(f, pi, camId, value) {
+    const s = this.current();
+    const obs = this.cloneObs(s.obs);
+    if (!obs[f]) obs[f] = {};
+    if (!obs[f][pi]) obs[f][pi] = {};
+    if (value) obs[f][pi][camId] = value; else delete obs[f][pi][camId];
+    this.setState({ obs: obs, toast: false });
+  }
+
+  viewClick(camId, e, isActive) {
+    const s = this.current();
+    if (s.layout === 'focus' && !isActive) { this.setState({ activeCam: camId }); return; }
+    if (!(s.stage === 'labeling' && s.names.length)) { this.setState({ activeCam: camId }); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return;
+    const obs = this.cloneObs(s.obs);
+    if (!obs[s.frame]) obs[s.frame] = {};
+    if (!obs[s.frame][s.active]) obs[s.frame][s.active] = {};
+    obs[s.frame][s.active][camId] = { x: x, y: y, origin: 'click' };
+    this.setState({ obs: obs, activeCam: camId, toast: false });
+  }
+
+  step(n) {
+    const s = this.current();
+    const total = this.issue() === 'missing' ? 7200 : 9000;
+    this.setState({ frame: Math.max(0, Math.min(total - 1, s.frame + n)), toast: false });
+  }
+
+  parseDraft(text) {
+    return text.split('\n').map((v) => v.trim()).filter((v) => v.length > 0);
+  }
+
+  timeText(f) {
+    const secs = f / 30;
+    const m = Math.floor(secs / 60);
+    const sec = secs - m * 60;
+    return String(m).padStart(2, '0') + ':' + sec.toFixed(2).padStart(5, '0');
+  }
+
+  renderVals() {
+    const s = this.current();
+    const issue = this.issue();
+    const cams = this.camDefs();
+    const colors = this.colors();
+    const f = s.frame;
+    const total = issue === 'missing' ? 7200 : 9000;
+    const hasPoints = s.names.length > 0;
+    const labeling = s.stage !== 'opened' && hasPoints;
+    const active = Math.min(s.active, Math.max(0, s.names.length - 1));
+    const activeCi = Math.max(0, cams.findIndex((c) => c.id === s.activeCam));
+    const evs = s.names.map((n, pi) => this.evidence(pi, f, s));
+    const recordingName = { none: '2026-11-03_toy_3cam', missing: '2026-10-28_toy_3cam_uncalibrated', ambiguous: '2026-10-12_toy_gopro_3cam', frames: '2026-11-07_toy_3cam_dropped' }[issue];
+    const badge = (color, z) => `width:${z}px;height:${z}px;flex:none;border-radius:50%;background:${color};color:#0b1111;font:700 11px/1 Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;`;
+
+    // Camera views
+    const views = cams.map((c, ci) => {
+      const isActive = ci === activeCi;
+      const st = this.camStatus(ci);
+      const markers = [];
+      if (labeling) {
+        s.names.forEach((n, pi) => {
+          const e = evs[pi].per[ci];
+          if (e.kind === 'none') return;
+          if (e.kind === 'projected' && !s.showProj) return;
+          markers.push(this.marker(e, colors[pi % colors.length], pi === active, pi + 1, n));
+        });
+      }
+      const unresolved = issue === 'ambiguous' && ci > 0;
+      const title = unresolved ? c.file.replace('.mp4', '') : c.id;
+      let cellStyle = 'display:flex;flex-direction:column;gap:4px;min-width:0;';
+      if (s.layout === 'focus') cellStyle += isActive ? 'grid-column:1;grid-row:1 / span 2;' : 'grid-column:2;';
+      if (s.layout === 'single' && !isActive) cellStyle += 'display:none;';
+      const thumb = s.layout === 'focus' && !isActive;
+      const cursor = thumb ? 'pointer' : (labeling ? 'crosshair' : 'default');
+      const frameStyle = `position:relative;display:block;width:100%;aspect-ratio:16 / 9;padding:0;margin:0;border:0;border-radius:4px;overflow:hidden;background:${c.wall};cursor:${cursor};outline:${isActive ? '2px solid #4cafb4' : '1px solid #353f40'};outline-offset:${isActive ? '-2px' : '-1px'};font:inherit;color:inherit;`;
+      let overlay = '';
+      if (issue === 'frames' && ci === 2) overlay = 'Frame count differs — left out of 3D';
+      if (unresolved) overlay = 'Which calibrated camera is this?';
+      const activeKind = labeling ? evs[active].per[ci].kind : 'none';
+      const tabStyle = `display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;background:${isActive ? '#0f1919' : 'transparent'};color:${isActive ? '#e1e5e5' : '#babfc0'};font:inherit;font-family:ui-monospace,Consolas,monospace;font-size:12px;cursor:pointer;box-shadow:${isActive ? 'inset 0 -2px 0 #4cafb4' : 'none'};`;
+      return {
+        title: title,
+        file: c.file,
+        dims: '1920×1080 · ' + (issue === 'frames' && ci === 2 ? '8,940' : total.toLocaleString('en-US')) + ' fr',
+        chip: st.chip,
+        chipStyle: st.chipStyle,
+        isActive: isActive,
+        cellStyle: cellStyle,
+        frameStyle: frameStyle,
+        scene: this.scene(c, ci, f),
+        markers: markers,
+        burnIn: `${c.id}  ${this.timeText(f)}  f${f}`,
+        showOverlay: overlay.length > 0,
+        overlay: overlay,
+        aria: thumb ? `Make ${title} the active camera` : (labeling ? `Place ${s.names[active]} in ${title}` : `Select ${title}`),
+        onClick: (e) => this.viewClick(c.id, e, isActive),
+        onSelect: () => this.setState({ activeCam: c.id }),
+        tabStyle: tabStyle,
+        tabGlyph: this.glyph(activeKind, labeling ? colors[active % colors.length] : '#737b7b', 9)
+      };
+    });
+
+    const gridStyle = {
+      grid: 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;',
+      focus: 'display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);gap:10px;align-items:start;',
+      single: 'display:grid;grid-template-columns:minmax(0,1fr);gap:10px;'
+    }[s.layout];
+
+    // Point rows
+    const rows = s.names.map((n, pi) => {
+      const ev = evs[pi];
+      const color = colors[pi % colors.length];
+      const kinds = ev.per.map((x) => x.kind);
+      const count = (k) => kinds.filter((x) => x === k).length;
+      const clicked = count('click');
+      const proj = count('projected');
+      const acc = count('accepted');
+      const pred = count('prediction');
+      let status = '';
+      let warn = false;
+      if (issue === 'missing') { status = clicked ? `${clicked} clicked · 2D only` : 'Not labeled on this frame'; warn = !clicked; }
+      else if (ev.canTri) { status = [`${clicked} clicked`, proj ? `${proj} projected` : '', acc ? `${acc} accepted` : ''].filter((x) => x).join(' · '); }
+      else if (clicked >= 1 && issue === 'ambiguous') { status = `${clicked} clicked · 3D waits for camera match`; warn = true; }
+      else if (clicked === 1) { status = '1 clicked · needs 1 more view'; warn = true; }
+      else if (pred) { status = `${pred} model prediction · not reviewed`; }
+      else { status = 'Not labeled on this frame'; warn = true; }
+      const isActive = pi === active && labeling;
+      return {
+        num: String(pi + 1),
+        name: n,
+        status: status,
+        statusStyle: `font-size:11px;color:${warn ? '#f3c490' : '#babfc0'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`,
+        badgeStyle: badge(color, 20),
+        pressed: isActive,
+        title: `${n}: ${status}`,
+        rowStyle: `display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border:0;border-radius:6px;font:inherit;color:#e1e5e5;cursor:pointer;background:${isActive ? '#0f1919' : 'transparent'};box-shadow:${isActive ? 'inset 0 0 0 1.5px #30a7ad' : 'none'};`,
+        glyphs: cams.map((c, ci) => ({ style: this.glyph(kinds[ci], color, 10), label: `${c.id}: ${this.kindLabel(kinds[ci])}` })),
+        onClick: () => this.setState({ active: pi, stage: 'labeling', toast: false })
+      };
+    });
+
+    // Inspector
+    let insp = { rows: [], triLines: [] };
+    if (labeling) {
+      const ev = evs[active];
+      const color = colors[active % colors.length];
+      const triNames = ev.tri.map((ci) => cams[ci].id).join(' + ');
+      const rowsI = cams.map((c, ci) => {
+        const e = ev.per[ci];
+        let detail = '';
+        let warn = false;
+        if (e.kind === 'click') {
+          const idx = ev.tri.indexOf(ci);
+          detail = `x ${Math.round(e.x * 1920)}, y ${Math.round(e.y * 1080)} px` + (ev.canTri && idx >= 0 ? ` · ${ev.errs[idx].toFixed(1)} px from triangulated` : '');
+        } else if (e.kind === 'accepted') {
+          detail = 'Confirmed by you — kept separate from independent clicks';
+        } else if (e.kind === 'projected') {
+          detail = `From ${triNames}. Not observed: click in this view, or accept it.`;
+        } else if (e.kind === 'prediction') {
+          detail = `Model v3 · ${Math.round(e.conf * 100)}% · not reviewed`;
+        } else {
+          warn = true;
+          if (issue === 'frames' && ci === 2) detail = 'Not synchronized (frame count differs), so nothing is projected here.';
+          else if (issue === 'missing') detail = 'Not clicked. Click in this view — saved as 2D.';
+          else if (issue === 'ambiguous' && ci > 0) detail = 'Not clicked. Clicks save now; 3D waits for the camera match.';
+          else detail = 'Not clicked — click in this view.';
+        }
+        const unresolved = issue === 'ambiguous' && ci > 0;
+        return {
+          cam: unresolved ? c.file.replace('.mp4', '') : c.id,
+          glyphStyle: this.glyph(e.kind, color, 12),
+          kind: this.kindLabel(e.kind),
+          kindStyle: `font-size:12px;margin-left:auto;color:${e.kind === 'none' ? '#babfc0' : '#e1e5e5'};`,
+          detail: detail,
+          detailStyle: `font-size:12px;color:${warn ? '#f3c490' : '#babfc0'};`,
+          showAccept: e.kind === 'projected' || e.kind === 'prediction',
+          onAccept: () => this.setObs(f, active, c.id, { x: e.x, y: e.y, origin: 'accepted' }),
+          showClear: e.kind === 'click' || e.kind === 'accepted' || e.kind === 'prediction',
+          onClear: () => this.setObs(f, active, c.id, null)
+        };
+      });
+      const line = (text, warn) => ({ text: text, style: `font-size:12px;color:${warn ? '#f3c490' : '#ced3d3'};font-variant-numeric:tabular-nums;` });
+      let triTitle = '';
+      let triWarn = false;
+      let triLines = [];
+      let showCalBtn = false;
+      let showMatch = false;
+      if (issue === 'missing') {
+        triTitle = '2D only';
+        triLines = [line('This recording has no calibration file. Clicks save per camera; triangulation and projections turn on after you add one.', false)];
+        showCalBtn = true;
+      } else if (ev.canTri) {
+        const mean = ev.errs.reduce((a, b) => a + b, 0) / ev.errs.length;
+        const projNames = cams.filter((c, ci) => ev.per[ci].kind === 'projected').map((c) => c.id).join(', ');
+        triTitle = `Triangulated from ${triNames}`;
+        triLines = [
+          line(`Position ${(112.4 + (f - 1284) * 0.8 + active * 14.2).toFixed(1)}, ${(-38.1 + active * 6.5).toFixed(1)}, ${(402.7 - active * 9.1).toFixed(1)} mm`, false),
+          line(`Mean reprojection error ${mean.toFixed(1)} px` + (mean > 6 ? ' — a click may be on the wrong spot' : ''), mean > 6)
+        ];
+        if (projNames) triLines.push(line(`${projNames}: dashed ring until you click or accept it.`, false));
+        if (issue === 'frames') triLines.push(line('cam_2 left out: its frame count differs.', true));
+      } else if (issue === 'ambiguous') {
+        triTitle = 'Waiting for camera match';
+        triWarn = true;
+        triLines = [line('GX010417 and GX010418 could each be cam_1 or cam_2. Match them to triangulate.', false)];
+        showMatch = true;
+      } else {
+        const have = ev.tri.length;
+        triTitle = 'Not triangulated yet';
+        triWarn = true;
+        triLines = [line(`Click ${s.names[active]} in ${2 - have} more calibrated camera${2 - have === 1 ? '' : 's'}.`, false)];
+      }
+      insp = {
+        num: String(active + 1),
+        name: s.names[active],
+        badgeStyle: badge(color, 22),
+        rows: rowsI,
+        triTitle: triTitle,
+        triTitleStyle: `font-weight:600;color:${triWarn ? '#f3c490' : '#e1e5e5'};`,
+        triLines: triLines,
+        showCalBtn: showCalBtn,
+        showMatch: showMatch
+      };
+    }
+
+    // Scrubber + per-point lanes
+    const frames = Object.keys(s.obs).map((k) => Number(k));
+    const leftPct = (fr) => ((fr / (total - 1)) * 100).toFixed(2) + '%';
+    const allTicks = frames.filter((fr) => Object.values(s.obs[fr] || {}).some((po) => Object.keys(po).length > 0)).map((fr) => ({ style: `position:absolute;left:${leftPct(fr)};top:4px;width:2px;height:10px;background:#ced3d3;border-radius:1px;` }));
+    const lanes = s.names.map((n, pi) => {
+      const color = colors[pi % colors.length];
+      const ticks = frames.map((fr) => {
+        const po = (s.obs[fr] && s.obs[fr][pi]) || {};
+        const nClick = Object.values(po).filter((o) => o.origin === 'click' || o.origin === 'accepted').length;
+        if (!nClick) return null;
+        return { style: `position:absolute;left:${leftPct(fr)};top:${nClick >= 2 ? 0 : 4}px;width:3px;height:${nClick >= 2 ? 8 : 4}px;background:${color};border-radius:1px;` };
+      }).filter((t) => t);
+      return { name: `${pi + 1} ${n}`, ticks: ticks };
+    });
+
+    const draftNames = this.parseDraft(s.draft);
+    const dup = draftNames.find((n, i) => draftNames.indexOf(n) !== i);
+    const startDisabled = draftNames.length === 0 || Boolean(dup);
+    const typeDefs = [
+      { id: 'points', title: 'Points move independently', desc: 'Default. Any body or object. Each point is tracked on its own.' },
+      { id: 'rigid', title: 'Rigid object', desc: 'Points keep fixed distances. Add reference landmarks later — typed in, or taken from one well-labeled frame.' },
+      { id: 'mesh', title: 'Rigid object with mesh (STL)', desc: 'Adds an STL file, its units, and which mesh spot each point is.' }
+    ];
+    const typeLabel = { points: 'Points', rigid: 'Rigid', mesh: 'Mesh (STL)' }[s.targetType];
+
+    const nextIdx = hasPoints ? (active + 1) % s.names.length : 0;
+    const syncShort = issue === 'frames' ? 'cam_2 out of sync' : 'synchronized';
+    const syncLong = issue === 'frames'
+      ? 'cam_2 has 8,940 frames; cam_0 and cam_1 have 9,000. Scrubbing still moves all three; cam_2 is left out of 3D.'
+      : `Synchronized: all ${cams.length} videos have ${total.toLocaleString('en-US')} frames and share one frame index.`;
+
+    let banner = { show: false };
+    if (issue === 'missing') banner = { show: true, title: 'No calibration in this recording — labeling in 2D', body: 'Clicks save per camera. Triangulation and projections turn on when you add a calibration TOML.', showLink: false, href: '#', linkText: '', style: 'flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:10px 12px 0;padding:10px 14px;border-radius:6px;background:#1a2424;border:1px solid #444f4f;' };
+    if (issue === 'ambiguous') banner = { show: true, title: '2 videos need a camera match before 3D', body: 'GX010417.mp4 and GX010418.mp4 are both 1920×1080 and match no camera name in the calibration, so each could be cam_1 or cam_2. Clicking works now.', showLink: true, href: 'CameraMatch.dc.html', linkText: 'Match cameras…', style: 'flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:10px 12px 0;padding:10px 14px;border-radius:6px;background:rgba(209,96,60,0.16);border:1px solid #8b4129;' };
+    if (issue === 'frames') banner = { show: true, title: 'cam_2 has 60 fewer frames than cam_0 and cam_1', body: '8,940 vs 9,000 — first difference near frame 6,120. cam_2 is left out of triangulation and projection until this is resolved.', showLink: true, href: '#', linkText: 'Show per-camera timing', style: 'flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:10px 12px 0;padding:10px 14px;border-radius:6px;background:rgba(209,96,60,0.16);border:1px solid #8b4129;' };
+
+    const calSummary = { none: 'Calibrated · 3 of 3 cameras', missing: 'No calibration · 2D labeling', ambiguous: '1 of 3 cameras matched', frames: 'Calibrated · 3 of 3 · 1 out of sync' }[issue];
+    const calSummaryStyle = issue === 'none'
+      ? 'align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:9px;background:rgba(76,175,180,0.14);color:#86c2c5;'
+      : issue === 'missing'
+        ? 'align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:9px;background:#232d2e;color:#babfc0;'
+        : 'align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:9px;background:rgba(209,96,60,0.2);color:#f3c490;';
+
+    return {
+      recordingName: recordingName,
+      recordingFacts: `${cams.length} cameras · ${total.toLocaleString('en-US')} frames · 30 fps`,
+      calSummary: calSummary,
+      calSummaryStyle: calSummaryStyle,
+      saveText: labeling ? 'Saved to the recording' : 'Nothing to save yet',
+      saveDotStyle: `width:7px;height:7px;border-radius:50%;display:inline-block;background:${labeling ? '#70d269' : '#737b7b'};`,
+      hasPoints: hasPoints,
+      noPoints: !hasPoints,
+      targetName: s.targetName,
+      targetTypeLabel: typeLabel,
+      camNums: cams.map((c, ci) => ({ n: String(ci) })),
+      rows: rows,
+      views: views,
+      gridStyle: gridStyle,
+      isSingle: s.layout === 'single',
+      showTips: s.layout === 'grid',
+      layouts: [
+        { id: 'grid', label: 'Grid', hint: 'All cameras (G)' },
+        { id: 'focus', label: 'Focus', hint: 'Active camera large (F)' },
+        { id: 'single', label: 'Single', hint: 'One camera, full width (S)' }
+      ].map((l) => ({
+        label: l.label,
+        hint: l.hint,
+        pressed: s.layout === l.id,
+        style: `height:28px;padding:0 12px;border:0;border-radius:4px;font:inherit;font-size:12px;cursor:pointer;background:${s.layout === l.id ? '#0f1919' : 'transparent'};color:${s.layout === l.id ? '#e1e5e5' : '#babfc0'};box-shadow:${s.layout === l.id ? 'inset 0 0 0 1px #30a7ad' : 'none'};`,
+        onClick: () => this.setState({ layout: l.id })
+      })),
+      showProj: s.showProj,
+      toggleProj: () => this.setState({ showProj: !s.showProj }),
+      projBtnLabel: s.showProj ? 'Projections: shown' : 'Projections: hidden',
+      projBtnStyle: `height:28px;padding:0 12px;border-radius:4px;font:inherit;font-size:12px;cursor:pointer;border:1.5px solid ${s.showProj ? '#30a7ad' : '#737b7b'};background:transparent;color:#e1e5e5;`,
+      banner: banner,
+      frameText: f.toLocaleString('en-US'),
+      totalText: total.toLocaleString('en-US'),
+      timeText: this.timeText(f),
+      syncText: syncShort,
+      syncLong: syncLong,
+      stepM10: () => this.step(-10),
+      stepM1: () => this.step(-1),
+      stepP1: () => this.step(1),
+      stepP10: () => this.step(10),
+      seek: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const ratio = (e.clientX - r.left) / r.width;
+        if (!(ratio >= 0 && ratio <= 1)) return;
+        this.setState({ frame: Math.round(ratio * (total - 1)), toast: false });
+      },
+      allTicks: allTicks,
+      playheadStyle: `position:absolute;left:${leftPct(f)};top:0;width:3px;height:18px;margin-left:-1px;background:#4cafb4;border-radius:1px;`,
+      lanePlayheadStyle: `position:absolute;left:${leftPct(f)};top:-2px;width:1px;height:12px;background:#4cafb4;`,
+      lanes: lanes,
+      showInspector: labeling,
+      showRecordingInfo: !labeling,
+      insp: insp,
+      nextPointName: hasPoints ? s.names[nextIdx] : '',
+      nextPoint: () => this.setState({ active: nextIdx }),
+      drawerOpen: s.stage === 'defining',
+      draft: s.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onTargetName: (e) => this.setState({ targetName: e.target.value }),
+      draftPreview: draftNames.map((n, i) => ({ num: String(i + 1), name: n, badgeStyle: badge(colors[i % colors.length], 18) })),
+      draftError: { show: Boolean(dup), text: dup ? `“${dup}” appears twice. Names must be unique.` : '' },
+      loadedJson: s.loadedJson,
+      loadJson: () => this.setState({ draft: this.defaultNames().join('\n'), loadedJson: true }),
+      loadJsonDirect: () => this.setState({ stage: 'defining', draft: this.defaultNames().join('\n'), loadedJson: true }),
+      openDefine: () => this.setState({ stage: 'defining', draft: hasPoints ? s.names.join('\n') : s.draft }),
+      editPoints: () => this.setState({ stage: 'defining', draft: s.names.join('\n'), loadedJson: false }),
+      targetTypes: typeDefs.map((t) => ({
+        title: t.title,
+        desc: t.desc,
+        pressed: s.targetType === t.id,
+        style: `display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;border-radius:6px;font:inherit;cursor:pointer;background:${s.targetType === t.id ? '#0f1919' : '#232d2e'};border:1.5px solid ${s.targetType === t.id ? '#30a7ad' : '#444f4f'};`,
+        radioStyle: `flex:none;width:14px;height:14px;margin-top:2px;box-sizing:border-box;border-radius:50%;border:2px solid ${s.targetType === t.id ? '#4cafb4' : '#737b7b'};box-shadow:${s.targetType === t.id ? 'inset 0 0 0 3px #0f1919' : 'none'};background:${s.targetType === t.id ? '#4cafb4' : 'transparent'};`,
+        onClick: () => this.setState({ targetType: t.id })
+      })),
+      cancelDefine: () => this.setState({ stage: hasPoints ? 'labeling' : 'opened' }),
+      startLabeling: () => { if (startDisabled) return; this.setState({ names: draftNames, stage: 'labeling', active: Math.min(active, draftNames.length - 1) }); },
+      startDisabled: startDisabled,
+      startLabel: hasPoints ? 'Save points' : 'Start labeling',
+      startStyle: `height:34px;padding:0 18px;border-radius:5px;border:0;background:#30a7ad;color:#0b1111;font:inherit;font-weight:600;cursor:${startDisabled ? 'not-allowed' : 'pointer'};opacity:${startDisabled ? 0.5 : 1};`,
+      toast: s.toast,
+      dismissToast: () => this.setState({ toast: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

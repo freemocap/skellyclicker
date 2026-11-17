@@ -1,0 +1,49 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-17T01:40:00Z"},
+  "title": "SkellyClicker multicamera labeling",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "1a · Entry + recents", "expand": "fill", "is_interactive": true},
+    "ParentFolder.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 900, "title": "1b · Picked a parent folder", "expand": "fill", "is_interactive": true},
+    "S1_Opened.dc.html": {"x": 0, "y": 1300, "w": 1440, "h": 900, "title": "2a · Recording open at a shared frame", "expand": "fill", "is_interactive": true},
+    "S2_Define.dc.html": {"x": 1520, "y": 1300, "w": 1440, "h": 900, "title": "2b · Define what to track", "expand": "fill", "is_interactive": true},
+    "S3_Projected.dc.html": {"x": 3040, "y": 1300, "w": 1440, "h": 900, "title": "2c · Two clicks → third camera projected", "expand": "fill", "is_interactive": true},
+    "Workspace.dc.html": {"x": 4560, "y": 1300, "w": 1440, "h": 900, "title": "▶ Play the whole flow (interactive)", "expand": "fill", "is_interactive": true},
+    "V_NoCalibration.dc.html": {"x": 0, "y": 2600, "w": 1440, "h": 900, "title": "3a · No calibration → 2D only", "expand": "fill", "is_interactive": true},
+    "V_Ambiguous.dc.html": {"x": 1520, "y": 2600, "w": 1440, "h": 900, "title": "3b · Ambiguous camera match", "expand": "fill", "is_interactive": true},
+    "CameraMatch.dc.html": {"x": 3040, "y": 2600, "w": 1440, "h": 900, "title": "3c · Fixing the camera match", "expand": "fill", "is_interactive": true},
+    "V_FrameMismatch.dc.html": {"x": 4560, "y": 2600, "w": 1440, "h": 900, "title": "3d · Frame counts disagree", "expand": "fill", "is_interactive": true},
+    "V_Reopened.dc.html": {"x": 0, "y": 3900, "w": 1440, "h": 900, "title": "4a · Close + reopen restores state", "expand": "fill", "is_interactive": true},
+    "TargetTools.dc.html": {"x": 1520, "y": 3900, "w": 1440, "h": 900, "title": "4b · Rigid / STL tools in the same workspace", "expand": "fill"}
+  },
+  "order": [
+    "Main.dc.html",
+    "ParentFolder.dc.html",
+    "S1_Opened.dc.html",
+    "S2_Define.dc.html",
+    "S3_Projected.dc.html",
+    "Workspace.dc.html",
+    "V_NoCalibration.dc.html",
+    "V_Ambiguous.dc.html",
+    "CameraMatch.dc.html",
+    "V_FrameMismatch.dc.html",
+    "V_Reopened.dc.html",
+    "TargetTools.dc.html"
+  ],
+  "notes": {
+    "t1": {"x": 0, "y": -280, "text": "1 · Open a recording", "kind": "title1", "maxW": 2960},
+    "t2": {"x": 0, "y": 1020, "text": "2 · Label and check one moment (3 cameras)", "kind": "title1", "maxW": 6000},
+    "t3": {"x": 0, "y": 2320, "text": "3 · When evidence is missing", "kind": "title1", "maxW": 6000},
+    "t4": {"x": 0, "y": 3620, "text": "4 · Reopen, then grow the target", "kind": "title1", "maxW": 2960},
+    "n1": {"x": 3040, "y": 0, "w": 520, "fill": "teal", "size": "s", "text": "BACKEND NEEDS — open\n\n• One call: open(folder) → recording | parent-with-candidates | project | error.\n• Candidate fields: name, path, layout (synchronized_videos/ or videos/synchronized/), camera count, frame count, calibration file + format, issues[] (specific, human-readable).\n• One recents list mixing recordings, folders and existing projects: kind, path, last opened, camera count, calibration state.\n• Existing *_project.json still opens via 'Open existing project…'."},
+    "n2": {"x": 6080, "y": 1300, "w": 520, "fill": "teal", "size": "s", "text": "BACKEND NEEDS — label one moment\n\n• Cameras: stable id, video path, width×height, frame_count, timing (fps or timestamps).\n• Shared frame index + source-frame identity.\n• Per-camera calibration state: calibrated | none | needs-match | size-mismatch.\n• Observation = (target, point name/index, camera_id, source_frame, x, y px, origin: click | accepted | prediction[model, confidence]).\n• Projections are DERIVED on read, never stored as observations.\n• triangulate(target, point, frame) → 3D, per-camera reprojection, error px, which cameras were used.\n• Session: frame, active point, active camera, layout."},
+    "n3": {"x": 6080, "y": 2600, "w": 520, "fill": "orange", "size": "s", "text": "BACKEND DECISIONS — missing evidence\n\n• Ambiguous match: discovery returns, per video, candidate camera ids + reason (name, size).\n• Proposed 'test assignments': given one point clicked in every video, score each permutation by reprojection error. Needs a call that accepts a hypothetical video→camera mapping.\n• Frame mismatch: per-stream frame_count + first divergent frame if known; list which operations are disabled for that stream.\n• No calibration: everything 2D still saves; triangulate returns a clear 'no calibration' state, not an error."},
+    "n4": {"x": 3040, "y": 3900, "w": 520, "fill": "purple", "size": "s", "text": "LATER — rigid / STL\n\n• Target type: points | rigid | mesh. Changing type keeps all clicks.\n• Rigid: reference landmarks from typed coords or from one well-labeled frame.\n• Mesh: STL path, units, hash, point → mesh coordinate bindings.\n• fit_pose(frame) needs ≥3 non-collinear observed landmarks; returns RMS px + per-view overlay.\n• Depth assist only when a ZED depth stream exists; existing ZED/STL projects keep working."},
+    "n5": {"x": 3600, "y": 3900, "w": 520, "fill": "gray", "size": "s", "text": "LATER — train + refine (step 5)\n\nEnters through the existing 'Training data' and 'Train & review' tabs.\n• Training data picks labeled camera-frames (any camera count), point order = target order.\n• Analysis results come back into THIS Label view as model predictions (hollow diamonds + confidence).\n• Correcting = clicking: a click replaces the prediction and becomes an observed point."}
+  },
+  "designSystems": [
+    {"title": "FreeMoCap UI", "namespace": "freemocap-ui", "artifact": "https://claude.ai/artifact/CKccZ8MNoYCcrWTMsiuSzm", "version": "1793387780-0647", "copiedAt": "2026-11-17T01:40:00Z"}
+  ]
+}

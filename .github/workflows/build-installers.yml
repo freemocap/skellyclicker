@@ -1,0 +1,225 @@
+name: Build SkellyClicker installers
+
+on:
+  push:
+    branches: ['codex/release-*']
+  workflow_dispatch:
+    inputs:
+      signed:
+        type: boolean
+        description: Sign Windows builds and sign and notarize macOS builds
+        default: false
+  workflow_call:
+    inputs:
+      signed:
+        type: boolean
+        default: false
+    secrets:
+      DEPENDENCY_READ_TOKEN:
+        required: false
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_SIGNING_SECRET:
+        required: false
+      AZURE_CLIENT_SECRET:
+        required: false
+      MAC_CERTIFICATE_P12:
+        required: false
+      MAC_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_ID_PASSWORD:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-2022, bundle: nsis, extension: exe }
+          - { name: macos-arm64, os: macos-15, bundle: dmg, extension: dmg }
+          - { name: ubuntu-x64, os: ubuntu-24.04, bundle: deb, extension: deb }
+    defaults:
+      run:
+        shell: bash
+        working-directory: other/skellyclicker
+    steps:
+      # Resolve the names used in SkellySpeak and FreeMoCap. Only booleans
+      # reach this diagnostic; signing material goes to its native signer.
+      - name: Check signing credential availability
+        if: inputs.signed && runner.os != 'Linux'
+        working-directory: .
+        env:
+          TENANT: ${{ runner.os == 'Windows' && secrets.AZURE_TENANT_ID != '' }}
+          CLIENT: ${{ runner.os == 'Windows' && secrets.AZURE_CLIENT_ID != '' }}
+          AZURE_PASSWORD: ${{ runner.os == 'Windows' && (secrets.AZURE_SIGNING_SECRET != '' || secrets.AZURE_CLIENT_SECRET != '') }}
+          CERT: ${{ runner.os == 'macOS' && secrets.MAC_CERTIFICATE_P12 != '' }}
+          CERT_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
+          APPLE_ACCOUNT: ${{ runner.os == 'macOS' && secrets.APPLE_ID != '' }}
+          NOTARY_PASSWORD: ${{ runner.os == 'macOS' && (secrets.APPLE_ID_PASSWORD != '' || secrets.APPLE_APP_SPECIFIC_PASSWORD != '') }}
+        run: |
+          missing=()
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            [[ "$TENANT" == true ]] || missing+=(AZURE_TENANT_ID)
+            [[ "$CLIENT" == true ]] || missing+=(AZURE_CLIENT_ID)
+            [[ "$AZURE_PASSWORD" == true ]] || missing+=("AZURE_SIGNING_SECRET or AZURE_CLIENT_SECRET")
+          else
+            [[ "$CERT" == true ]] || missing+=(MAC_CERTIFICATE_P12)
+            [[ "$CERT_PASSWORD" == true ]] || missing+=(MAC_CERTIFICATE_PASSWORD)
+            [[ "$APPLE_ACCOUNT" == true ]] || missing+=(APPLE_ID)
+            [[ "$NOTARY_PASSWORD" == true ]] || missing+=("APPLE_ID_PASSWORD or APPLE_APP_SPECIFIC_PASSWORD")
+          fi
+          if (( ${#missing[@]} )); then
+            for name in "${missing[@]}"; do
+              echo "::error::Make the Actions secret $name available to $GITHUB_REPOSITORY for $RUNNER_OS signing."
+            done
+            exit 1
+          fi
+      # Preserve the relative paths already locked by uv, npm and Cargo.
+      - uses: actions/checkout@v4
+        with:
+          path: other/skellyclicker
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: freemocap/sdk
+          ref: d09330c46e39d70dd721da2d48dbe00fcb7221c2
+          path: project/repos/sdk
+          token: ${{ secrets.DEPENDENCY_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: freemocap/skellyforge
+          ref: 871edd6b3a9cd6d8fc92738fc50d298b50c84761
+          path: project/repos/skellyforge
+          token: ${{ secrets.DEPENDENCY_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: freemocap/skellylogs
+          ref: eeea4fa3710d789790bbc2f49c7599d13e58fa72
+          path: project/repos/utils/skellylogs
+          token: ${{ secrets.DEPENDENCY_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.11.7'
+          enable-cache: false
+      - name: Install Ubuntu build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Build the locked SDK packages and install the UI
+        run: |
+          for package in client ui; do
+            (cd "../../project/repos/sdk/packages/$package" && npm ci && npm run build)
+          done
+          (cd skellyclicker-ui && npm ci)
+      - name: Freeze Python and stage native playback tools
+        run: |
+          uv python install 3.12
+          node tools/prepare-desktop.mjs
+          node tools/stage-release-tools.mjs
+      - name: Install Azure Artifact Signing CLI
+        if: runner.os == 'Windows' && inputs.signed
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/artifact-signing-cli.exe" \
+            https://github.com/levminer/trusted-signing-cli/releases/download/0.11.0/artifact-signing-cli.exe
+          echo "ddc6f6ef68631bf367ad051d7d37109e58d46095406e1fbba60d553b10f94393  $RUNNER_TEMP/artifact-signing-cli.exe" | sha256sum --check --strict
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Sign embedded macOS executables and Python libraries
+        if: runner.os == 'macOS' && inputs.signed
+        env:
+          MAC_CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: 'Developer ID Application: FreeMoCap Foundation, Inc. (U8LBJLBYPR)'
+        run: bash tools/sign-macos-backend.sh
+      - name: Build installer
+        working-directory: other/skellyclicker/native
+        env:
+          SIGNED: ${{ inputs.signed || false }}
+          AZURE_TENANT_ID: ${{ runner.os == 'Windows' && inputs.signed && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ runner.os == 'Windows' && inputs.signed && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ runner.os == 'Windows' && inputs.signed && (secrets.AZURE_SIGNING_SECRET || secrets.AZURE_CLIENT_SECRET) || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && inputs.signed && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ runner.os == 'macOS' && inputs.signed && (secrets.APPLE_ID_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD) || '' }}
+        run: |
+          args=(build --ci --bundles "${{ matrix.bundle }}")
+          if [[ "$SIGNED" == true && "$RUNNER_OS" == Windows ]]; then
+            args+=(--config tauri.windows-signing.conf.json)
+          elif [[ "$SIGNED" == true && "$RUNNER_OS" == macOS ]]; then
+            export APPLE_SIGNING_IDENTITY='Developer ID Application: FreeMoCap Foundation, Inc. (U8LBJLBYPR)'
+            export APPLE_TEAM_ID='U8LBJLBYPR'
+            : "${APPLE_ID:?missing Apple ID}" "${APPLE_PASSWORD:?missing notarization password}"
+          else
+            unset APPLE_ID APPLE_PASSWORD
+          fi
+          node ../skellyclicker-ui/node_modules/@tauri-apps/cli/tauri.js "${args[@]}" -- --locked
+      - name: Verify installer output
+        run: |
+          shopt -s nullglob
+          files=(native/target/release/bundle/${{ matrix.bundle }}/*.${{ matrix.extension }})
+          [[ ${#files[@]} == 1 && -s "${files[0]}" ]]
+          mkdir -p release-output
+          cp "${files[0]}" release-output/
+      - name: Verify Windows installer signature
+        if: runner.os == 'Windows' && inputs.signed
+        shell: pwsh
+        run: |
+          $file = Get-Item release-output/*.exe
+          $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
+          if ($signature.Status -ne 'Valid') { throw "Invalid signature on $file ($($signature.Status))" }
+      - name: Verify the notarized app inside the disk image
+        if: runner.os == 'macOS' && inputs.signed
+        run: |
+          mount="$RUNNER_TEMP/verify-dmg"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" release-output/*.dmg
+          trap 'hdiutil detach "$mount"' EXIT
+          codesign --verify --strict --deep "$mount/SkellyClicker.app"
+          xcrun stapler validate "$mount/SkellyClicker.app"
+          spctl --assess --type execute "$mount/SkellyClicker.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: other/skellyclicker/release-output/*
+          if-no-files-found: error
+          compression-level: 0
+
+  smoke:
+    name: Install and launch ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: windows-x64, os: windows-2022}
+          - {name: macos-arm64, os: macos-15}
+          - {name: ubuntu-x64, os: ubuntu-24.04}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: release-output
+      - uses: ./.github/actions/smoke-installed
+        with:
+          installer-directory: release-output

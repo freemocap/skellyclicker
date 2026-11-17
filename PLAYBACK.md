@@ -12,10 +12,7 @@ Local npm `file:`, uv editable and Cargo path dependencies point to `../../proje
 
 Windows prerequisites are Node22+, uv, Rust/MSVC and WebView2. Existing installations were verified on this machine; no system-wide prerequisite installation was performed.
 
-1. In each SDK `packages/client` and `packages/ui`, run its documented `npm ci --ignore-scripts` and `npm run build`.
-2. In `skellyclicker-ui`, run `npm ci --ignore-scripts`.
-3. In `backend`, run `uv sync --locked`.
-4. From this repository root, run `node tools/desktop.mjs dev --no-watch`.
+Run `poe dev` from this repository root. The launcher installs the locked SDK and application npm dependencies, builds the SDK client and UI, and syncs the Python backend before starting the native application.
 
 The desktop wrapper runs the SDK PyInstaller onedir bundler before Tauri. Its output includes Python and required packages, then Tauri maps the whole directory to bundled `backend/` resources. The SDK starts this hidden child, announces readiness only after ASGI startup and socket binding, and closes it on app exit. The native window obtains its endpoint through `backend_url`; HTTP and WebSocket remain the application transport.
 
