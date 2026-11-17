@@ -6,7 +6,8 @@ import {
     type FrameEvidence, type LabelDocument,
 } from './labels';
 import {loadLabels, saveLabels, type RecordingKey} from './labels-api';
-import {LabelImageOverlay} from './LabelImageOverlay';
+import {LabelImageOverlay, type LabelLayers} from './LabelImageOverlay';
+import type {TargetCropBounds} from '@freemocap/ui';
 
 const SESSION_SAVE_DELAY_MS = 800;
 const NO_VIEWS: Readonly<Record<string, {width: number; height: number}>> = {};
@@ -20,6 +21,7 @@ export interface Labeling {
     readonly error: string | null;
     readonly saveError: string | null;
     waitForSave(): Promise<void>;
+    moveTrainingLabel(cameraId:string,sourceFrame:number,point:string,pixel:Vec2):void;
     readonly notice: string | null;
     readonly document: LabelDocument | null;
     readonly evidence: FrameEvidence | null;
@@ -28,7 +30,7 @@ export interface Labeling {
     readonly calibrationLoaded: boolean;
     readonly presented: PresentedFrame | null;
     readonly sceneAnnotations: SceneAnnotations | undefined;
-    renderImageOverlay(context: ImageOverlayContext): ReactNode;
+    renderImageOverlay(context: ImageOverlayContext, crop?: TargetCropBounds | null, layers?: LabelLayers): ReactNode;
     onCalibration(calibration: LoadedCalibration | null): void;
     setPointNames(names: readonly string[]): void;
     setActivePoint(point: string): void;
@@ -161,10 +163,10 @@ export function useLabeling({baseUrl, recording, playbackId, sourceSizes, camera
     const annotations = useMemo(() => evidence ? sceneAnnotations(evidence, activePoint, cameras) : undefined,
         [evidence, activePoint, cameras]);
 
-    const place = useCallback((videoId: string, pixel: Vec2, image: PresentedImage): void => {
+    const place = useCallback((videoId: string, pixel: Vec2, image: PresentedImage, draggedPoint?: string): void => {
         setNotice(null);
         commit(current => {
-            const point = current.session.active_point;
+            const point = draggedPoint ?? current.session.active_point;
             if (point === null) throw new Error('No active point to place');
             return withSession(withObservation(current, point, videoId, image.sourceFrameNumber, {x_px: pixel[0], y_px: pixel[1], origin: 'click'}),
                 {active_camera: videoId, source_frame: image.sourceFrameNumber, local_frame_index: image.localFrameIndex});
@@ -182,10 +184,19 @@ export function useLabeling({baseUrl, recording, playbackId, sourceSizes, camera
 
     const frameUnavailable = useCallback((): void => setNotice('The frame is still loading. Click again once it shows.'), []);
 
-    const renderImageOverlay = useCallback((context: ImageOverlayContext): ReactNode => <LabelImageOverlay
+    const cameraColors = useMemo(() => {
+        const palette = ['#56d9ff', '#ff9b59', '#bd98ff', '#73df90', '#ff80ae', '#eada64'];
+        return new Map(cameraStatuses.map(({cameraId}, index) => [
+            cameraId, palette[index] ?? `hsl(${(index * 137.508) % 360} 85% 68%)`,
+        ]));
+    }, [cameraStatuses]);
+
+    const renderImageOverlay = useCallback((context: ImageOverlayContext, crop?: TargetCropBounds | null, layers?: LabelLayers): ReactNode => <LabelImageOverlay
+        crop={crop} layers={layers}
+        cameraColors={cameraColors}
         context={context} sourceSize={sourceSizes?.[context.filename]} evidence={evidence} activePoint={activePoint} cameras={cameras}
         onRegisterView={onRegisterView} onPlace={place} onClear={clearAt} onFrameUnavailable={frameUnavailable}/>,
-    [sourceSizes, evidence, activePoint, cameras, onRegisterView, place, clearAt, frameUnavailable]);
+    [sourceSizes, evidence, activePoint, cameras, cameraColors, onRegisterView, place, clearAt, frameUnavailable]);
 
     const currentFrame = (): PresentedFrame => {
         if (!frame) throw new Error('No presented frame');
@@ -196,6 +207,8 @@ export function useLabeling({baseUrl, recording, playbackId, sourceSizes, camera
         status: !recording ? 'no_recording' : error ? 'error' : document ? 'ready' : 'loading',
         error, saveError, notice, document, evidence, cameraStatuses, cameras,
         waitForSave: () => latestSave.current,
+        moveTrainingLabel: (cameraId,sourceFrame,point,pixel) => commit(current =>
+            withObservation(current,point,cameraId,sourceFrame,{x_px:pixel[0],y_px:pixel[1],origin:'click'})),
         calibrationLoaded: !!cameraEntries?.length || calibration !== null,
         presented: frame,
         sceneAnnotations: annotations,

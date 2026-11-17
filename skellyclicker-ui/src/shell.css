@@ -196,7 +196,46 @@ html, body, #root {height:100%; margin:0;}
 .project-dialog-source {display:grid;gap:5px;margin-top:14px;font-size:13px}
 #results-view {color:var(--gray-100,#e1e5e5); background:var(--gray-900,#121c1c); color-scheme:dark;}
 .keypoint-training {padding:clamp(16px,2vw,32px); overflow:auto; min-height:0; flex:1; container-type:inline-size;}
-.keypoint-training header {display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:20px;}
+.keypoint-training > header {display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:20px;}
+.keypoint-feedback {margin-bottom:20px;}
+/* Orbit the tab perimeter while training, using the SkellySpeak activity border. */
+@property --activity-border-angle {syntax:'<angle>';initial-value:0deg;inherits:false;}
+@keyframes activity-border-orbit {to {--activity-border-angle:360deg;}}
+.skellyclicker-app:has(.sdk-run-activity[data-active=true]) [role=tab][aria-controls="results-view"] {position:relative;}
+.skellyclicker-app:has(.sdk-run-activity[data-active=true]) [role=tab][aria-controls="results-view"]::after {
+  content:'';position:absolute;inset:0;border-radius:5px;padding:2px;pointer-events:none;
+  background:conic-gradient(from var(--activity-border-angle),#822e64 0deg,#ff72d1 80deg,#ffb8e7 110deg,#822e64 170deg);
+  mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);
+  animation:activity-border-orbit 1.8s linear infinite;
+}
+@media(prefers-reduced-motion:reduce) {
+  .skellyclicker-app:has(.sdk-run-activity[data-active=true]) [role=tab][aria-controls="results-view"]::after {animation:none;}
+}
+.training-stage-panel {height:clamp(320px,40vh,440px);margin-block:12px;}
+.training-stage-panel[data-view=list] {height:auto;}
+.training-stage-panel[data-view=list] .mp-outline {display:none;}
+.training-stage-panel .mp-list {position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));align-items:start;padding:8px;gap:8px;}
+.training-stage-panel .mp-list .settings-section-header {flex-wrap:wrap;}
+.training-stage-panel .mp-list .settings-section-summary {display:none;}
+.keypoint-training[data-training-active=true] {display:flex;flex-direction:column;}
+.keypoint-training[data-training-active=true] > header {order:-2;}
+.keypoint-training[data-training-active=true] > .keypoint-feedback {order:-1;}
+.recording-layers {display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:8px 14px;background:var(--gray-900);font-size:13px;}
+.recording-layers label {display:inline-flex;align-items:center;gap:5px;}
+.recording-overlay {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.recording-gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,30rem),1fr));gap:16px;}
+.recording-image-pair {display:grid;grid-template-columns:2fr 1fr;align-items:center;gap:8px;}
+.recording-image-pair > div {position:relative;}
+.training-label-handle {cursor:grab;touch-action:none;}
+.training-label-handle:active {cursor:grabbing;}
+.playback-timeline-scrubber:has(.label-quality-timeline) {flex-wrap:wrap;}
+.playback-timeline-scrubber:has(.label-quality-timeline) .playback-timeline-track {flex-basis:100%;}
+.label-quality-timeline {flex-basis:100%;padding:3px 8px;color:var(--gray-200);font:11px/1.35 var(--font-sans);}
+.label-quality-track svg {display:block;width:100%;height:8px;background:var(--gray-800);cursor:pointer;margin-bottom:2px;}
+.label-quality-timeline small {color:var(--gray-300);}
+.recording-image-pair img,.recording-image-pair svg {display:block;width:100%;height:auto;}
+.recording-image-pair > div > svg {position:absolute;inset:0;}
+.keypoint-metrics {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:16px;margin:16px 0;}
 .keypoint-training h2 {margin:0; font-size:22px; line-height:1.25; color:var(--gray-100,#e1e5e5);}
 .keypoint-training header span,.keypoint-names {color:var(--gray-300,#c0c6c7);}
 .keypoint-training-grid {display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px; max-width:76rem;}
@@ -222,3 +261,7 @@ html, body, #root {height:100%; margin:0;}
 @container(max-width:660px) {.keypoint-training-grid {grid-template-columns:minmax(0,1fr);}}
 .training-model-field {display:grid; gap:4px;}
 .training-model-field > span {display:flex; gap:6px; align-items:center;}
+
+.label-crop-overlay { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
+#viewer-view:has(.recording-layers) .playback-closeup-drag { display: none; }
+.playback-target-closeup:has(canvas[data-crop-status=unavailable]) .label-crop-overlay { display: none; }

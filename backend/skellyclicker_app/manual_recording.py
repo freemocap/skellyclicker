@@ -4,6 +4,7 @@ from threading import RLock
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from skellycam.core.recorders.videos.video_file_metadata import VideoFileMetadata
 from freemocap_sdk.storage import atomic_json
@@ -68,8 +69,8 @@ def labeling_bundle(recording_id: str, recording_parent_directory: str):
         views.append(video.model_copy(update={"video_id":camera}))
     if len({view.video_id for view in views}) != len(views):
         raise HTTPException(422, "Multiple synchronized videos map to one camera.")
-    return bundle.model_copy(update={"media":media, "videos":bundle.videos.model_copy(update={
-        "preferred_source":source, "sources":{source:raw.model_copy(update={"videos":views})}})})
+    return bundle.model_copy(update={"videos":bundle.videos.model_copy(update={
+        "preferred_source":source, "sources":{**bundle.videos.sources,source:raw.model_copy(update={"videos":views})}})})
 
 
 # Core emits media URLs rooted at /freemocap. Keep the reader's lease, streaming
@@ -152,6 +153,37 @@ def read_labels(recording_id: str, recording_parent_directory: str):
     path = labels_path(recording_id, recording_parent_directory)
     with _lock:
         return {"document": LabelDocument.model_validate_json(path.read_bytes()) if path.exists() else None}
+
+
+@router.get("/labels/source-image")
+def label_source_image(recording_id: str, recording_parent_directory: str, camera_id: str, source_frame: int):
+    import cv2
+    labels_path(recording_id, recording_parent_directory)
+    bundle = labeling_bundle(recording_id, recording_parent_directory)
+    source = PlaybackVideoSource.SYNCHRONIZED
+    view = next((v for v in bundle.videos.sources[source].videos if v.video_id == camera_id), None)
+    if view is None:
+        raise HTTPException(404, "Camera unavailable")
+    timeline = next(item.timeline for item in bundle.media if item.video_source == source and item.video_filename == view.filename)
+    try:
+        index = list(timeline.frame_numbers).index(source_frame)
+    except ValueError as error:
+        raise HTTPException(404, "Source frame unavailable") from error
+    recording = Path(recording_parent_directory)/recording_id
+    folder = video_source_folder(recording=recording, source=source)
+    capture = cv2.VideoCapture(str(folder/view.filename))
+    try:
+        if not capture.set(cv2.CAP_PROP_POS_FRAMES, index):
+            raise HTTPException(422, "Could not seek to the labeled image")
+        ok, image = capture.read()
+        if not ok:
+            raise HTTPException(422, "Could not decode the labeled image")
+        ok, data = cv2.imencode(".png", image)
+        if not ok:
+            raise HTTPException(422, "Could not encode the labeled image")
+        return Response(content=data.tobytes(), media_type="image/png", headers={"Cache-Control":"private, max-age=3600"})
+    finally:
+        capture.release()
 
 
 @router.put("/labels")

@@ -44,6 +44,15 @@ test('the epipolar curve of a click passes through the matching pixel in another
   }
   assert.ok(best<0.5,`closest approach ${best}px`);
 });
+test('barrel distortion cannot fold an off-camera ray back across the principal point',()=>{
+  const camera={...cameras[0],rotation:[[1,0,0],[0,1,0],[0,0,1]],translation:[0,0,0],
+    imageWidth:720,imageHeight:1280,fx:873.6987475759536,fy:873.6987475759536,
+    cx:359.5,cy:639.5,k1:-0.28931531670319016,k2:0,p1:0,p2:0};
+  const ray={origin:[2000,0,0],direction:[0,0,1]};
+  const pixels=epipolarPolylines(camera,ray,100,20000,96).flat();
+  assert.ok(pixels.length>1);
+  assert.ok(pixels.every(([x])=>x>camera.cx));
+});
 test('an inconsistent calibration entry fails instead of drawing wrong geometry',()=>{
   const broken=calibrationCamera('bad',[1000,0,0],0);broken.world_position=[0,1000,0];
   assert.throws(()=>cameraModelFromCalibration(broken),/disagrees/);

@@ -109,7 +109,8 @@ def prepare(*, force):
             "--collect-data", "skellyforge", "--collect-data", "skellytracker",
         ], cwd=ROOT, env={**os.environ, "PYTHONPATH": os.pathsep.join(search_paths)}, check=True)
         executable = OUTPUT / NAME / (NAME + (".exe" if os.name == "nt" else ""))
-        subprocess.run([sys.executable, str(ROOT / "tools/smoke-installed.py"), "--backend-only", str(executable)],
+        subprocess.run([sys.executable, str(ROOT / "tools/smoke-installed.py"), "--backend-only", str(executable),
+                        *([] if force else ["--wait-for-ready"])],
                        check=True)
         inventory = bundle_inventory()
         if not inventory or source_digest() != inputs:

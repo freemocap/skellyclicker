@@ -125,7 +125,7 @@ export interface FrameEvidence {
  * Everything the views, panel and 3D viewport show for one frame.
  * `cameraIds` lists every video; `cameras` holds the calibrated ones by id.
  */
-export function frameEvidence(document: LabelDocument, sourceFrame: number, cameraIds: readonly string[],
+export function frameEvidence(document: Pick<LabelDocument,'observations'|'tracked_point_names'>, sourceFrame: number, cameraIds: readonly string[],
     cameras: ReadonlyMap<string, CameraModel>): FrameEvidence {
     const atFrame = document.observations.filter(observation => observation.source_frame === sourceFrame);
     const points = document.tracked_point_names.map((point, index): PointEvidence => {

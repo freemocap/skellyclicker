@@ -82,7 +82,7 @@ def read_ready(stdout, events):
     events.put(None)
 
 
-def smoke_backend(backend, work):
+def smoke_backend(backend, work, *, readiness_timeout=90):
     env = {**os.environ, "SKELLYLOGS_LOG_DIR": str(work / "logs"),
            "SKELLYCLICKER_SESSION_PATH": str(work / "session.json")}
     child = subprocess.Popen([backend], cwd=work, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -92,7 +92,7 @@ def smoke_backend(backend, work):
             ready = queue.Queue()
             threading.Thread(target=read_ready, args=(child.stdout, ready), daemon=True).start()
             try:
-                event = ready.get(timeout=90)
+                event = ready.get(timeout=readiness_timeout)
             except queue.Empty as error:
                 raise RuntimeError("Backend readiness timed out") from error
             if not event or event.get("pid") != child.pid:
@@ -124,13 +124,15 @@ def main():
     group.add_argument("installer_directory", type=Path, nargs="?")
     group.add_argument("--backend", type=Path, help="Exercise an existing payload, skipping installation")
     group.add_argument("--backend-only", type=Path, help="Check desktop server readiness before staging release tools")
+    parser.add_argument("--wait-for-ready", action="store_true",
+                        help="Allow a local development build to start without a readiness deadline")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="skellyclicker-smoke-") as directory:
         work = Path(directory)
         payload = args.backend_only or args.backend
         backend = payload.resolve() if payload else install(args.installer_directory, work)
         print(f"Exercising {backend}", flush=True)
-        smoke_backend(backend, work)
+        smoke_backend(backend, work, readiness_timeout=None if args.wait_for_ready else 90)
         if args.backend_only:
             print("Passed backend readiness, HTTP status, shutdown, and port release.")
             return

@@ -19,7 +19,7 @@ def train_round(recording, output, python, training_frames, validation_frames, e
         run_external([python,str(worker),mode,str(output)])
 
 
-def freeze_clicks(recording, output, training_frames, validation_frames, epochs, parent=None, *, doc=None, check_cancelled=lambda: None):
+def freeze_clicks(recording, output, training_frames, validation_frames, epochs, parent=None, *, save_every=1, doc=None, check_cancelled=lambda: None):
     if not training_frames or not validation_frames or training_frames & validation_frames:
         raise ValueError("Choose disjoint, nonempty training and validation moments")
     if doc is None:
@@ -37,7 +37,7 @@ def freeze_clicks(recording, output, training_frames, validation_frames, epochs,
     dataset = output/"dataset"
     dataset.mkdir()
     rows, files = [], {}
-    clocks = {item.video_filename:item.timeline.frame_numbers for item in bundle.media}
+    clocks = {item.video_filename:item.timeline.frame_numbers for item in bundle.media if item.video_source == source}
     for camera_index, view in enumerate(bundle.videos.sources[source].videos):
         capture = cv2.VideoCapture(str(folder/view.filename))
         try:
@@ -68,7 +68,7 @@ def freeze_clicks(recording, output, training_frames, validation_frames, epochs,
     manifest = dataset/"manifest.json"
     atomic_json(manifest,{"keypoint_names":doc.tracked_point_names,"files":files,"label_origin":"click"})
     request = {"dataset":str(dataset),"dataset_sha256":file_digest(manifest),"images":rows,
-               "epochs":epochs,"save_every":epochs,"batch_size":1,"seed":42}
+               "epochs":epochs,"save_every":min(save_every, epochs),"batch_size":1,"seed":42}
     if parent:
         request.update(initial_checkpoint=str(parent),initial_checkpoint_sha256=file_digest(parent))
     atomic_json(output/"worker-request.json",request)

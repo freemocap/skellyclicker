@@ -27,6 +27,7 @@ def consume_event(event,ctx,job):
     kind=event['kind']
     if kind == 'stage_progress':
         job['worker_stage'] = event
+        ctx.progress(event['completed'],event['total'],event['unit'],event['detail'])
     if kind=='metric':ctx.metric(event['id'],label=event['label'],step=event['step'],value=event['value'],unit=event['unit'],step_label='Epoch')
     elif kind=='preview':
         asset=resolve_relative(job['work'],event['path'])
@@ -34,6 +35,7 @@ def consume_event(event,ctx,job):
         base=job.get('artifact_url') or f"/api/training/runs/{job['run'].run_id}/artifact?project_path={quote(str(job['manifest']),safe='')}"
         url=f"{base}&path={quote(event['path'],safe='')}"
         ctx.preview(event['id'],label=event['label'],image_url=url,step=event['step'],step_label='Epoch',checkpoint_id=event['checkpoint_id'])
+    elif kind=='prepare_progress':ctx.progress(event['completed'],event['total'],'steps',event['detail'])
     elif kind=='scan_progress':ctx.progress(event['completed'],event['total'],'images','Analyzing recording images')
     elif kind=='progress':ctx.progress(event['epoch'],job['request']['epochs'],'epochs',f"{event['detail']} · epoch {event['epoch']} / {job['request']['epochs']}")
     elif kind=='checkpoint':

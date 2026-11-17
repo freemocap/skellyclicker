@@ -27,6 +27,7 @@ def check_stop():
     if (WORK/'STOP').exists():raise RequestedStop()
 
 def prepare(request):
+    emit('prepare_progress',completed=0,total=4,detail='Loading DeepLabCut and its dependencies')
     import numpy as np,pandas as pd,deeplabcut
     from deeplabcut.utils import auxiliaryfunctions as af
     from deeplabcut.core.engine import Engine
@@ -35,6 +36,7 @@ def prepare(request):
     from copy import deepcopy
     from importlib.metadata import version
     if version('deeplabcut')!='3.0.2':raise ValueError('This adapter requires verified DeepLabCut 3.0.2')
+    emit('prepare_progress',completed=1,total=4,detail='Checking frozen images and building the label table')
     dataset=Path(request['dataset']);manifest=json.loads((dataset/'manifest.json').read_text())
     if digest(dataset/'manifest.json')!=request['dataset_sha256']:raise ValueError('Dataset manifest changed')
     for name,identity in manifest['files'].items():
@@ -62,6 +64,7 @@ def prepare(request):
     config,_=af.create_config_template()
     config.update(Task='stl_tracking',scorer=scorer,date='Nov05',project_path=str(project.resolve()),video_sets={str(project/'videos/geometry.mp4'):{'crop':f'0, {width}, 0, {height}'}},bodyparts=manifest['keypoint_names'],skeleton=[],multianimalproject=False,default_net_type='resnet_50',default_augmenter='default',TrainingFraction=[round(len(train)/len(rows),2)],iteration=0,snapshotindex=-1,cropping=False,start=0,stop=1,numframes2pick=len(rows),x1=0,x2=width,y1=0,y2=height,batch_size=request['batch_size'],engine='pytorch')
     af.write_config(project/'config.yaml',config)
+    emit('prepare_progress',completed=2,total=4,detail='Creating the DeepLabCut training dataset')
     deeplabcut.create_training_dataset(project/'config.yaml',Shuffles=[1],trainIndices=[train],testIndices=[test],net_type='resnet_50',engine=Engine.PYTORCH,userfeedback=False)
     posepath=next(project.glob('dlc-models-pytorch/**/train/pytorch_config.yaml'));pose=read_config_as_dict(posepath)
     for key in ('resize','longest_max_size','hflip','affine','random_bbox_transform','crop_sampling','top_down_crop'):pose['data']['inference'][key]=None
@@ -77,6 +80,7 @@ def prepare(request):
     probe=build_transforms(pose['data']['train'])(image=sample,keypoints=corners.tolist(),class_labels=list(range(4)),bboxes=[],bbox_labels=[])
     if probe['image'].shape[:2]!=(height,width):raise ValueError('Training transform changes native image size')
     np.testing.assert_allclose(np.array(probe['keypoints'])[:,:2],corners,atol=.001)
+    emit('prepare_progress',completed=3,total=4,detail='Verifying the training and validation split')
     saved=DLCLoader.load_split(af.read_config(project/'config.yaml'),shuffle=1)
     merged,=(project/'training-datasets').rglob(f'CollectedData_{scorer}.h5');index=pd.read_hdf(merged).index
     for key,indices in [('train',train),('test',test)]:
@@ -285,6 +289,7 @@ def mine(request):
 
 
 def train(request):
+    emit('progress',epoch=0,detail='Loading the GPU training runtime')
     import torch,cv2,numpy as np,random,gc
     from deeplabcut.pose_estimation_pytorch.runners.logger import LOGGER,BaseLogger
     from deeplabcut.pose_estimation_pytorch.apis.training import train as dlc_train
@@ -305,6 +310,7 @@ def train(request):
     LOGGER.register_module(module=SkellyClickerLogger)
     prepared=json.loads((WORK/'prepared.json').read_text());checkpoint=None;epoch=0
     if request.get('initial_checkpoint'):
+        emit('progress',epoch=0,detail='Loading and verifying the starting checkpoint')
         source=Path(request['initial_checkpoint'])
         if digest(source)!=request['initial_checkpoint_sha256']:raise ValueError('Parent checkpoint changed')
         saved=torch.load(source,map_location='cpu',weights_only=True)
@@ -333,6 +339,7 @@ def train(request):
         del state;gc.collect();torch.cuda.empty_cache();check_stop()
         import shutil
         published=WORK/'checkpoints'/f'epoch-{epoch:06d}.pt';published.parent.mkdir(exist_ok=True)
+        emit('stage_progress',stage='save_weights',completed=epoch,total=request['epochs'],unit='epochs',detail='Saving and verifying checkpoint weights')
         shutil.copyfile(checkpoint,published)
         if digest(published)!=digest(checkpoint):raise ValueError('Checkpoint publication changed bytes')
         checkpoint=published

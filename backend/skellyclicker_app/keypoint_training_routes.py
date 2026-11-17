@@ -26,6 +26,7 @@ class RoundRequest(BaseModel):
     validation_frames: set[int]
     python_path: str = Field(default_factory=training_python)
     epochs: int = Field(default=10, ge=1, le=10000)
+    save_every: int = Field(default=1, ge=1, le=10000)
     max_seconds: int = Field(default=3600, ge=30, le=86400)
     parent_run_id: UUID | None = None
 
@@ -107,7 +108,8 @@ def start_round(request: RoundRequest):
             job["artifact_url"] = f"/api/keypoint-training/runs/{work.name}/artifact?{query}"
             def freeze(inputs, ctx):
                 recording = Path(config.recording_parent_directory)/config.recording_id
-                freeze_clicks(recording, work, train, validate, config.epochs, parent, doc=doc, check_cancelled=ctx.check_cancelled)
+                freeze_clicks(recording, work, train, validate, config.epochs, parent, save_every=config.save_every,
+                             doc=doc, check_cancelled=ctx.check_cancelled)
                 return {"dataset":str(work/"dataset")}
             def prepare(inputs, ctx):
                 run_worker("prepare", job, ctx)

@@ -102,6 +102,14 @@ export function projectPoint(camera: CameraModel, point: Vec3): Vec2 | null {
  * polynomial folds back beyond the calibrated field of view, so directions outside it are not drawn.
  */
 function fieldOfViewRadius(camera: CameraModel): number {
+    // r_distorted = r + k1*r³ + k2*r⁵. Beyond its first turning point,
+    // off-axis rays can project back into the image a second time.
+    const b = 3 * camera.k1;
+    const discriminant = b * b - 20 * camera.k2;
+    if (discriminant > 0) {
+        const denominator = Math.sqrt(discriminant) - b;
+        if (denominator > 0) return Math.sqrt(2 / denominator);
+    }
     const corners: Vec2[] = [[0, 0], [camera.imageWidth, 0], [0, camera.imageHeight], [camera.imageWidth, camera.imageHeight]];
     return 1.2 * Math.max(...corners.map(corner => Math.hypot(...undistortPixel(camera, corner))));
 }

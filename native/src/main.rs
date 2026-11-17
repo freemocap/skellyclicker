@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use freemocap_desktop::BackendProcess;
-use std::{io, sync::Mutex, time::Duration};
+use std::{io, sync::Mutex, time::Instant};
 use tauri::Manager;
 struct DesktopState(Mutex<BackendProcess>);
 
@@ -28,7 +28,16 @@ fn main() {
                 } else {
                     "skellyclicker-backend"
                 });
-            let backend = BackendProcess::spawn(&executable, &[], Duration::from_secs(30))?;
+            let started = Instant::now();
+            eprintln!("Starting the SkellyClicker backend…");
+            let backend = BackendProcess::spawn(&executable, &[], None).map_err(|error| {
+                io::Error::other(format!(
+                    "Starting {} failed after {:.1}s: {error}",
+                    executable.display(),
+                    started.elapsed().as_secs_f32(),
+                ))
+            })?;
+            eprintln!("Backend ready in {:.1}s", started.elapsed().as_secs_f32());
             app.manage(DesktopState(Mutex::new(backend)));
             // State precedes webview creation, following SkellySpeak's startup ordering.
             // [@skellyspeakDesktopReference]
