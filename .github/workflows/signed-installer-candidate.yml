@@ -1,0 +1,15 @@
+name: Build signed installer candidate
+
+on:
+  push:
+    branches: ['codex/signed-installer-candidate']
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    uses: ./.github/workflows/build-installers.yml
+    with:
+      signed: true
+    secrets: inherit
