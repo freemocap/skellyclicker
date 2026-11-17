@@ -5,6 +5,7 @@ from fastapi import APIRouter,HTTPException
 from pydantic import Field, model_validator
 from .training_inputs import TrainingInputs,training_input_preview
 from .training_pipeline import GRAPH
+from .gpu_runtime import runtime_config
 
 router=APIRouter(prefix='/api/training')
 class TrainingRequest(TrainingInputs):
@@ -30,7 +31,7 @@ class TrainingRequest(TrainingInputs):
 
 @router.get('/configuration')
 def configuration():
-    candidates=[os.environ.get('SKELLYCLICKER_TRAINING_PYTHON',''),str(Path.home()/'freemocap_data/training_environments/benchy-dlc/Scripts/python.exe')]
+    candidates=[os.environ.get('SKELLYCLICKER_TRAINING_PYTHON',''),runtime_config()['training_python']]
     return {'graph':GRAPH.model_dump(mode='json'),'defaults':TrainingRequest(project_path='',python_path=next((p for p in candidates if p and Path(p).is_file()),'')).model_dump(mode='json'),'backend':'DeepLabCut 3.0.2 · ResNet-50'}
 
 @router.post('/preview')

@@ -2,21 +2,42 @@
 print('Starting standalone fit_pose worker', flush=True)
 import json,os,sys,time,hashlib,importlib.metadata
 from pathlib import Path
-request=json.loads(Path(sys.argv[1]).read_text());out=Path(request['output'])
-handle=os.add_dll_directory(request['runtime']['pose_dlls'])
-os.environ['PATH']=request['runtime']['pose_dlls']+os.pathsep+os.environ['PATH']
+request=json.loads(Path(sys.argv[1]).read_text())
+dll_dir=request['runtime']['pose_dlls']
+if os.name == 'nt' and dll_dir:
+    handle=os.add_dll_directory(dll_dir)
+    os.environ['PATH']=dll_dir+os.pathsep+os.environ['PATH']
 import numpy as np,cv2,trimesh,moderngl,onnxruntime as ort
-ort.preload_dlls(directory=request['runtime']['pose_dlls']);ort.set_default_logger_severity(3)
+ort.preload_dlls(directory=dll_dir)
 from spatialhub import FoundationPose
 from spatialhub.utils.mesh import scale_mesh,center_mesh
+context=moderngl.create_standalone_context(require=430, **({'backend':'egl'} if sys.platform=='linux' else {}))
+def load_engine(intrinsics, mesh, units):
+    paths={}
+    if 'pose_models' in request['runtime']:
+        models=Path(request['runtime']['pose_models'])
+        paths={'scorenet_onnx_path':models/'score_net.onnx','refinenet_onnx_path':models/'refine_net.onnx'}
+    engine=FoundationPose(intrinsics=intrinsics,model=mesh,model_unit=units,glctx=context,
+                          providers=['CUDAExecutionProvider'],**paths)
+    for predictor in (engine.scorer, engine.refiner):
+        if 'CUDAExecutionProvider' not in predictor.ort_session.get_providers():
+            raise RuntimeError('FoundationPose failed to initialize the CUDA execution provider')
+    return engine
+if request.get('check'):
+    try:
+        load_engine(np.eye(3),trimesh.creation.box(),'m')
+        print('Loaded FoundationPose scorer and refiner on CUDA, OpenGL', context.info['GL_RENDERER'], flush=True)
+    finally:
+        context.release()
+    sys.exit(0)
+out=Path(request['output'])
 cal=json.loads((out/'calibration.json').read_text());samples=json.loads((out/'samples.json').read_text())
 K=np.array(cal['left']);Kr=np.array(cal['right']);extr=np.linalg.inv(cal['T_left_from_right_m'])
 mesh=trimesh.load_mesh(request['stl']);mesh=mesh.simplify_quadric_decimation(face_count=10000)
 _,offset=center_mesh(scale_mesh(mesh.copy(),model_unit=request['stl_units']))
 original_to_center=np.eye(4);original_to_center[:3,3]=offset
 (out/'geometry.json').write_text(json.dumps({'source_units':request['stl_units'],'source_sha256':request['target_sha256'],'T_centered_from_original_m':original_to_center.tolist(),'meaning':'Convert original STL vertices to metres, then apply this centering matrix; original-STL poses already include it.','simplified_faces':len(mesh.faces)},indent=2))
-context=moderngl.create_standalone_context(require=430)
-engine=FoundationPose(intrinsics=K,model=mesh,model_unit=request['stl_units'],glctx=context,providers=['CUDAExecutionProvider'])
+engine=load_engine(K,mesh,request['stl_units'])
 
 def emit(**value): print('SKELLY_PROGRESS '+json.dumps(value,allow_nan=False),flush=True)
 def mask_for(image,depth):

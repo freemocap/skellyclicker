@@ -165,3 +165,26 @@ jobs:
           path: other/skellyclicker/release-output/*
           if-no-files-found: error
           compression-level: 0
+
+  smoke:
+    name: Install and launch ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: windows-x64, os: windows-2022}
+          - {name: macos-arm64, os: macos-15}
+          - {name: ubuntu-x64, os: ubuntu-24.04}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: release-output
+      - uses: ./.github/actions/smoke-installed
+        with:
+          installer-directory: release-output

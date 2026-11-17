@@ -1,7 +1,7 @@
 // Native programs used by playback export and the authored geometry projector.
 import {createHash} from 'node:crypto';
 import {chmod, copyFile, mkdir, writeFile} from 'node:fs/promises';
-import {dirname, join} from 'node:path';
+import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
@@ -50,3 +50,13 @@ for (const name of ['README', 'LICENSE']) {
 await copyFile(process.execPath, join(dest, 'node' + ext));
 await download(`https://raw.githubusercontent.com/nodejs/node/${process.version}/LICENSE`, join(dest, 'node.LICENSE'));
 execFileSync(join(dest, 'node' + ext), ['--version'], {stdio: 'inherit'});
+
+if (process.platform !== 'darwin') {
+  const locator = process.platform === 'win32' ? 'where.exe' : 'which';
+  const uvSource = execFileSync(locator, ['uv'], {encoding: 'utf8'}).trim().split(/\r?\n/)[0];
+  const uv = join(dest, 'uv' + ext);
+  await copyFile(uvSource, uv);
+  const version = execFileSync(uv, ['--version'], {encoding: 'utf8'}).split(/\s+/)[1];
+  if (version !== '0.11.7') throw new Error(`Installer needs uv 0.11.7, found ${version}`);
+  await download(`https://raw.githubusercontent.com/astral-sh/uv/${version}/LICENSE-MIT`, join(dest, 'uv.LICENSE'));
+}

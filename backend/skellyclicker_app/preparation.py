@@ -7,7 +7,6 @@ from pathlib import Path
 import queue
 import subprocess
 import threading
-import sys
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -21,6 +20,7 @@ from .projects import Project, Recording, read_model, open_project, recording_st
 router = APIRouter(prefix='/api/preparation')
 logger = logging.getLogger('skellyclicker.preparation')
 from .job_lifecycle import jobs as _jobs, guard as _guard, busy
+from .gpu_runtime import launch_external, runtime_config
 
 class PreparationRequest(BaseModel):
     project_path: str
@@ -28,19 +28,15 @@ class PreparationRequest(BaseModel):
     frame_count: int | None = Field(default=None, ge=1)
 
 
-def runtime_config():
-    base = Path(os.environ.get('SKELLYCLICKER_ZED_RUNTIME', str(Path.home()/'AppData/Local/ZEDBenchy')))
-    cuda = list((base/'cuda12-runtime').rglob('cudart64_12.dll'))
-    return {'zed_python': str(base/'.venv/Scripts/python.exe'),
-            'pose_python': str(base/'pose-env/Scripts/python.exe'),
-            'zed_dlls': [os.environ.get('SKELLYCLICKER_ZED_SDK_BIN', 'C:/Program Files (x86)/ZED SDK/bin')] + list(dict.fromkeys(str(p.parent) for p in cuda)),
-            'pose_dlls': os.environ.get('SKELLYCLICKER_POSE_DLLS', str(Path.home()/'code-stuff/codeberg/jonmatthis/playground/happypose/local_data/windows-env/Lib/site-packages/torch/lib'))}
-
 @router.get('/runtime')
 def runtime():
     config = runtime_config()
-    missing = [p for p in [config['zed_python'],config['pose_python'],config['pose_dlls'],*config['zed_dlls']] if not Path(p).exists()]
-    if len(config['zed_dlls']) < 2: missing.append('CUDA 12 runtime DLL directory')
+    paths = [config['zed_python'], config['pose_python'], *config['zed_dlls']]
+    if config['pose_dlls']:
+        paths.append(config['pose_dlls'])
+    if 'pose_models' in config:
+        paths.extend(str(Path(config['pose_models']) / name) for name in ('refine_net.onnx', 'score_net.onnx'))
+    missing = [p for p in paths if not Path(p).exists()]
     return {'available': not missing, 'missing': missing}
 
 
@@ -61,16 +57,8 @@ def terminate_owned(process):
 def run_worker(job, name, interpreter):
     source = importlib.resources.files('skellyclicker_app').joinpath('workers',name+'.worker').read_text(encoding='utf-8-sig')
     script = job['work']/(name+'.py');script.write_text(source,encoding='utf-8')
-    # Frozen Windows DLL search paths must not leak into independent Python runtimes.
-    env = {k:v for k,v in os.environ.items() if not k.startswith('_PYI') and k not in ('_MEIPASS2','PYTHONHOME','PYTHONPATH')}
-    frozen = os.name == 'nt' and hasattr(sys, '_MEIPASS')
-    if frozen:
-        import ctypes
-        ctypes.windll.kernel32.SetDllDirectoryW(None)
-    try:
-        process = subprocess.Popen([interpreter,'-u',str(script),str(job['work']/'request.json')],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,errors='replace',env=env,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-    finally:
-        if frozen: ctypes.windll.kernel32.SetDllDirectoryW(str(sys._MEIPASS))
+    process = launch_external([interpreter,'-u',str(script),str(job['work']/'request.json')],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
     job['process'] = process
     lines = queue.Queue()
     def read():

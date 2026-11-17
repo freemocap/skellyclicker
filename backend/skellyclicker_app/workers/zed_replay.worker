@@ -4,7 +4,6 @@ import json, os, sys
 from pathlib import Path
 import importlib.metadata
 request=json.loads(Path(sys.argv[1]).read_text())
-out=Path(request['output']);out.mkdir(exist_ok=True)
 handles=[]
 for directory in request['runtime']['zed_dlls']:
     handles.append(os.add_dll_directory(directory))
@@ -12,6 +11,14 @@ for directory in request['runtime']['zed_dlls']:
 import pyzed.sl as sl
 import cv2
 import numpy as np
+
+if request.get('check'):
+    version = sl.Camera.get_sdk_version()
+    if 'pose_models' in request['runtime'] and version.split('.')[:2] != ['5', '5']:
+        raise RuntimeError(f'Expected ZED SDK 5.5.x for the packaged pyzed wheel, found {version}')
+    print('Loaded ZED SDK', version, flush=True)
+    sys.exit(0)
+out=Path(request['output']);out.mkdir(exist_ok=True)
 
 def emit(**value): print('SKELLY_PROGRESS '+json.dumps(value,allow_nan=False),flush=True)
 def save(name,value): (out/name).write_text(json.dumps(value,indent=2,allow_nan=False))
