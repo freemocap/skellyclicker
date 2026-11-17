@@ -151,6 +151,31 @@ def keypoint_measurement(prediction, truth, labeled):
     return {'expected_points':int(expected.sum()),'predicted_points':int(valid.sum()),'missing_points':int((expected&~finite).sum()),'distances_px':distances}
 
 
+PREVIEW_HEIGHT_PX=360
+# Same order and colors as POINT_COLORS in skellyclicker-ui/src/labeling/labels.ts, as BGR.
+POINT_COLORS_BGR=[(102,209,255),(255,155,195),(122,138,255),(255,214,127),(139,227,155),(224,168,255),(144,196,243),(209,207,162)]
+
+
+def draw_keypoint_preview(image,truth,valid,prediction):
+    """Label: filled circle with the point number. Prediction: hollow diamond in the same color, joined to its label by an error line."""
+    import cv2,numpy as np
+    draw=image.copy();scale=max(1,round(max(image.shape[:2])/720))
+    for index,((tx,ty),labeled,(px,py,_)) in enumerate(zip(truth,valid,prediction)):
+        color=POINT_COLORS_BGR[index%len(POINT_COLORS_BGR)]
+        has_label=bool(labeled) and bool(np.isfinite([tx,ty]).all());has_prediction=bool(np.isfinite([px,py]).all())
+        if has_label and has_prediction:cv2.line(draw,(round(tx),round(ty)),(round(px),round(py)),color,scale,cv2.LINE_AA)
+        if has_prediction:cv2.drawMarker(draw,(round(px),round(py)),color,cv2.MARKER_DIAMOND,10*scale,2*scale,cv2.LINE_AA)
+        if has_label:
+            cv2.circle(draw,(round(tx),round(ty)),5*scale,color,-1,cv2.LINE_AA);cv2.circle(draw,(round(tx),round(ty)),5*scale,(17,17,11),scale,cv2.LINE_AA)
+            cv2.putText(draw,str(index+1),(round(tx)+7*scale,round(ty)-7*scale),cv2.FONT_HERSHEY_SIMPLEX,0.45*scale,color,scale,cv2.LINE_AA)
+    return draw
+
+
+def resize_to_preview_height(image):
+    import cv2
+    return cv2.resize(image,(max(1,round(image.shape[1]*PREVIEW_HEIGHT_PX/image.shape[0])),PREVIEW_HEIGHT_PX),interpolation=cv2.INTER_AREA)
+
+
 def preview_checkpoint(request,checkpoint,epoch):
     import cv2,numpy as np,torch,gc
     from deeplabcut.pose_estimation_pytorch.apis.utils import get_pose_inference_runner
@@ -179,17 +204,14 @@ def preview_checkpoint(request,checkpoint,epoch):
             errors.extend(measured['distances_px'])
             if request.get('pose_validation',False):pose_rows.append({'image_id':row['image_id'],**evaluate_pose(pred,points_mm,calibration.get(row['camera_id']),references.get(row['image_id']),rectified=calibration.get('rectified',False))})
         if sample:
-            used.add(sample_key);draw=im.copy()
-            for x,y in truth[np.asarray(row['valid'],bool)]:cv2.circle(draw,(round(x),round(y)),3,(255,70,255),1,cv2.LINE_AA)
-            for x,y,confidence in pred:
-                if math.isfinite(float(x)) and math.isfinite(float(y)):cv2.drawMarker(draw,(round(x),round(y)),(255,230,60),cv2.MARKER_CROSS,6,1)
-            points=truth[np.asarray(row['valid'],bool)]
-            lo=np.maximum(np.floor(points.min(axis=0)-20),0).astype(int);hi=np.minimum(np.ceil(points.max(axis=0)+20),[im.shape[1],im.shape[0]]).astype(int)
-            full=cv2.resize(draw,(640,360));crop=draw[lo[1]:hi[1],lo[0]:hi[0]]
-            crop=cv2.resize(crop,(round(crop.shape[1]*360/crop.shape[0]),360));canvas=np.hstack([full,crop])
+            used.add(sample_key);draw=draw_keypoint_preview(im,truth,np.asarray(row['valid'],bool),pred)
+            labeled=truth[np.asarray(row['valid'],bool)];predicted=pred[np.isfinite(pred[:,:2]).all(axis=1),:2]
+            points=np.vstack([labeled,predicted]);context=max(40,0.06*max(im.shape[:2]))
+            lo=np.maximum(np.floor(points.min(axis=0)-context),0).astype(int);hi=np.minimum(np.ceil(points.max(axis=0)+context),[im.shape[1],im.shape[0]]).astype(int)
+            canvas=np.hstack([resize_to_preview_height(draw),resize_to_preview_height(draw[lo[1]:hi[1],lo[0]:hi[0]])])
             name=f"{row['split']}-{row['camera_id']}.png";cv2.imwrite(str(output/name),canvas)
             sample_id=row['split']+'-'+row['camera_id'];relative=(output/name).relative_to(WORK).as_posix()
-            emit('preview',id=sample_id,label=f"{row['split']} · {row['camera_id']} · frame {row['source_frame']} · magenta labels / cyan predictions",path=relative,step=epoch,checkpoint_id=checkpoint.name+':'+checkpoint_hash[:12])
+            emit('preview',id=sample_id,label=f"{row['split']} · {row['camera_id']} · frame {row['source_frame']}",path=relative,step=epoch,checkpoint_id=checkpoint.name+':'+checkpoint_hash[:12])
             samples.append({'image_id':row['image_id'],'path':relative,'keypoints':np.where(np.isfinite(pred),pred,None).tolist()})
     if errors:
         emit('metric',id='validation_mean_px',label='Validation keypoint error',unit='px',step=epoch,value=float(np.mean(errors)))

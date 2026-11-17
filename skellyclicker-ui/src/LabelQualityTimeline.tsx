@@ -16,36 +16,42 @@ function describe(error:number|null|undefined) {
 }
 function QualityTrack({name,scores,indices,current,frames,seek}:{name:string;scores:Score;indices:Map<number,number>;current:number;frames:number[];seek:(index:number)=>void}) {
   const position=(index:number)=>100*index/Math.max(1,frames.length-1)+'%';
-  return <div className="label-quality-track"><span>{name} · {describe(scores.get(current))}</span>
-    <svg role="img" aria-label={name+' across playback frames'} onClick={e=>{
+  const summary=name+' · '+describe(scores.get(current));
+  return <svg className="label-quality-track" role="img" aria-label={summary} onClick={e=>{
       const box=e.currentTarget.getBoundingClientRect();
       seek(Math.max(0,Math.min(frames.length-1,Math.round((e.clientX-box.left)/box.width*(frames.length-1)))));
-    }}>
+    }}><title>{summary} · green 0 px · yellow 6 px · red 12+ px · gray unscored</title>
       {Array.from(scores,([frame,error])=>{
         const index=indices.get(frame);
         if(index===undefined) return null;
-        const x=position(index);
-        return <rect key={frame} x={x} y="0" width="4" height="100%" transform="translate(-2 0)"
+        return <rect key={frame} x={position(index)} y="0" width="3" height="100%" transform="translate(-1.5 0)"
           fill={error===null?'#adb4c0':`hsl(${125*(1-Math.min(error/12,1))} 82% 60%)`}>
           <title>Frame {frame} · {name} · {describe(error)}</title></rect>;
       })}
-      {indices.has(current)&&<line x1={position(indices.get(current)!)} x2={position(indices.get(current)!)} y1="0" y2="100%" stroke="white" strokeWidth="1"/>}
-    </svg></div>;
+    </svg>;
 }
-export function LabelQualityTimeline({recording,baseUrl,labeling,review,controls}:{recording:OpenRecording;baseUrl:string;labeling:Labeling;review:Review;controls:React.RefObject<PlaybackWorkspaceHandle|null>}) {
-  const anchor=useRef<HTMLSpanElement>(null);
-  const [scrubber,setScrubber]=useState<HTMLElement|null>(null);
+/** Source frame number at each local playback index for the presented media source. */
+export function usePlaybackFrames(recording:OpenRecording|null,baseUrl:string,mediaSource:string) {
   const [bundle,setBundle]=useState<Bundle|null>(null);
   const [error,setError]=useState('');
-  const source=recording.labelSource!;
+  const source=recording?.labelSource;
   useEffect(()=>{
+    setBundle(null);setError('');
+    if(!source) return;
     const abort=new AbortController();
     const query=new URLSearchParams({recording_parent_directory:source.parent});
     fetch(baseUrl+'/core/freemocap/recordings/'+encodeURIComponent(source.id)+'/playback/bundle?'+query,{signal:abort.signal})
       .then(async r=>{if(!r.ok) throw Error('Playback timeline unavailable ('+r.status+')');return r.json();})
       .then(data=>{if(!abort.signal.aborted)setBundle(data);}).catch(e=>{if(!abort.signal.aborted)setError(String(e));});
     return ()=>abort.abort();
-  },[source.id,source.parent,baseUrl]);
+  },[source?.id,source?.parent,baseUrl]);
+  const filename=bundle?.videos.sources[mediaSource]?.videos[0]?.filename;
+  const frames=bundle?.media.find(m=>m.video_source===mediaSource&&m.video_filename===filename)?.timeline.frame_numbers;
+  return {frames,error};
+}
+export function LabelQualityTimeline({frames,error,labeling,review,controls}:{frames:number[]|undefined;error:string;labeling:Labeling;review:Review;controls:React.RefObject<PlaybackWorkspaceHandle|null>}) {
+  const anchor=useRef<HTMLSpanElement>(null);
+  const [scrubber,setScrubber]=useState<HTMLElement|null>(null);
   useEffect(()=>{
     const panel=anchor.current?.closest('[role=tabpanel]');
     if(!panel) return;
@@ -55,9 +61,6 @@ export function LabelQualityTimeline({recording,baseUrl,labeling,review,controls
     observer.observe(panel,{childList:true,subtree:true});
     return ()=>observer.disconnect();
   },[]);
-  const mediaSource=labeling.presented?.mediaSource??'synchronized';
-  const filename=bundle?.videos.sources[mediaSource]?.videos[0]?.filename;
-  const frames=bundle?.media.find(m=>m.video_source===mediaSource&&m.video_filename===filename)?.timeline.frame_numbers;
   const indices=useMemo(()=>new Map(frames?.map((n,i)=>[n,i])),[frames]);
   const observations=labeling.document?.observations,names=labeling.document?.tracked_point_names;
   const scores=useMemo(()=>{
@@ -91,10 +94,9 @@ export function LabelQualityTimeline({recording,baseUrl,labeling,review,controls
   const current=labeling.presented?.sourceFrameNumber??-1;
   function seek(index:number) {controls.current?.pause();void controls.current?.seekFrame(index);}
   return <><span hidden ref={anchor}/>{scrubber&&createPortal(<div className="label-quality-timeline">
-    {error?<span role="alert">{error}</span>:!!frames?.length&&<>
+    {!error&&!!frames?.length&&<>
       <QualityTrack name="Label reprojection error" scores={scores.human} {...{indices,current,frames,seek}}/>
-      <QualityTrack name="Model error vs. clicks" scores={scores.machine} {...{indices,current,frames,seek}}/>
-      <small>Mean error · green 0 px · yellow 6 px · red 12+ px · gray unscored</small>
+      {scores.machine.size>0&&<QualityTrack name="Model error vs. clicks" scores={scores.machine} {...{indices,current,frames,seek}}/>}
     </>}
   </div>,scrubber)}</>;
 }
